@@ -42,6 +42,34 @@ The deprecated `ifc` subpath is only an INC compatibility alias; new napplets us
 `inc`. If a NAP is not in the list above, do not implement against it as usable
 API even if a spec PR exists. Flag the package/spec gap.
 
+## Visual Integration — No Chrome, Use DaisyUI
+
+Napplets are embedded surfaces in the stlstr shell, not standalone widgets.
+Treat this as a hard pre-code gate alongside the sandbox authority contract.
+
+- A napplet MUST NOT render its own title bar, heading chrome, app frame,
+  card wrapper, or visible border around its content. The shell owns window
+  titles, layout framing, and the surrounding surface. Napplet content flows
+  edge-to-edge into the host region the shell allocates.
+- A napplet MUST NOT add a card/border/background "container" around the whole
+  UI. Use DaisyUI components and the shell theme tokens directly so the
+  napplet reads as a seamless region of stlstr, not a foreign panel.
+- Napplets MUST use **DaisyUI** (on Tailwind) as their component/styling
+  system. This is required so visual language, spacing, controls, and theming
+  match the stlstr shell. Do not introduce an alternate UI kit, bespoke CSS
+  framework, or hand-rolled component library.
+- Apply NAP-THEME to the full surface (`:root`, `html`, `body`, app root) as
+  described in Step 12 — the napplet's background MUST track the shell theme
+  so no browser-default white edge leaks around the seamless region.
+- When a design spec shows a "card" or "panel" affordance, rewrite it before
+  coding: drop the wrapper, render the content directly, and let the shell's
+  layout provide any separation. Internal sectioning (e.g. a list row) is
+  fine; the outer chrome is not.
+
+If an existing app being ported wraps everything in a card/frame/hero with a
+title, strip that chrome during the port and reflow the content into a
+borderless DaisyUI surface.
+
 ## Runtime Injection And SDK
 
 The runtime injects `window.napplet` before napplet scripts run. Napplet code

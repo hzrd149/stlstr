@@ -8,10 +8,10 @@ export default defineConfig({
     svelte(),
     tailwindcss(),
     nip5aManifest({
-      nappletType: 'counter',
-      requires: ['storage'],
+      nappletType: 'edit-object',
+      requires: ['outbox', 'upload', 'identity'],
       artifactMode: 'single-file',
-      archetypes: [{ slug: 'counter', naps: ['counter'] }],
+      archetypes: [{ slug: 'edit-object', naps: ['outbox', 'upload', 'identity'] }],
     }),
   ],
   build: {

@@ -10,6 +10,12 @@ const host = process.env.STLSTR_TEST_HOST || '127.0.0.1';
 const port = Number(process.env.STLSTR_TEST_PORT || 5174);
 const baseUrl = `http://${host}:${port}`;
 const registryPath = join(root, 'apps', 'stlstr', 'public', 'napplets.dev.json');
+const testNapplets = [
+  { name: 'browse-objects', title: 'Browse Objects' },
+  { name: 'create-object', title: 'Create Object' },
+  { name: 'object-detail', title: 'Object Detail' },
+  { name: 'edit-object', title: 'Edit Object' },
+];
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -78,20 +84,18 @@ function writeRegistry() {
       url: baseUrl,
     },
     paja: null,
-    napplets: [
-      {
-        name: 'counter',
-        folder: 'napplets/counter',
-        packageName: 'counter',
-        title: 'counter',
-        url: `${baseUrl}/napplets.dev/counter/index.html`,
-        dev: {
-          mode: 'browser-test',
-          dist: join(root, 'napplets', 'counter', 'dist'),
-          route: '/napplets.dev/counter/',
-        },
+    napplets: testNapplets.map((napplet) => ({
+      name: napplet.name,
+      folder: `napplets/${napplet.name}`,
+      packageName: napplet.name,
+      title: napplet.title,
+      url: `${baseUrl}/napplets.dev/${napplet.name}/index.html`,
+      dev: {
+        mode: 'browser-test',
+        dist: join(root, 'napplets', napplet.name, 'dist'),
+        route: `/napplets.dev/${napplet.name}/`,
       },
-    ],
+    })),
   };
 
   writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`);
@@ -109,10 +113,12 @@ async function main() {
 
   writeRegistry();
 
-  await run('pnpm', ['--filter', './napplets/counter', 'build']);
+  for (const napplet of testNapplets) {
+    await run('pnpm', ['--filter', `./napplets/${napplet.name}`, 'build']);
 
-  if (!existsSync(join(root, 'napplets', 'counter', 'dist', 'index.html'))) {
-    throw new Error('Counter napplet build did not produce dist/index.html');
+    if (!existsSync(join(root, 'napplets', napplet.name, 'dist', 'index.html'))) {
+      throw new Error(`${napplet.title} napplet build did not produce dist/index.html`);
+    }
   }
 
   const server = spawn(
