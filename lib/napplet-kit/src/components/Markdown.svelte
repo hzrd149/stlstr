@@ -1,6 +1,6 @@
 <script lang="ts">
   import MarkdownBlocks from './MarkdownBlocks.svelte';
-  import { parseMarkdown } from './markdown';
+  import { parseMarkdown } from '../markdown';
 
   /**
    * Renders a NIP.md Markdown body.

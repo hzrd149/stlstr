@@ -4,7 +4,7 @@ import puppeteer from 'puppeteer';
 import { addressOf, MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
 
 /**
- * The home feed, end to end: objects published to the test relay are read through
+ * The search feed, end to end: objects published to the test relay are read through
  * NAP-OUTBOX, covers are proxied through NAP-RESOURCE, and both click targets on a card
  * dispatch NAP-INTENT.
  */
@@ -29,7 +29,7 @@ after(async () => {
 });
 
 /** The shell titles the frame after the intent, so each browse route has its own title. */
-async function openBrowse(path = '/', title = 'Browse prints') {
+async function openBrowse(path = '/search', title = 'Search prints') {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle0' });

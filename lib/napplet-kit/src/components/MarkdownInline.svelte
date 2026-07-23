@@ -1,9 +1,9 @@
 <script lang="ts">
   import { link } from '@napplet/sdk';
-  import { hasDomain } from '@stlstr/napplet-kit/capabilities';
+  import { hasDomain } from '../capabilities';
   import MarkdownImage from './MarkdownImage.svelte';
   import Self from './MarkdownInline.svelte';
-  import { decodeEntities, safeUrl, type Token } from './markdown';
+  import { decodeEntities, safeUrl, type Token } from '../markdown';
 
   /**
    * Inline Markdown tokens: emphasis, code spans, links, images, line breaks.

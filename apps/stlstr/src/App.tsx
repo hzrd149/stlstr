@@ -49,6 +49,7 @@ import { sealNappletFrame } from './services/sandbox';
 import {
   baseHref,
   hasPreview,
+  intentToHref,
   overlayFromLocation,
   type StlstrIntent,
 } from './services/intent-map';
@@ -637,9 +638,9 @@ function AccountNav() {
  * Mounts one napplet in a sandboxed iframe and gives it a shell bridge.
  *
  * `routeId` names the shell route mounting the napplet; it distinguishes windows
- * when several routes share one napplet (browse/search/tag all mount
- * `print-browse`). The iframe is keyed by pathname, so navigating between two
- * objects tears the napplet down and rebuilds it against the new address.
+ * when several routes share one napplet (search/tag both mount `print-browse`).
+ * The iframe is keyed by pathname, so navigating between two objects tears the
+ * napplet down and rebuilds it against the new address.
  */
 function NappletFrame({
   napplet,
@@ -1001,13 +1002,13 @@ function useShellNavigate() {
   );
 }
 
-function BrowseRoute() {
+function DiscoveryRoute() {
   return (
     <NappletRouteFrame
-      archetype="printable-browse"
-      routeId="browse"
-      title="Browse prints"
-      intent={{ archetype: 'printable-browse', action: 'open', payload: {} }}
+      archetype="printable-discovery"
+      routeId="discovery"
+      title="Discover prints"
+      intent={{ archetype: 'printable-discovery', action: 'open', payload: {} }}
     />
   );
 }
@@ -1117,6 +1118,42 @@ function PartDetailRoute() {
   );
 }
 
+/** "I made one" — publish an immutable kind-2351 make for a printable object. */
+function MakeCreateRoute() {
+  const { pubkey = '', identifier = '' } = useParams();
+
+  return (
+    <NappletRouteFrame
+      archetype="make-create"
+      routeId="make-create"
+      title="Post a make"
+      intent={{
+        archetype: 'make-create',
+        action: 'open',
+        payload: { address: `33500:${pubkey}:${identifier}` },
+      }}
+    />
+  );
+}
+
+/** A single make: photos, notes, maker attribution, parent printable, comments. */
+function MakeDetailRoute() {
+  const { eventId = '' } = useParams();
+
+  return (
+    <NappletRouteFrame
+      archetype="make-detail"
+      routeId="make-detail"
+      title="Make"
+      intent={{
+        archetype: 'make-detail',
+        action: 'open',
+        payload: { eventId },
+      }}
+    />
+  );
+}
+
 function ObjectEditRoute() {
   const { pubkey = '', identifier = '' } = useParams();
 
@@ -1178,6 +1215,39 @@ function ShellNavLink({
   );
 }
 
+function ShellSearch() {
+  const navigate = useShellNavigate();
+  const [query, setQuery] = useState('');
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = query.trim();
+    const href = intentToHref({
+      archetype: 'printable-browse',
+      action: 'open',
+      payload: trimmed ? { query: trimmed } : {},
+    });
+    if (!href) return;
+    closeDrawer();
+    navigate(href);
+  }
+
+  return (
+    <form className="join w-full min-w-0 lg:w-80" role="search" onSubmit={submit}>
+      <input
+        className="input input-sm join-item w-full"
+        aria-label="Search prints"
+        placeholder="Search prints"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      <button className="btn btn-primary btn-sm join-item" type="submit">
+        Search
+      </button>
+    </form>
+  );
+}
+
 function BrandLogo({ className = 'size-8' }: { className?: string }) {
   return <img src="/logo.svg" alt="" className={className} aria-hidden="true" />;
 }
@@ -1197,7 +1267,7 @@ function ShellLayout() {
 
   const navLinks = (
     <>
-      <ShellNavLink to="/" label="Browse" alsoActiveOn={/^\/(search|tags)(\/|$)/} />
+      <ShellNavLink to="/" label="Discover" />
       <ShellNavLink to="/create" label="Create" />
       <ShellNavLink to="/parts" label="Parts" alsoActiveOn={/^\/parts(\/|$)/} />
       <ShellNavLink to="/settings" label="Settings" />
@@ -1223,6 +1293,9 @@ function ShellLayout() {
               <BrandLogo />
               STLstr
             </Link>
+          </div>
+          <div className="hidden flex-1 justify-center px-3 md:flex">
+            <ShellSearch />
           </div>
           <nav className="hidden flex-none lg:block">
             <ul className="menu menu-horizontal gap-1 px-1">{navLinks}</ul>
@@ -1259,6 +1332,9 @@ function ShellLayout() {
           <p className="mb-4 text-xs text-base-content/60">
             The worst named nostr app for 3d printing
           </p>
+          <div className="mb-4">
+            <ShellSearch />
+          </div>
           <ul className="menu gap-1">{navLinks}</ul>
         </div>
       </aside>
@@ -1278,7 +1354,7 @@ function App() {
   return (
     <Routes>
       <Route element={<ShellLayout />}>
-        <Route index element={<BrowseRoute />} />
+        <Route index element={<DiscoveryRoute />} />
         <Route path="search" element={<SearchRoute />} />
         <Route path="tags/:tag" element={<TagRoute />} />
         <Route path="create" element={<CreateRoute />} />
@@ -1287,6 +1363,8 @@ function App() {
         <Route path="profiles/:pubkey" element={<UserProfileRoute />} />
         <Route path="objects/:pubkey/:identifier" element={<ObjectDetailRoute />} />
         <Route path="objects/:pubkey/:identifier/edit" element={<ObjectEditRoute />} />
+        <Route path="objects/:pubkey/:identifier/makes/new" element={<MakeCreateRoute />} />
+        <Route path="makes/:eventId" element={<MakeDetailRoute />} />
         <Route path="part/:fileId" element={<PartDetailRoute />} />
         <Route path="*" element={<NotFoundRoute />} />
       </Route>

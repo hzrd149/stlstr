@@ -10,13 +10,16 @@
     "./tags": "./src/tags.ts",
     "./capabilities": "./src/capabilities.ts",
     "./images": "./src/images.ts",
+    "./markdown": "./src/markdown.ts",
     "./stl": "./src/stl.ts",
     "./stl-thumbnail": "./src/stl-thumbnail.ts",
     "./stl-viewer": "./src/stl-viewer.ts",
     "./components/Comments.svelte": "./src/components/Comments.svelte",
     "./components/PartThumb.svelte": "./src/components/PartThumb.svelte",
     "./profiles": "./src/profiles.ts",
-    "./components/MakerLink.svelte": "./src/components/MakerLink.svelte"
+    "./components/MakerLink.svelte": "./src/components/MakerLink.svelte",
+    "./components/Markdown.svelte": "./src/components/Markdown.svelte",
+    "./components/GalleryImage.svelte": "./src/components/GalleryImage.svelte"
   },
   "scripts": {
     "type-check": "tsc --noEmit",
@@ -27,6 +30,7 @@
     "@napplet/sdk": "^0.24.4",
     "applesauce-common": "^6.2.0",
     "applesauce-core": "^6.2.0",
+    "marked": "^18.0.7",
     "svelte": "^5.56.4"
   },
   "devDependencies": {

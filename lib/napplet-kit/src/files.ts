@@ -17,6 +17,9 @@ export const FILE_KIND = 1063;
 /** The `kind:33500` printable objects that reference them. */
 export const OBJECT_KIND = 33500;
 
+/** The `kind:2351` makes users publish for a printable object (NIP.md). */
+export const MAKE_KIND = 2351;
+
 /**
  * What a `kind:1063` event says about its file.
  *

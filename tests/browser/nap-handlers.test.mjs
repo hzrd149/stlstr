@@ -24,13 +24,13 @@ after(async () => {
   await browser?.close();
 });
 
-/** Opens the browse route, which is granted both the resource and intent domains. */
-async function openBrowseNapplet(path = '/') {
+/** Opens the search route, which is granted both the resource and intent domains. */
+async function openBrowseNapplet(path = '/search') {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle0' });
 
-  const iframeHandle = await page.waitForSelector('iframe[title="Browse prints napplet"]');
+  const iframeHandle = await page.waitForSelector('iframe[title="Search prints napplet"]');
   const frame = await iframeHandle.contentFrame();
   assert.ok(frame, 'browse napplet iframe should be available');
 
@@ -142,11 +142,14 @@ test('NAP-INTENT advertises the archetypes the shell can route', async () => {
 
     const handlers = await frame.evaluate(() => window.napplet.intent.handlers());
     assert.deepEqual(handlers.map((entry) => entry.archetype).sort(), [
+      'make-create',
+      'make-detail',
       'part-detail',
       'part-library',
       'printable-browse',
       'printable-create',
       'printable-detail',
+      'printable-discovery',
       'printable-edit',
       'profile',
       'stl-preview',
@@ -168,7 +171,7 @@ test('NAP-INTENT open navigates the shell to the print route', async () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.handled, true);
-    assert.equal(result.handler, 'printable-detail');
+    assert.equal(result.handler, 'print-detail');
 
     await page.waitForFunction(
       () => window.location.pathname === '/objects/deadbeef/adjustable-phone-stand',
@@ -193,8 +196,8 @@ test('NAP-INTENT rejects a request it cannot route', async () => {
     assert.equal(unknown.ok, false);
     assert.match(unknown.error, /no handler/i);
 
-    // A failed intent must not move the shell off the browse route.
-    assert.equal(new URL(page.url()).pathname, '/');
+    // A failed intent must not move the shell off the search route.
+    assert.equal(new URL(page.url()).pathname, '/search');
   } finally {
     await page.close();
   }

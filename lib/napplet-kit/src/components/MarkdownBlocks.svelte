@@ -1,7 +1,7 @@
 <script lang="ts">
   import MarkdownInline from './MarkdownInline.svelte';
   import Self from './MarkdownBlocks.svelte';
-  import { decodeEntities, type Token, type Tokens } from './markdown';
+  import { decodeEntities, type Token, type Tokens } from '../markdown';
 
   /**
    * Block-level Markdown tokens. Recurses into itself for the containers (block quotes and

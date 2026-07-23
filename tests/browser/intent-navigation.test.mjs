@@ -104,10 +104,10 @@ test('a payload is not delivered to the napplet on the next route', async () => 
   try {
     await nappletFrame(page, '#desk');
 
-    // Navigate to a plain browse route; its napplet must not inherit the tag.
+    // Navigate to the discovery route; it must not inherit the tag payload.
     await page.click('a[href="/"]');
-    const frame = await nappletFrame(page, 'Browse prints');
-    await frame.waitForSelector('[data-testid="browse-results"]');
+    const frame = await nappletFrame(page, 'Discover prints');
+    await frame.waitForSelector('[data-testid="discover-home"]');
 
     assert.equal(await frame.$('[data-testid="browse-tag"]'), null);
   } finally {

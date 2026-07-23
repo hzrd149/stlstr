@@ -2,12 +2,12 @@
   import { count, identity, inc, intent, outbox, type NostrEvent } from '@napplet/sdk';
   import { onMount } from 'svelte';
   import Comments from '@stlstr/napplet-kit/components/Comments.svelte';
-  import GalleryImage from './lib/GalleryImage.svelte';
-  import Markdown from './lib/Markdown.svelte';
+  import GalleryImage from '@stlstr/napplet-kit/components/GalleryImage.svelte';
+  import Markdown from '@stlstr/napplet-kit/components/Markdown.svelte';
   import { threadFilter } from '@stlstr/napplet-kit/comments';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import { parseImages, type ObjectImage } from './lib/object';
+  import { parseImages, type ObjectImage } from '@stlstr/napplet-kit/images';
 
   /**
    * The object detail page.

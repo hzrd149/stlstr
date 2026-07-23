@@ -34,13 +34,13 @@ async function nappletFrame(page, title) {
   return frame;
 }
 
-test('stlstr loads browse as the home route', async () => {
+test('stlstr loads discovery as the home route', async () => {
   const page = await openStlstr('/');
 
   try {
     assert.equal(await page.title(), 'STLstr');
     assert.equal(await page.$('main > .card'), null);
-    assert.equal(await page.$('main h1'), null);
+    assert.equal(await page.$('main > h1'), null);
     assert.equal(
       await page.$eval(
         'label[aria-label="Open navigation"]',
@@ -53,9 +53,9 @@ test('stlstr loads browse as the home route', async () => {
       'none',
     );
 
-    const frame = await nappletFrame(page, 'Browse prints');
-    assert.ok(await frame.$('input[placeholder^="Search phone stands, minis, brackets..."]'));
-    assert.equal(await frame.$('h1'), null);
+    const frame = await nappletFrame(page, 'Discover prints');
+    await frame.waitForSelector('[data-testid="discover-home"]');
+    assert.ok(await frame.$('input[placeholder^="Search phone stands, gridfinity"]'));
     assert.equal(await frame.$('.card'), null);
   } finally {
     await page.close();
@@ -126,13 +126,15 @@ test('stlstr renders settings in the shell and saves changes', async () => {
   const page = await openStlstr('/settings');
 
   try {
-    await page.waitForSelector('main h1');
-    assert.equal(await page.$eval('main h1', (node) => node.textContent), 'Settings');
+    await page.waitForSelector('main [role="tablist"]');
+    assert.match(await page.$eval('main', (node) => node.textContent ?? ''), /Appearance/);
     assert.equal(await page.$('iframe'), null);
 
     // Theme choices apply immediately and persist.
     await page.click('button[aria-label="Dark"]');
     assert.equal(await page.$eval('html', (node) => node.getAttribute('data-theme')), 'dark');
+
+    await page.click('button[role="tab"]:nth-child(2)');
 
     // Dev builds pin relays and media servers, so those settings are read-only.
     const settingsText = await page.$eval('main', (node) => node.textContent ?? '');
@@ -144,7 +146,7 @@ test('stlstr renders settings in the shell and saves changes', async () => {
     assert.equal(await page.$('button[aria-label^="Remove "]'), null);
 
     await page.reload({ waitUntil: 'networkidle0' });
-    await page.waitForSelector('main h1');
+    await page.waitForSelector('main [role="tablist"]');
     assert.equal(await page.$eval('html', (node) => node.getAttribute('data-theme')), 'dark');
   } finally {
     // Settings live in localStorage, which is shared with the other tests.
@@ -157,7 +159,8 @@ test('stlstr shell and active napplet fit mobile viewport', async () => {
   const page = await openStlstr('/', { width: 390, height: 844 });
 
   try {
-    const frame = await nappletFrame(page, 'Browse prints');
+    const frame = await nappletFrame(page, 'Discover prints');
+    await frame.waitForSelector('[data-testid="discover-home"]');
     assert.notEqual(
       await page.$eval(
         'label[aria-label="Open navigation"]',

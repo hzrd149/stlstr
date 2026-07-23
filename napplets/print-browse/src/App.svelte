@@ -73,8 +73,13 @@
   }
 
   function parseSearchInput(input: string): { query: string; topics: string[] } {
-    const topics = normalizeTopics(input.match(/(^|\s)#([^\s#]+)/g)?.map((tag) => tag.trim()) ?? []);
-    const query = input.replace(/(^|\s)#[^\s#]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const topics = normalizeTopics(
+      input.match(/(^|\s)#([^\s#]+)/g)?.map((tag) => tag.trim()) ?? [],
+    );
+    const query = input
+      .replace(/(^|\s)#[^\s#]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     return { query, topics };
   }
 
@@ -84,12 +89,14 @@
 
   function buildFilter(): BrowseFilter {
     const filter: BrowseFilter = { kinds: [OBJECT_KIND], limit: FEED_LIMIT };
-    if (query) filter.search = query;
-    if (topics.length === 1) filter['#t'] = topics;
-    if (topics.length > 1) {
-      filter['&t'] = topics;
+    const tagFilters = [...topics];
+    // Text matching is applied client-side below. Keeping the relay query broad makes search
+    // work on basic NIP-01 relays that do not implement NIP-50.
+    if (tagFilters.length === 1) filter['#t'] = tagFilters;
+    if (tagFilters.length > 1) {
+      filter['&t'] = [...tagFilters];
       // NIP-91 requires clients to include the equivalent OR tag for older relays.
-      filter['#t'] = topics;
+      filter['#t'] = [...tagFilters];
     }
     return filter;
   }

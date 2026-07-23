@@ -24,7 +24,7 @@ export type ArchetypeEntry = {
   /** Shell route id, used for the window id and for React keys. */
   routeId: string;
   /** Navigation group this archetype belongs to, when it is a top-level destination. */
-  nav?: 'browse' | 'create' | 'parts' | 'settings';
+  nav?: 'discover' | 'browse' | 'create' | 'parts' | 'settings';
   title: string;
   description: string;
   /** Verbs this archetype accepts. */
@@ -79,6 +79,9 @@ const PREVIEW_PARAM = 'stl';
 function isFileId(value: string): boolean {
   return /^[0-9a-f]{64}$/i.test(value);
 }
+
+/** A kind-2351 make event id — same 64-char hex shape as a file id. */
+const isEventId = isFileId;
 
 function isPreviewPayload(payload: IntentPayload): boolean {
   return Boolean(payload.url?.trim());
@@ -173,24 +176,34 @@ export function normalizeObjectPayload(payload: IntentPayload): IntentPayload | 
 }
 
 export const ARCHETYPES: Record<string, ArchetypeEntry> = {
+  'printable-discovery': {
+    dTag: 'print-discover',
+    routeId: 'discovery',
+    nav: 'discover',
+    title: 'Discover prints',
+    description: 'Find new, featured, and friend-adjacent printable models.',
+    actions: ['open'],
+    toHref: () => '/',
+  },
+
   'printable-browse': {
     dTag: 'print-browse',
-    routeId: 'browse',
+    routeId: 'search',
     nav: 'browse',
-    title: 'Browse prints',
-    description: 'Find printable models published as Nostr events.',
+    title: 'Search prints',
+    description: 'Search printable models published as Nostr events.',
     actions: ['open'],
     toHref: (payload) => {
       const tag = payload.tag?.trim();
       if (tag) return `/tags/${encodeURIComponent(tag)}`;
       const query = payload.query?.trim();
       if (query) return `/search?q=${encodeURIComponent(query)}`;
-      return '/';
+      return '/search';
     },
     titleFor: (intent) => {
       if (intent.payload.tag) return `#${intent.payload.tag}`;
       if (intent.payload.query) return `Search: ${intent.payload.query}`;
-      return 'Browse prints';
+      return 'Search prints';
     },
   },
 
@@ -276,6 +289,30 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
       return normalized ? encodeAddressPath(normalized.address, '/edit') : null;
     },
   },
+
+  'make-create': {
+    dTag: 'make-create',
+    routeId: 'make-create',
+    title: 'Post a make',
+    description: 'Share photos and notes of a print you made from a printable object.',
+    actions: ['open', 'create'],
+    toHref: (payload) => {
+      const normalized = normalizeObjectPayload(payload);
+      return normalized ? encodeAddressPath(normalized.address, '/makes/new') : null;
+    },
+  },
+
+  'make-detail': {
+    dTag: 'make-detail',
+    routeId: 'make-detail',
+    title: 'Make',
+    description: 'View a single make: photos, notes, maker, and the printable it was made from.',
+    actions: ['open'],
+    toHref: (payload) => {
+      const eventId = payload.eventId?.trim();
+      return eventId && isEventId(eventId) ? `/makes/${encodeURIComponent(eventId)}` : null;
+    },
+  },
 };
 
 /** Every convention id the shell can route, for manifest and capability reporting. */
@@ -326,7 +363,7 @@ export function intentFromLocation(location: {
   const parts = path.split('/').filter(Boolean);
   const search = new URLSearchParams(location.search);
 
-  if (path === '/') return intent('printable-browse', 'open');
+  if (path === '/') return intent('printable-discovery', 'open');
 
   if (path === '/search') {
     const query = search.get('q')?.trim() ?? '';
@@ -351,7 +388,13 @@ export function intentFromLocation(location: {
   if (parts[0] === 'objects' && parts[1] && parts[2]) {
     const address = `${OBJECT_KIND}:${decodePart(parts[1])}:${decodePart(parts[2])}`;
     if (parts[3] === 'edit') return intent('printable-edit', 'edit', { address });
+    if (parts[3] === 'makes' && parts[4] === 'new')
+      return intent('make-create', 'open', { address });
     if (parts.length === 3) return intent('printable-detail', 'open', { address });
+  }
+
+  if (parts[0] === 'makes' && parts[1] && isEventId(decodePart(parts[1]))) {
+    return intent('make-detail', 'open', { eventId: decodePart(parts[1]) });
   }
 
   if (parts[0] === 'part' && parts[1] && isFileId(decodePart(parts[1]))) {

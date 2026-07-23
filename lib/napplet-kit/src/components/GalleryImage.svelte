@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { loadImageUrl } from '@stlstr/napplet-kit/images';
-  import type { ObjectImage } from './object';
+  import { loadImageUrl, type ObjectImage } from '../images';
 
   /**
    * One image from the gallery, fetched through NAP-RESOURCE.

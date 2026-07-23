@@ -19,6 +19,7 @@ const baseUrl = `http://${host}:${port}`;
 const relayUrl = process.env.STLSTR_TEST_RELAY_URL || 'ws://localhost:4869';
 const registryPath = join(root, 'apps', 'stlstr', 'public', 'napplets.dev.json');
 const testNapplets = [
+  { name: 'print-discover', title: 'Discover Prints' },
   { name: 'print-browse', title: 'Browse Prints' },
   { name: 'print-create', title: 'Create Print' },
   { name: 'print-detail', title: 'Print Detail' },
