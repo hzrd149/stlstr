@@ -1,6 +1,6 @@
 <script lang="ts">
   import { outbox, type NostrEvent } from '@napplet/sdk';
-  import { getReplaceableAddress } from 'applesauce-core/helpers';
+  import { getReplaceableAddress } from 'applesauce-core/helpers/event';
   import {
     buildComment,
     buildThread,
@@ -23,13 +23,17 @@
   const {
     object,
     viewer,
+    active,
+    onCommentPublished,
   }: {
     /**
-     * The object event itself, not just its address: applesauce derives a comment's whole
+     * The object event itself, not just its address: Applesauce derives a comment's whole
      * root scope from the parent event. Null until the object loads.
      */
     object: NostrEvent | null;
     viewer: string;
+    active: boolean;
+    onCommentPublished?: () => void;
   } = $props();
 
   /** The root scope every comment in this thread points at. */
@@ -47,12 +51,13 @@
   let status = $state('');
 
   let draft = $state('');
-  // Raw for the same reason as the object event: applesauce memoizes onto `.event` with
+  // Raw for the same reason as the object event: Applesauce memoizes onto `.event` with
   // symbol properties, which a deep `$state` proxy turns into reactive writes.
   let replyTo = $state.raw<Comment | null>(null);
   /** The inline reply composer's own draft, kept apart from the top-level one. */
   let replyDraft = $state('');
   let publishing = $state(false);
+  let loadedScope = '';
 
   const thread = $derived(buildThread(comments.values()));
 
@@ -63,7 +68,14 @@
     >;
   }
 
-  const hasOutbox = () => typeof napplets().outbox === 'object';
+  const hasOutboxSubscribe = () => {
+    const domain = napplets().outbox as { subscribe?: unknown } | undefined;
+    return typeof domain?.subscribe === 'function';
+  };
+  const hasOutboxPublish = () => {
+    const domain = napplets().outbox as { publish?: unknown } | undefined;
+    return typeof domain?.publish === 'function';
+  };
 
   function authorName(pubkey: string): string {
     return authors.get(pubkey)?.name || 'Unknown maker';
@@ -120,21 +132,32 @@
   }
 
   /**
-   * Re-opened whenever the object address changes, and torn down by the same effect, so two
-   * threads never stream into one list.
+   * Re-opened whenever the object address changes or the comments tab becomes active, and
+   * torn down by the same effect, so two threads never stream into one list. The tab can be
+   * hidden without losing loaded comments or drafts, but hidden comments do not keep a relay
+   * subscription open.
    */
   $effect(() => {
     const scope = address;
     const author = object?.pubkey ?? '';
+    const shouldLoad = active;
 
-    comments = new Map();
-    replyTo = null;
-    status = '';
-    loading = false;
+    if (scope !== loadedScope) {
+      loadedScope = scope;
+      comments = new Map();
+      replyTo = null;
+      replyDraft = '';
+      status = '';
+      loading = false;
+    }
 
-    if (!scope) return;
+    if (!scope) {
+      return;
+    }
 
-    if (!hasOutbox()) {
+    if (!shouldLoad) return;
+
+    if (!hasOutboxSubscribe()) {
       status = 'This shell does not provide relay access, so comments cannot be shown.';
       return;
     }
@@ -178,13 +201,18 @@
 
   /**
    * Publishes one comment. The parent is the object for a top-level comment and the comment
-   * being answered for a reply; applesauce reads the root scope off whichever it is given.
+   * being answered for a reply; Applesauce reads the root scope off whichever it is given.
    *
    * Returns whether it published, so each composer can clear only its own draft.
    */
   async function publish(parent: NostrEvent, content: string): Promise<boolean> {
     const body = content.trim();
     if (!body || publishing) return false;
+
+    if (!hasOutboxPublish()) {
+      status = 'This shell does not provide publishing access.';
+      return false;
+    }
 
     publishing = true;
     status = '';
@@ -200,6 +228,7 @@
 
       // Show it immediately rather than waiting for it to come back off a relay.
       ingest(result.event);
+      onCommentPublished?.();
       return true;
     } catch (error) {
       status = error instanceof Error ? error.message : 'Your comment could not be published.';

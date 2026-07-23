@@ -1,10 +1,10 @@
 /**
  * NIP-22 (`kind:1111`) comments scoped to a printable object.
  *
- * Tag construction and tag reading are applesauce's job, not ours: `CommentFactory` builds
- * the root/parent tag pairs and `getCommentReplyPointer` reads them back, so the uppercase
- * root scope and lowercase parent scope stay correct for both top-level comments (parent is
- * the `kind:33500` object) and replies (parent is another comment).
+ * Tag construction and tag reading are Applesauce's job: `CommentFactory` builds the
+ * root/parent tag pairs and `getCommentReplyPointer` reads them back, so the uppercase
+ * root scope and lowercase parent scope stay correct for both top-level comments (parent
+ * is the `kind:33500` object) and replies (parent is another comment).
  *
  * This module makes no SDK calls — events in, view models and unsigned templates out. The
  * shell still owns signing and relay routing through NAP-OUTBOX.
@@ -15,8 +15,8 @@ import {
   getCommentReplyPointer,
   isCommentEventPointer,
   isValidComment,
-} from 'applesauce-common/helpers';
-import { CommentFactory } from 'applesauce-common/factories';
+} from 'applesauce-common/helpers/comment';
+import { CommentFactory } from 'applesauce-common/factories/comment';
 import type { EventTemplate, NostrEvent, NostrFilter } from '@napplet/sdk';
 
 export { COMMENT_KIND };
@@ -29,7 +29,7 @@ export type Comment = {
   createdAt: number;
   /** Id of the comment being replied to, or '' for a comment on the object itself. */
   parentId: string;
-  /** The source event, kept because applesauce builds replies from the parent event. */
+  /** The source event, kept because Applesauce builds replies from the parent event. */
   event: NostrEvent;
 };
 
@@ -47,7 +47,7 @@ export function threadFilter(address: string): NostrFilter {
 /**
  * Converts an event into a comment, or null when it is not one we can thread.
  *
- * The parent comes from applesauce's reply pointer: an event pointer at `kind:1111` means
+ * The parent comes from Applesauce's reply pointer: an event pointer at `kind:1111` means
  * the parent is another comment. Anything else — an address pointer back at the object — is
  * a comment on the object itself.
  */
@@ -117,9 +117,8 @@ export function buildThread(comments: Iterable<Comment>, maxDepth = 4): ThreadEn
  * Builds the unsigned `kind:1111` template for a new comment.
  *
  * `parent` is the object event for a top-level comment or another comment's event for a
- * reply; applesauce derives the root scope from it either way, which is why the raw parent
- * event is what a caller must hold on to. The factory resolves to a template rather than a
- * signed event — the shell signs it at publish time.
+ * reply; Applesauce derives the root scope off whichever it is given. The factory resolves
+ * to a template rather than a signed event — the shell signs it at publish time.
  */
 export function buildComment(parent: NostrEvent, content: string): Promise<EventTemplate> {
   return CommentFactory.create(parent, content.trim());

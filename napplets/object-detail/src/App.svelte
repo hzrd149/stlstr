@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { identity, inc, intent, outbox, type NostrEvent } from '@napplet/sdk';
+  import { count, identity, inc, intent, outbox, type NostrEvent } from '@napplet/sdk';
   import { onMount } from 'svelte';
   import Comments from './lib/Comments.svelte';
   import GalleryImage from './lib/GalleryImage.svelte';
   import Markdown from './lib/Markdown.svelte';
+  import { threadFilter } from './lib/comments';
   import { parseImages, type ObjectImage } from './lib/object';
 
   /**
@@ -45,6 +46,8 @@
   let status = $state('Waiting for an object to open...');
   let canPreview = $state(false);
   let activeTab = $state<TabId>('description');
+  let commentCount = $state<number | null>(null);
+  let commentsCounting = $state(false);
 
   /** Address and author of the object on screen, set once it loads. */
   let address = $state('');
@@ -79,10 +82,31 @@
     >;
   }
 
-  const hasOutbox = () => typeof napplets().outbox === 'object';
-  const hasInc = () => typeof napplets().inc === 'object';
-  const hasIntent = () => typeof napplets().intent === 'object';
-  const hasIdentity = () => typeof napplets().identity === 'object';
+  const hasOutbox = () => {
+    const domain = napplets().outbox as { query?: unknown } | undefined;
+    return typeof domain?.query === 'function';
+  };
+  const hasInc = () => {
+    const domain = napplets().inc as { on?: unknown; emit?: unknown } | undefined;
+    return typeof domain?.on === 'function' && typeof domain.emit === 'function';
+  };
+  const hasIntentOpen = () => {
+    const domain = napplets().intent as { open?: unknown } | undefined;
+    return typeof domain?.open === 'function';
+  };
+  const hasIntentAvailable = () => {
+    const domain = napplets().intent as { available?: unknown } | undefined;
+    return typeof domain?.available === 'function';
+  };
+  const hasIdentity = () => {
+    const domain = napplets().identity as
+      { getPublicKey?: unknown; onChanged?: unknown } | undefined;
+    return typeof domain?.getPublicKey === 'function' && typeof domain.onChanged === 'function';
+  };
+  const hasCount = () => {
+    const domain = napplets().count as { query?: unknown } | undefined;
+    return typeof domain?.query === 'function';
+  };
 
   function tagValue(tags: string[][], name: string): string {
     return tags.find((tag) => tag[0] === name)?.[1]?.trim() ?? '';
@@ -115,6 +139,35 @@
     });
   }
 
+  async function loadCommentCount(scope: string): Promise<void> {
+    if (!scope || !hasCount()) return;
+
+    const requestedScope = scope;
+    commentsCounting = true;
+
+    try {
+      const result = await count.query(threadFilter(requestedScope), {
+        approximate: false,
+      });
+      if (address !== requestedScope) return;
+      commentCount = result.ok && typeof result.count === 'number' ? result.count : null;
+    } catch {
+      if (address === requestedScope) commentCount = null;
+    } finally {
+      if (address === requestedScope) commentsCounting = false;
+    }
+  }
+
+  function commentLabel(): string {
+    if (commentCount !== null) return `Comments (${commentCount})`;
+    if (commentsCounting) return 'Comments (...)';
+    return 'Comments';
+  }
+
+  function incrementCommentCount(): void {
+    if (commentCount !== null) commentCount += 1;
+  }
+
   // The parameter is deliberately not named `address`: that would shadow the state below,
   // and the assignments at the end would land on the local instead of the owner gate.
   async function loadObject(requested: string): Promise<void> {
@@ -138,6 +191,8 @@
     owner = '';
     address = '';
     object = null;
+    commentCount = null;
+    commentsCounting = false;
 
     try {
       const { events } = await outbox.query(
@@ -162,6 +217,7 @@
       address = `33500:${newest.pubkey}:${identifier}`;
       object = newest;
       status = '';
+      void loadCommentCount(address);
       await loadParts(partIds(newest.tags));
     } catch (error) {
       status = error instanceof Error ? error.message : 'Could not load this object.';
@@ -176,7 +232,7 @@
 
   /** Owner-only: hands the object to whichever napplet fulfills the `edit-object` role. */
   async function edit(): Promise<void> {
-    if (!address || !hasIntent()) return;
+    if (!address || !hasIntentOpen()) return;
     const result = await intent.open('edit-object', { address });
     if (!result.ok) status = result.error ?? 'Could not open the editor.';
   }
@@ -200,7 +256,7 @@
   onMount(() => {
     // Feature-detected, not assumed: a shell without a preview handler still renders the
     // file list, just without the button.
-    if (hasIntent()) {
+    if (hasIntentAvailable()) {
       void intent
         .available(PREVIEW_ARCHETYPE)
         .then((availability) => {
@@ -350,7 +406,7 @@
             data-tab={tab.id}
             onclick={() => (activeTab = tab.id)}
           >
-            {tab.label}
+            {tab.id === 'comments' ? commentLabel() : tab.label}
           </button>
         {/each}
       </div>
@@ -378,7 +434,12 @@
         hidden={activeTab !== 'comments'}
         data-testid="object-panel-comments"
       >
-        <Comments {object} {viewer} />
+        <Comments
+          {object}
+          {viewer}
+          active={activeTab === 'comments'}
+          onCommentPublished={incrementCommentCount}
+        />
       </div>
     </div>
   {/if}
