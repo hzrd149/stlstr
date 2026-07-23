@@ -50,6 +50,8 @@
   // Raw for the same reason as the object event: applesauce memoizes onto `.event` with
   // symbol properties, which a deep `$state` proxy turns into reactive writes.
   let replyTo = $state.raw<Comment | null>(null);
+  /** The inline reply composer's own draft, kept apart from the top-level one. */
+  let replyDraft = $state('');
   let publishing = $state(false);
 
   const thread = $derived(buildThread(comments.values()));
@@ -162,64 +164,71 @@
 
   // ---------------------------------------------------------------- composing
 
+  /** Opens the inline composer under one comment, closing whichever was open before. */
   function startReply(comment: Comment): void {
     replyTo = comment;
+    replyDraft = '';
     status = '';
   }
 
   function cancelReply(): void {
     replyTo = null;
+    replyDraft = '';
   }
 
-  async function publish(): Promise<void> {
-    const content = draft.trim();
-    if (!content || publishing || !object) return;
+  /**
+   * Publishes one comment. The parent is the object for a top-level comment and the comment
+   * being answered for a reply; applesauce reads the root scope off whichever it is given.
+   *
+   * Returns whether it published, so each composer can clear only its own draft.
+   */
+  async function publish(parent: NostrEvent, content: string): Promise<boolean> {
+    const body = content.trim();
+    if (!body || publishing) return false;
 
     publishing = true;
     status = '';
 
     try {
-      // The parent is the object for a top-level comment, the comment being answered for a
-      // reply; applesauce reads the root scope off whichever it is given.
-      const template = await buildComment(replyTo?.event ?? object, content);
+      const template = await buildComment(parent, body);
       const result = await outbox.publish(template);
 
       if (!result.ok || !result.event) {
         status = result.error ?? 'Your comment could not be published.';
-        return;
+        return false;
       }
 
       // Show it immediately rather than waiting for it to come back off a relay.
       ingest(result.event);
-      draft = '';
-      replyTo = null;
+      return true;
     } catch (error) {
       status = error instanceof Error ? error.message : 'Your comment could not be published.';
+      return false;
     } finally {
       publishing = false;
     }
   }
+
+  async function publishComment(): Promise<void> {
+    if (!object) return;
+    if (await publish(object, draft)) draft = '';
+  }
+
+  async function publishReply(): Promise<void> {
+    if (!replyTo) return;
+    if (await publish(replyTo.event, replyDraft)) cancelReply();
+  }
 </script>
 
+<!-- No heading of its own: the tab this sits in already names it. -->
 <section class="grid gap-3" aria-label="Comments" data-testid="object-comments">
-  <div class="divider my-0">Comments</div>
-
   {#if viewer}
     <div class="grid gap-2">
-      {#if replyTo}
-        <div class="flex items-center gap-2 text-sm text-base-content/70">
-          <span class="min-w-0 truncate">Replying to {authorName(replyTo.pubkey)}</span>
-          <button type="button" class="link" data-testid="cancel-reply" onclick={cancelReply}>
-            Cancel
-          </button>
-        </div>
-      {/if}
-
       <textarea
         class="textarea w-full"
         rows="3"
-        placeholder={replyTo ? 'Write a reply...' : 'Share a print, a tip, or a question...'}
-        aria-label={replyTo ? 'Write a reply' : 'Write a comment'}
+        placeholder="Share a print, a tip, or a question..."
+        aria-label="Write a comment"
         data-testid="comment-draft"
         bind:value={draft}
         disabled={publishing}
@@ -230,9 +239,9 @@
         class="btn btn-primary w-fit"
         data-testid="publish-comment"
         disabled={publishing || draft.trim().length === 0 || !object}
-        onclick={publish}
+        onclick={publishComment}
       >
-        {publishing ? 'Posting...' : replyTo ? 'Post reply' : 'Post comment'}
+        {publishing ? 'Posting...' : 'Post comment'}
       </button>
     </div>
   {:else}
@@ -279,7 +288,7 @@
             {comment.content}
           </p>
 
-          {#if viewer}
+          {#if viewer && replyTo?.id !== comment.id}
             <button
               type="button"
               class="link w-fit text-xs text-base-content/60"
@@ -288,6 +297,42 @@
             >
               Reply
             </button>
+          {/if}
+
+          {#if viewer && replyTo?.id === comment.id}
+            <!-- The composer opens in place, under the comment being answered. -->
+            <div class="grid gap-2 pt-1" data-testid="reply-composer">
+              <textarea
+                class="textarea w-full"
+                rows="2"
+                placeholder="Write a reply..."
+                aria-label="Reply to {authorName(comment.pubkey)}"
+                data-testid="reply-draft"
+                bind:value={replyDraft}
+                disabled={publishing}
+              ></textarea>
+
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  data-testid="publish-reply"
+                  disabled={publishing || replyDraft.trim().length === 0}
+                  onclick={publishReply}
+                >
+                  {publishing ? 'Posting...' : 'Post reply'}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  data-testid="cancel-reply"
+                  disabled={publishing}
+                  onclick={cancelReply}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           {/if}
         </li>
       {/each}

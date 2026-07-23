@@ -19,6 +19,17 @@
   const READY_TOPIC = 'object-detail:ready';
   const PREVIEW_ARCHETYPE = 'part-preview';
 
+  /**
+   * The sections of the tabbed lower half. Adding one means adding an entry here and a
+   * matching `role="tabpanel"` block below; makes, remixes, and collections all land here.
+   */
+  const TABS = [
+    { id: 'description', label: 'Description' },
+    { id: 'comments', label: 'Comments' },
+  ] as const;
+
+  type TabId = (typeof TABS)[number]['id'];
+
   type PartFile = {
     id: string;
     name: string;
@@ -32,6 +43,7 @@
   let activeImage = $state(0);
   let status = $state('Waiting for an object to open...');
   let canPreview = $state(false);
+  let activeTab = $state<TabId>('description');
 
   /** Address and author of the object on screen, set once it loads. */
   let address = $state('');
@@ -49,6 +61,9 @@
   let viewer = $state('');
 
   const cover = $derived(images[activeImage] ?? images[0] ?? null);
+
+  /** The object's Markdown body, per NIP.md. */
+  const description = $derived(object?.content.trim() ?? '');
 
   /**
    * The owner-only gate. NAP-IDENTITY is the sole source of truth for who is signed in, so
@@ -318,9 +333,53 @@
   </div>
 
   {#if object}
-    <!-- Mounted only once the object resolved: the thread is scoped to it. -->
+    <!-- The tabbed lower half. Panels are hidden rather than unmounted, so the comment
+         thread keeps its live subscription and drafts across tab switches. -->
     <div class="mt-6">
-      <Comments {object} {viewer} />
+      <div role="tablist" class="tabs tabs-border" data-testid="object-tabs">
+        {#each TABS as tab (tab.id)}
+          <button
+            type="button"
+            role="tab"
+            id="tab-{tab.id}"
+            class="tab {activeTab === tab.id ? 'tab-active' : ''}"
+            aria-selected={activeTab === tab.id}
+            aria-controls="panel-{tab.id}"
+            data-testid="object-tab"
+            data-tab={tab.id}
+            onclick={() => (activeTab = tab.id)}
+          >
+            {tab.label}
+          </button>
+        {/each}
+      </div>
+
+      <div
+        id="panel-description"
+        role="tabpanel"
+        aria-labelledby="tab-description"
+        class="pt-4"
+        hidden={activeTab !== 'description'}
+        data-testid="object-panel-description"
+      >
+        {#if description}
+          <!-- NIP.md defines this as Markdown; rendering it as such is a follow-up. -->
+          <p class="max-w-prose whitespace-pre-wrap text-base-content/80">{description}</p>
+        {:else}
+          <p class="text-sm text-base-content/70">This object has no description yet.</p>
+        {/if}
+      </div>
+
+      <div
+        id="panel-comments"
+        role="tabpanel"
+        aria-labelledby="tab-comments"
+        class="pt-4"
+        hidden={activeTab !== 'comments'}
+        data-testid="object-panel-comments"
+      >
+        <Comments {object} {viewer} />
+      </div>
     </div>
   {/if}
 </main>
