@@ -32,7 +32,7 @@ import {
   loginWithExtension,
   type StlstrAccount,
 } from './services/accounts';
-import { createIdentityService } from '@kehto/services';
+import { createStlstrIdentityService } from './services/identity';
 import { createIntentDelivery, type IntentDelivery } from './services/intent-delivery';
 import { createStlstrIntentService } from './services/intent';
 import { createStlstrLinkService } from './services/links';
@@ -146,7 +146,7 @@ function createStlstrAdapter({ navigate, resolveIdentity }: AdapterOptions): She
       intent: createStlstrIntentService({ navigate }),
       // NAP-IDENTITY is read-only: napplets learn who the user is, never act as them.
       // This is what lets a napplet gate an owner-only action such as "Edit".
-      identity: createIdentityService({
+      identity: createStlstrIdentityService({
         getSigner: () => accountManager.active?.signer ?? null,
       }),
       link: createStlstrLinkService(),
