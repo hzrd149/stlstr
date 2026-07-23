@@ -1,10 +1,10 @@
 <script lang="ts">
   import { count, identity, inc, intent, outbox, type NostrEvent } from '@napplet/sdk';
   import { onMount } from 'svelte';
-  import Comments from './lib/Comments.svelte';
+  import Comments from '@stlstr/napplet-kit/components/Comments.svelte';
   import GalleryImage from './lib/GalleryImage.svelte';
   import Markdown from './lib/Markdown.svelte';
-  import { threadFilter } from './lib/comments';
+  import { threadFilter } from '@stlstr/napplet-kit/comments';
   import { parseImages, type ObjectImage } from './lib/object';
 
   /**

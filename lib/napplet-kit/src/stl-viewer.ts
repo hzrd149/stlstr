@@ -1,13 +1,11 @@
-import type { Mesh } from '@stlstr/napplet-kit/stl';
+import type { Mesh } from './stl';
 
 /**
  * A minimal WebGL turntable viewer.
  *
- * This is hand-rolled rather than three.js on purpose: the napplet ships as a single-file
- * artifact that the shell fetches and injects as `srcdoc`, so every kilobyte is inlined
- * into every preview open. Showing one flat-shaded mesh on a turntable needs a shader,
- * a bounding box, and pointer math — not a scene graph — and this is a few KB against
- * a few hundred.
+ * This is hand-rolled rather than three.js on purpose: napplets ship as single-file
+ * artifacts, so every kilobyte is inlined into each load. Showing one flat-shaded mesh on a
+ * turntable needs a shader, a bounding box, and pointer math, not a scene graph.
  */
 
 export type Viewer = {
@@ -24,8 +22,6 @@ uniform mat4 uProjection;
 uniform mat4 uModelView;
 varying vec3 vNormal;
 void main() {
-  // Rotation-only model-view with uniform scale, so the 3x3 block transforms normals
-  // correctly without a separate inverse-transpose.
   vNormal = normalize(mat3(uModelView) * aNormal);
   gl_Position = uProjection * uModelView * vec4(aPosition, 1.0);
 }
@@ -42,9 +38,7 @@ uniform vec3 uDirectionalColor;
 uniform vec3 uLightDirection;
 void main() {
   vec3 normal = normalize(vNormal);
-  // Two-sided: STL winding is unreliable, and a flipped facet should not read as a hole.
   if (!gl_FrontFacing) normal = -normal;
-
   float hemiMix = normal.y * 0.5 + 0.5;
   vec3 hemi = mix(uGroundColor, uSkyColor, hemiMix);
   float direct = max(dot(normal, normalize(uLightDirection)), 0.0);
@@ -91,7 +85,6 @@ function perspective(fovY: number, aspect: number, near: number, far: number): M
 
 function multiply(a: Matrix, b: Matrix): Matrix {
   const out = new Float32Array(16);
-
   for (let row = 0; row < 4; row += 1) {
     for (let column = 0; column < 4; column += 1) {
       let sum = 0;
@@ -99,26 +92,22 @@ function multiply(a: Matrix, b: Matrix): Matrix {
       out[row * 4 + column] = sum;
     }
   }
-
   return out;
 }
 
 function translation(x: number, y: number, z: number): Matrix {
-  // prettier-ignore
   return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
 }
 
 function rotationX(angle: number): Matrix {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
-  // prettier-ignore
   return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]);
 }
 
 function rotationY(angle: number): Matrix {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
-  // prettier-ignore
   return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
 }
 
@@ -137,34 +126,22 @@ function compile(gl: WebGLRenderingContext, type: number, source: string): WebGL
   return shader;
 }
 
-/**
- * Creates a viewer on this canvas, or returns null when WebGL is unavailable — a real
- * outcome in hardened browsers and headless environments, and one the caller must be able
- * to fall back from rather than treat as a crash.
- */
 export function createViewer(canvas: HTMLCanvasElement): Viewer | null {
   const context =
-    (canvas.getContext('webgl', {
-      alpha: true,
-      antialias: true,
-    }) as WebGLRenderingContext | null) ??
+    (canvas.getContext('webgl', { alpha: true, antialias: true }) as WebGLRenderingContext | null) ??
     (canvas.getContext('experimental-webgl') as WebGLRenderingContext | null);
   if (!context) return null;
 
-  // Rebound as a non-null const: the closures below all capture it, and a nullable binding
-  // cannot stay narrowed across them.
   const gl = context;
 
   function link(): WebGLProgram | null {
     try {
       const created = gl.createProgram();
       if (!created) return null;
-
       gl.attachShader(created, compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER));
       gl.attachShader(created, compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER));
       gl.linkProgram(created);
       if (!gl.getProgramParameter(created, gl.LINK_STATUS)) return null;
-
       return created;
     } catch {
       return null;
@@ -205,8 +182,6 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer | null {
     frame = 0;
     if (contextLost || vertexCount === 0) return;
 
-    // Match the drawing buffer to the CSS box each frame: the dialog is resizable by the
-    // viewport, and a stale buffer shows up as a blurry or letterboxed model.
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
     const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
@@ -261,9 +236,7 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer | null {
 
   function onPointerMove(event: PointerEvent) {
     if (dragPointer !== event.pointerId) return;
-
     yaw += (event.clientX - lastX) * 0.01;
-    // Clamped just short of the poles, where the turntable would gimbal over.
     pitch = Math.max(
       -Math.PI / 2 + 0.01,
       Math.min(Math.PI / 2 - 0.01, pitch + (event.clientY - lastY) * 0.01),
@@ -287,8 +260,6 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer | null {
   }
 
   function onContextLost(event: Event) {
-    // Without preventDefault the context is never restorable; the canvas would stay blank
-    // for the rest of the napplet's life.
     event.preventDefault();
     contextLost = true;
   }
@@ -311,7 +282,6 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer | null {
   function frameCamera() {
     yaw = DEFAULT_YAW;
     pitch = DEFAULT_PITCH;
-    // Far enough back that the bounding sphere fits the 45° vertical field, with headroom.
     distance = radius * 3.2;
     schedule();
   }

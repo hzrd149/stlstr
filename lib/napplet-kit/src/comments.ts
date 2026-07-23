@@ -1,23 +1,21 @@
 /**
- * NIP-22 (`kind:1111`) comments scoped to a printable object.
+ * Shared NIP-22 (`kind:1111`) comment helpers for printable objects and files.
  *
  * Tag construction and tag reading are Applesauce's job: `CommentFactory` builds the
- * root/parent tag pairs and `getCommentReplyPointer` reads them back, so the uppercase
- * root scope and lowercase parent scope stay correct for both top-level comments (parent
- * is the `kind:33500` object) and replies (parent is another comment).
- *
- * This module makes no SDK calls — events in, view models and unsigned templates out. The
- * shell still owns signing and relay routing through NAP-OUTBOX.
+ * root/parent tag pairs and `getCommentReplyPointer` reads them back. This module makes no
+ * SDK calls: events in, view models and unsigned templates out. The shell still owns
+ * signing and relay routing through NAP-OUTBOX.
  */
 
+import type { EventTemplate, NostrEvent, NostrFilter } from '@napplet/sdk';
+import { CommentFactory } from 'applesauce-common/factories/comment';
 import {
   COMMENT_KIND,
   getCommentReplyPointer,
   isCommentEventPointer,
   isValidComment,
 } from 'applesauce-common/helpers/comment';
-import { CommentFactory } from 'applesauce-common/factories/comment';
-import type { EventTemplate, NostrEvent, NostrFilter } from '@napplet/sdk';
+import { getReplaceableAddress } from 'applesauce-core/helpers/event';
 
 export { COMMENT_KIND };
 
@@ -27,7 +25,7 @@ export type Comment = {
   pubkey: string;
   content: string;
   createdAt: number;
-  /** Id of the comment being replied to, or '' for a comment on the object itself. */
+  /** Id of the comment being replied to, or '' for a top-level comment. */
   parentId: string;
   /** The source event, kept because Applesauce builds replies from the parent event. */
   event: NostrEvent;
@@ -36,21 +34,26 @@ export type Comment = {
 /** A comment placed in the thread: `depth` is how far it is indented. */
 export type ThreadEntry = Comment & { depth: number };
 
-/**
- * Every comment in the thread — top level and replies alike — carries the object address as
- * its uppercase root scope, so one filter returns the whole thread.
- */
-export function threadFilter(address: string): NostrFilter {
+/** Comments scoped to an addressable/replaceable root, such as `kind:33500`. */
+export function addressThreadFilter(address: string): NostrFilter {
   return { kinds: [COMMENT_KIND], '#A': [address] };
 }
 
-/**
- * Converts an event into a comment, or null when it is not one we can thread.
- *
- * The parent comes from Applesauce's reply pointer: an event pointer at `kind:1111` means
- * the parent is another comment. Anything else — an address pointer back at the object — is
- * a comment on the object itself.
- */
+/** Backwards-compatible alias for printable-object callers. */
+export const threadFilter = addressThreadFilter;
+
+/** Comments scoped to a regular-event root, such as a NIP-94 `kind:1063` file event. */
+export function eventThreadFilter(event: NostrEvent): NostrFilter {
+  const address = getReplaceableAddress(event);
+  return address ? addressThreadFilter(address) : { kinds: [COMMENT_KIND], '#E': [event.id] };
+}
+
+/** A stable key for resetting/loading a thread when its root changes. */
+export function commentScopeKey(event: NostrEvent): string {
+  return getReplaceableAddress(event) ?? event.id;
+}
+
+/** Converts an event into a comment, or null when it is not one we can thread. */
 export function toComment(event: NostrEvent): Comment | null {
   const content = event.content.trim();
   if (!content || !isValidComment(event)) return null;
@@ -82,9 +85,6 @@ export function collectComment(known: Map<string, Comment>, next: Comment): Map<
 /**
  * Orders a flat set of comments into a depth-tagged reading order: oldest first at each
  * level, with each comment's replies directly beneath it.
- *
- * A reply whose parent never arrives is promoted to the top level rather than dropped —
- * relays return what they hold, and a visible orphan beats a silently missing comment.
  */
 export function buildThread(comments: Iterable<Comment>, maxDepth = 4): ThreadEntry[] {
   const all = [...comments].sort((a, b) => a.createdAt - b.createdAt);
@@ -93,7 +93,6 @@ export function buildThread(comments: Iterable<Comment>, maxDepth = 4): ThreadEn
   const children = new Map<string, Comment[]>();
   for (const comment of all) {
     const parent = comment.parentId && present.has(comment.parentId) ? comment.parentId : '';
-    // A comment cannot reply to itself; a malformed event must not build a cycle.
     const key = parent === comment.id ? '' : parent;
     const bucket = children.get(key);
     if (bucket) bucket.push(comment);
@@ -113,13 +112,7 @@ export function buildThread(comments: Iterable<Comment>, maxDepth = 4): ThreadEn
   return thread;
 }
 
-/**
- * Builds the unsigned `kind:1111` template for a new comment.
- *
- * `parent` is the object event for a top-level comment or another comment's event for a
- * reply; Applesauce derives the root scope off whichever it is given. The factory resolves
- * to a template rather than a signed event — the shell signs it at publish time.
- */
+/** Builds the unsigned `kind:1111` template for a new comment. */
 export function buildComment(parent: NostrEvent, content: string): Promise<EventTemplate> {
   return CommentFactory.create(parent, content.trim());
 }

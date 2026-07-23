@@ -1,19 +1,19 @@
 <script lang="ts">
   import { outbox, type NostrEvent } from '@napplet/sdk';
-  import MakerLink from '@stlstr/napplet-kit/components/MakerLink.svelte';
-  import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
-  import { getReplaceableAddress } from 'applesauce-core/helpers/event';
+  import MakerLink from './MakerLink.svelte';
+  import { fetchMakers, type MakerProfile } from '../profiles';
   import {
     buildComment,
     buildThread,
     collectComment,
-    threadFilter,
+    commentScopeKey,
+    eventThreadFilter,
     toComment,
     type Comment,
-  } from './comments';
+  } from '../comments';
 
   /**
-   * The NIP-22 comment thread for one printable object.
+   * The NIP-22 comment thread for one printable root event.
    *
    * Reads and writes both go through NAP-OUTBOX: the shell owns relay routing and signing,
    * so this component never learns which relays a comment came from or went to. Composing
@@ -26,19 +26,17 @@
     viewer,
     active,
     onCommentPublished,
+    placeholder = 'Share a print, a tip, or a question...',
+    emptyText = 'No comments yet. Be the first to share how this printed.',
   }: {
-    /**
-     * The object event itself, not just its address: Applesauce derives a comment's whole
-     * root scope from the parent event. Null until the object loads.
-     */
+    /** The event being discussed: a printable object, a NIP-94 file, a make, etc. */
     object: NostrEvent | null;
     viewer: string;
     active: boolean;
     onCommentPublished?: () => void;
+    placeholder?: string;
+    emptyText?: string;
   } = $props();
-
-  /** The root scope every comment in this thread points at. */
-  const address = $derived(object ? (getReplaceableAddress(object) ?? '') : '');
 
   /** Relays holding no thread never send a closing signal, so the empty state needs a deadline. */
   const LOAD_DEADLINE_MS = 6000;
@@ -52,10 +50,9 @@
   let status = $state('');
 
   let draft = $state('');
-  // Raw for the same reason as the object event: Applesauce memoizes onto `.event` with
-  // symbol properties, which a deep `$state` proxy turns into reactive writes.
+  // Raw because Applesauce memoizes onto `.event` with symbol properties, which a deep
+  // `$state` proxy turns into reactive writes.
   let replyTo = $state.raw<Comment | null>(null);
-  /** The inline reply composer's own draft, kept apart from the top-level one. */
   let replyDraft = $state('');
   let publishing = $state(false);
   let loadedScope = '';
@@ -81,7 +78,7 @@
     return authors.get(pubkey)?.name || 'Unknown maker';
   }
 
-  /** Coarse and relative on purpose — an exact timestamp is protocol detail, not product UX. */
+  /** Coarse and relative on purpose: an exact timestamp is protocol detail, not product UX. */
   function when(createdAt: number): string {
     const seconds = Math.max(0, Math.floor(Date.now() / 1000) - createdAt);
     if (seconds < 60) return 'just now';
@@ -90,8 +87,6 @@
     if (seconds < 2592000) return `${Math.floor(seconds / 86400)}d ago`;
     return new Date(createdAt * 1000).toLocaleDateString();
   }
-
-  // ---------------------------------------------------------------- author names
 
   let pendingAuthors = new Set<string>();
   let nameTimer = 0;
@@ -112,8 +107,6 @@
     }, NAME_LOOKUP_DELAY_MS);
   }
 
-  // ---------------------------------------------------------------- the thread
-
   function ingest(event: Parameters<typeof toComment>[0]): void {
     const comment = toComment(event);
     if (!comment) return;
@@ -126,15 +119,10 @@
     scheduleNameLookup(comment.pubkey);
   }
 
-  /**
-   * Re-opened whenever the object address changes or the comments tab becomes active, and
-   * torn down by the same effect, so two threads never stream into one list. The tab can be
-   * hidden without losing loaded comments or drafts, but hidden comments do not keep a relay
-   * subscription open.
-   */
   $effect(() => {
-    const scope = address;
-    const author = object?.pubkey ?? '';
+    const root = object;
+    const scope = root ? commentScopeKey(root) : '';
+    const author = root?.pubkey ?? '';
     const shouldLoad = active;
 
     if (scope !== loadedScope) {
@@ -146,10 +134,7 @@
       loading = false;
     }
 
-    if (!scope) {
-      return;
-    }
-
+    if (!root || !scope) return;
     if (!shouldLoad) return;
 
     if (!hasOutboxSubscribe()) {
@@ -159,10 +144,7 @@
 
     loading = true;
 
-    // A root-scope filter names no authors, so the shell has nothing to route on by
-    // itself. The hint points it at the object author's relays instead of the app's
-    // fallback set — the thread lives where the object was published.
-    const subscription = outbox.subscribe([threadFilter(scope)], { authors: [author] });
+    const subscription = outbox.subscribe([eventThreadFilter(root)], { authors: [author] });
     subscription.on('event', (result) => ingest(result.event));
     subscription.on('closed', (reason) => {
       loading = false;
@@ -180,9 +162,6 @@
     };
   });
 
-  // ---------------------------------------------------------------- composing
-
-  /** Opens the inline composer under one comment, closing whichever was open before. */
   function startReply(comment: Comment): void {
     replyTo = comment;
     replyDraft = '';
@@ -194,12 +173,6 @@
     replyDraft = '';
   }
 
-  /**
-   * Publishes one comment. The parent is the object for a top-level comment and the comment
-   * being answered for a reply; Applesauce reads the root scope off whichever it is given.
-   *
-   * Returns whether it published, so each composer can clear only its own draft.
-   */
   async function publish(parent: NostrEvent, content: string): Promise<boolean> {
     const body = content.trim();
     if (!body || publishing) return false;
@@ -221,7 +194,6 @@
         return false;
       }
 
-      // Show it immediately rather than waiting for it to come back off a relay.
       ingest(result.event);
       onCommentPublished?.();
       return true;
@@ -244,14 +216,13 @@
   }
 </script>
 
-<!-- No heading of its own: the tab this sits in already names it. -->
 <section class="grid gap-3" aria-label="Comments" data-testid="object-comments">
   {#if viewer}
     <div class="grid gap-2">
       <textarea
         class="textarea w-full"
         rows="3"
-        placeholder="Share a print, a tip, or a question..."
+        {placeholder}
         aria-label="Write a comment"
         data-testid="comment-draft"
         bind:value={draft}
@@ -276,7 +247,7 @@
 
   {#if loading && thread.length === 0}
     <div class="grid gap-3" aria-label="Loading comments">
-      {#each [0, 1] as placeholder (placeholder)}
+      {#each [0, 1] as placeholderRow (placeholderRow)}
         <div class="grid gap-2">
           <div class="skeleton h-4 w-1/3"></div>
           <div class="skeleton h-3 w-full"></div>
@@ -284,9 +255,7 @@
       {/each}
     </div>
   {:else if thread.length === 0}
-    <p class="text-sm text-base-content/70" data-testid="comments-empty">
-      No comments yet. Be the first to share how this printed.
-    </p>
+    <p class="text-sm text-base-content/70" data-testid="comments-empty">{emptyText}</p>
   {:else}
     <ul class="grid gap-3" data-testid="comment-list">
       {#each thread as comment (comment.id)}
@@ -322,7 +291,6 @@
           {/if}
 
           {#if viewer && replyTo?.id === comment.id}
-            <!-- The composer opens in place, under the comment being answered. -->
             <div class="grid gap-2 pt-1" data-testid="reply-composer">
               <textarea
                 class="textarea w-full"

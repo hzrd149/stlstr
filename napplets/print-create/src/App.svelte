@@ -1,15 +1,45 @@
 <script lang="ts">
-  import { identity, intent, outbox, storage, upload, type NostrTag } from '@napplet/sdk';
-  import { imetaFromNip94, nip94TagsFromUpload } from '@stlstr/napplet-kit/files';
-  import { onMount } from 'svelte';
+  import {
+    identity,
+    intent,
+    outbox,
+    storage,
+    upload,
+    type NostrEvent,
+    type NostrTag,
+  } from '@napplet/sdk';
+  import {
+    FILE_KIND,
+    formatBytes,
+    imetaFromNip94,
+    isModelFile,
+    nip94TagsFromUpload,
+    readFileMeta,
+    type FileMeta,
+  } from '@stlstr/napplet-kit/files';
+  import { looksLikeStl } from '@stlstr/napplet-kit/stl';
+  import { renderStlThumbnail } from '@stlstr/napplet-kit/stl-thumbnail';
+  import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
+  import { onDestroy, onMount } from 'svelte';
 
   type StepId = 'basics' | 'images' | 'files' | 'review';
   type FileRole = 'part' | 'instructions' | 'video' | 'preview' | 'aux';
   type UploadResult = Awaited<ReturnType<typeof upload.upload>>;
   type PublishedFile = { id: string; role: FileRole; filename: string };
-  type SelectedResource = { id: string; file: File; role: FileRole; description: string };
+  type ThumbnailStatus = 'none' | 'rendering' | 'ready' | 'error';
+  type SelectedResource = {
+    id: string;
+    file: File;
+    role: FileRole;
+    description: string;
+    thumbnailBlob: Blob | null;
+    thumbnailUrl: string;
+    thumbnailStatus: ThumbnailStatus;
+  };
+  type ExistingPart = { eventId: string; createdAt: number; meta: FileMeta; description: string };
 
   const DRAFT_KEY = 'printable-create:draft:v1';
+  const EXISTING_PART_LIMIT = 200;
   const STEPS: Array<{ id: StepId; title: string; helper: string }> = [
     { id: 'basics', title: 'Basics', helper: 'Name and describe the print.' },
     { id: 'images', title: 'Images', helper: 'Add cover and gallery images.' },
@@ -48,6 +78,11 @@
   let sourceUrl = $state('');
   let imageFiles = $state<File[]>([]);
   let resources = $state<SelectedResource[]>([]);
+  let existingParts = $state<ExistingPart[]>([]);
+  let selectedExistingPartIds = $state<string[]>([]);
+  let existingPartsLoading = $state(false);
+  let existingPartsStatus = $state('');
+  let partSearch = $state('');
   let currentPubkey = $state('');
 
   /**
@@ -61,6 +96,15 @@
 
   const currentIndex = $derived(STEPS.findIndex((step) => step.id === currentStep));
   const objectSlug = $derived(slugify(slug || title));
+  const selectedExistingParts = $derived(
+    existingParts.filter((part) => selectedExistingPartIds.includes(part.eventId)),
+  );
+  const visibleExistingParts = $derived(
+    existingParts.filter((part) => {
+      const needle = partSearch.trim().toLowerCase();
+      return !needle || part.meta.name.toLowerCase().includes(needle);
+    }),
+  );
 
   const hasStorage = () => {
     const domain = getNappletNamespace().storage as Partial<typeof storage> | undefined;
@@ -73,6 +117,10 @@
   const hasIntent = () => {
     const domain = getNappletNamespace().intent as Partial<typeof intent> | undefined;
     return typeof domain?.open === 'function';
+  };
+  const hasOutbox = () => {
+    const domain = getNappletNamespace().outbox as Partial<typeof outbox> | undefined;
+    return typeof domain?.query === 'function' && typeof domain?.publish === 'function';
   };
 
   function getNappletNamespace(): Record<string, unknown> {
@@ -100,7 +148,7 @@
   function stepComplete(step: StepId): boolean {
     if (step === 'basics') return Boolean(title.trim() && objectSlug && description.trim());
     if (step === 'images') return imageFiles.length > 0;
-    if (step === 'files') return resources.length > 0;
+    if (step === 'files') return resources.length + selectedExistingPartIds.length > 0;
     return stepComplete('basics') && stepComplete('images') && stepComplete('files');
   }
 
@@ -141,13 +189,20 @@
 
   function onResourceChange(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
-    const next = Array.from(input.files ?? []).map((file) => ({
-      id: `${file.name}:${file.size}:${file.lastModified}`,
-      file,
-      role: inferRole(file),
-      description: '',
-    }));
+    const next = Array.from(input.files ?? []).map((file) => {
+      const role = inferRole(file);
+      return {
+        id: `${file.name}:${file.size}:${file.lastModified}`,
+        file,
+        role,
+        description: '',
+        thumbnailBlob: null,
+        thumbnailUrl: '',
+        thumbnailStatus: role === 'part' && isStlFile(file) ? 'rendering' : 'none',
+      } satisfies SelectedResource;
+    });
     resources = [...resources, ...next];
+    for (const resource of next) void renderSelectedThumbnail(resource.id);
     input.value = '';
     status = resources.length
       ? `${resources.length} resource${resources.length === 1 ? '' : 's'} ready.`
@@ -166,14 +221,128 @@
     return 'aux';
   }
 
+  function isStlFile(file: File): boolean {
+    const name = file.name.toLowerCase();
+    return file.type === 'model/stl' || file.type === 'application/sla' || name.endsWith('.stl');
+  }
+
+  function toExistingPart(event: NostrEvent): ExistingPart | null {
+    const meta = readFileMeta(event.tags);
+    if (!meta || !isModelFile(meta)) return null;
+    return {
+      eventId: event.id,
+      createdAt: event.created_at,
+      meta,
+      description: event.content.trim(),
+    };
+  }
+
+  function formatDate(seconds: number): string {
+    return new Date(seconds * 1000).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+
+  async function loadExistingParts(pubkey: string): Promise<void> {
+    if (!pubkey) {
+      existingParts = [];
+      selectedExistingPartIds = [];
+      existingPartsStatus = '';
+      return;
+    }
+    if (!hasOutbox()) {
+      existingPartsStatus = 'This shell does not provide relay access for existing parts.';
+      return;
+    }
+
+    existingPartsLoading = true;
+    existingPartsStatus = 'Loading your existing parts...';
+    try {
+      const { events } = await outbox.query(
+        [{ kinds: [FILE_KIND], authors: [pubkey], limit: EXISTING_PART_LIMIT }],
+        { timeoutMs: 6000 },
+      );
+      if (currentPubkey !== pubkey) return;
+
+      const unique = new Map<string, NostrEvent>();
+      for (const { event } of events) unique.set(event.id, event);
+      existingParts = [...unique.values()]
+        .map(toExistingPart)
+        .filter((part): part is ExistingPart => part !== null)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      selectedExistingPartIds = selectedExistingPartIds.filter((id) =>
+        existingParts.some((part) => part.eventId === id),
+      );
+      existingPartsStatus = existingParts.length
+        ? ''
+        : 'No reusable model parts found on the relays we can reach.';
+    } catch (error) {
+      if (currentPubkey !== pubkey) return;
+      existingPartsStatus =
+        error instanceof Error ? error.message : 'Could not load existing parts.';
+    } finally {
+      if (currentPubkey === pubkey) existingPartsLoading = false;
+    }
+  }
+
+  function toggleExistingPart(id: string): void {
+    selectedExistingPartIds = selectedExistingPartIds.includes(id)
+      ? selectedExistingPartIds.filter((selected) => selected !== id)
+      : [...selectedExistingPartIds, id];
+  }
+
+  function revokeObjectUrl(url: string): void {
+    if (url) URL.revokeObjectURL(url);
+  }
+
+  function updateResource(id: string, update: Partial<SelectedResource>): void {
+    resources = resources.map((resource) =>
+      resource.id === id ? { ...resource, ...update } : resource,
+    );
+  }
+
+  async function renderSelectedThumbnail(id: string): Promise<void> {
+    const resource = resources.find((candidate) => candidate.id === id);
+    if (!resource || resource.role !== 'part' || !isStlFile(resource.file)) return;
+
+    updateResource(id, { thumbnailStatus: 'rendering' });
+    try {
+      const bytes = new Uint8Array(await resource.file.arrayBuffer());
+      if (!looksLikeStl(bytes)) {
+        updateResource(id, { thumbnailStatus: 'none' });
+        return;
+      }
+
+      const thumbnailBlob = await renderStlThumbnail(bytes, { width: 512, height: 512 });
+      const thumbnailUrl = URL.createObjectURL(thumbnailBlob);
+      const current = resources.find((candidate) => candidate.id === id);
+      if (!current) {
+        revokeObjectUrl(thumbnailUrl);
+        return;
+      }
+      revokeObjectUrl(current.thumbnailUrl);
+      updateResource(id, { thumbnailBlob, thumbnailUrl, thumbnailStatus: 'ready' });
+    } catch {
+      updateResource(id, { thumbnailBlob: null, thumbnailUrl: '', thumbnailStatus: 'error' });
+    }
+  }
+
   function removeResource(id: string): void {
+    const removed = resources.find((resource) => resource.id === id);
+    revokeObjectUrl(removed?.thumbnailUrl ?? '');
     resources = resources.filter((resource) => resource.id !== id);
   }
 
   function setResourceRole(id: string, role: FileRole): void {
-    resources = resources.map((resource) =>
-      resource.id === id ? { ...resource, role } : resource,
+    const resource = resources.find((candidate) => candidate.id === id);
+    resources = resources.map((candidate) =>
+      candidate.id === id ? { ...candidate, role } : candidate,
     );
+    if (role === 'part' && resource && isStlFile(resource.file) && !resource.thumbnailBlob) {
+      void renderSelectedThumbnail(id);
+    }
   }
 
   function setResourceDescription(id: string, value: string): void {
@@ -216,10 +385,50 @@
     return result;
   }
 
+  function thumbnailName(file: File): string {
+    const dot = file.name.lastIndexOf('.');
+    const base = dot > 0 ? file.name.slice(0, dot) : file.name;
+    return `${base}-thumbnail.png`;
+  }
+
+  async function thumbnailTagsFor(resource: SelectedResource): Promise<NostrTag[]> {
+    if (resource.role !== 'part' || !isStlFile(resource.file)) return [];
+
+    try {
+      let thumbnail = resource.thumbnailBlob;
+      if (!thumbnail) {
+        status = `Rendering thumbnail for ${resource.file.name}...`;
+        const bytes = new Uint8Array(await resource.file.arrayBuffer());
+        if (!looksLikeStl(bytes)) return [];
+        thumbnail = await renderStlThumbnail(bytes, { width: 512, height: 512 });
+      }
+      const name = thumbnailName(resource.file);
+      const file = new File([thumbnail], name, { type: thumbnail.type || 'image/png' });
+
+      status = `Uploading thumbnail for ${resource.file.name}...`;
+      const result = await uploadFile(file);
+      if (!result.url) return [];
+
+      const tags: NostrTag[] = [];
+      const thumb: NostrTag = result.sha256
+        ? ['thumb', result.url, result.sha256]
+        : ['thumb', result.url];
+      const image: NostrTag = result.sha256
+        ? ['image', result.url, result.sha256]
+        : ['image', result.url];
+      tags.push(thumb, image, ['alt', `Rendered view of ${resource.file.name}`]);
+      if (result.blurhash) tags.push(['blurhash', result.blurhash]);
+      return tags;
+    } catch {
+      return [];
+    }
+  }
+
   async function publishResource(resource: SelectedResource): Promise<PublishedFile> {
+    const thumbnailTags = await thumbnailTagsFor(resource);
     status = `Uploading ${resource.file.name}...`;
     const result = await uploadFile(resource.file);
-    const tags = uploadResultToNip94(result, resource.file);
+    const tags = [...uploadResultToNip94(result, resource.file), ...thumbnailTags];
 
     status = `Publishing NIP-94 metadata for ${resource.file.name}...`;
     const published = await outbox.publish({
@@ -252,6 +461,9 @@
 
       const publishedFiles: PublishedFile[] = [];
       for (const resource of resources) publishedFiles.push(await publishResource(resource));
+      for (const part of selectedExistingParts) {
+        publishedFiles.push({ id: part.eventId, role: 'part', filename: part.meta.name });
+      }
 
       const tags: NostrTag[] = [
         ['d', objectSlug],
@@ -331,18 +543,25 @@
         .getPublicKey()
         .then((pubkey) => {
           currentPubkey = pubkey;
+          void loadExistingParts(pubkey);
         })
         .catch(() => {
           currentPubkey = '';
+          void loadExistingParts('');
         });
       identitySubscription = identity.onChanged((pubkey) => {
         currentPubkey = pubkey;
+        void loadExistingParts(pubkey);
       });
     }
 
     void loadDraft();
 
     return () => identitySubscription?.unsubscribe();
+  });
+
+  onDestroy(() => {
+    for (const resource of resources) revokeObjectUrl(resource.thumbnailUrl);
   });
 </script>
 
@@ -491,7 +710,8 @@
     {:else if currentStep === 'files'}
       <section class="grid gap-4" aria-label="Printable files and resources">
         <p class="text-sm text-base-content/70">
-          Files become NIP-94 events and are referenced by role from the print.
+          Upload new resources or reuse parts you have already published. New STL parts get a
+          rendered thumbnail when the browser can create one.
         </p>
 
         <label class="fieldset">
@@ -503,14 +723,53 @@
         </label>
 
         {#if resources.length > 0}
-          <div class="grid gap-3">
+          <div class="divide-y divide-base-300" data-testid="selected-resources-list">
             {#each resources as resource}
-              <article class="grid gap-3 rounded-box bg-base-200 p-3 md:grid-cols-[1fr_auto_auto]">
-                <div>
-                  <div class="font-medium">{resource.file.name}</div>
+              <article class="grid gap-3 py-3 md:grid-cols-[4rem_minmax(0,1fr)_12rem_auto]">
+                <div
+                  class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-box bg-base-200"
+                >
+                  {#if resource.thumbnailUrl}
+                    <img
+                      src={resource.thumbnailUrl}
+                      alt={`Rendered preview of ${resource.file.name}`}
+                      class="h-full w-full object-cover"
+                      data-testid="selected-part-thumbnail"
+                    />
+                  {:else if resource.thumbnailStatus === 'rendering'}
+                    <span
+                      class="loading loading-spinner loading-sm"
+                      aria-label="Rendering thumbnail"
+                    ></span>
+                  {:else}
+                    <span class="text-xs font-medium text-base-content/50">
+                      {isStlFile(resource.file)
+                        ? '3D'
+                        : resource.file.name.split('.').pop()?.toUpperCase().slice(0, 4) || 'FILE'}
+                    </span>
+                  {/if}
+                </div>
+                <div class="min-w-0">
+                  <div class="truncate font-medium">{resource.file.name}</div>
                   <div class="text-xs text-base-content/60">
-                    {Math.round(resource.file.size / 1024)} KB
+                    {formatBytes(resource.file.size)} · {ROLE_LABELS[resource.role]}
+                    {#if resource.thumbnailStatus === 'ready'}
+                      · thumbnail ready
+                    {:else if resource.thumbnailStatus === 'error'}
+                      · thumbnail unavailable
+                    {/if}
                   </div>
+                  <textarea
+                    class="textarea mt-2 w-full"
+                    rows="2"
+                    placeholder="Optional file-specific print notes"
+                    value={resource.description}
+                    oninput={(event) =>
+                      setResourceDescription(
+                        resource.id,
+                        (event.currentTarget as HTMLTextAreaElement).value,
+                      )}
+                  ></textarea>
                 </div>
                 <select
                   class="select w-full"
@@ -526,20 +785,9 @@
                     <option value={role}>{label}</option>
                   {/each}
                 </select>
-                <textarea
-                  class="textarea md:col-span-3 w-full"
-                  rows="2"
-                  placeholder="Optional file-specific print notes"
-                  value={resource.description}
-                  oninput={(event) =>
-                    setResourceDescription(
-                      resource.id,
-                      (event.currentTarget as HTMLTextAreaElement).value,
-                    )}
-                ></textarea>
                 <button
                   type="button"
-                  class="btn btn-error btn-outline btn-sm md:col-start-3"
+                  class="btn btn-error btn-outline btn-sm"
                   onclick={() => removeResource(resource.id)}
                 >
                   Remove
@@ -550,6 +798,96 @@
         {:else}
           <div class="alert">No printable resources selected yet.</div>
         {/if}
+
+        <div class="divider">Existing parts</div>
+
+        <section class="grid gap-3" aria-label="Existing published parts">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-base font-semibold">Reuse published parts</h2>
+              <p class="text-sm text-base-content/70">
+                Selected parts are referenced directly. They are not uploaded again.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              onclick={() => loadExistingParts(currentPubkey)}
+              disabled={!signedIn || existingPartsLoading}
+            >
+              {existingPartsLoading ? 'Loading...' : 'Refresh parts'}
+            </button>
+          </div>
+
+          {#if existingParts.length > 0}
+            <input
+              class="input w-full sm:w-80"
+              placeholder="Filter existing parts"
+              aria-label="Filter existing parts"
+              bind:value={partSearch}
+            />
+          {/if}
+
+          {#if existingPartsLoading && existingParts.length === 0}
+            <div class="grid gap-2" aria-label="Loading existing parts">
+              {#each [0, 1, 2] as placeholder (placeholder)}
+                <div class="skeleton h-16 w-full"></div>
+              {/each}
+            </div>
+          {:else if !signedIn}
+            <div class="alert">Sign in to reuse your published parts.</div>
+          {:else if existingParts.length === 0}
+            <div class="alert">{existingPartsStatus || 'No existing model parts loaded yet.'}</div>
+          {:else if visibleExistingParts.length === 0}
+            <div class="alert">No existing parts match that filter.</div>
+          {:else}
+            <ul
+              class="max-h-96 divide-y divide-base-300 overflow-y-auto pr-1"
+              data-testid="existing-parts-list"
+            >
+              {#each visibleExistingParts as part (part.eventId)}
+                {@const selected = selectedExistingPartIds.includes(part.eventId)}
+                <li class="py-3" data-testid="existing-part-row">
+                  <label class="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-primary mt-3"
+                      checked={selected}
+                      onchange={() => toggleExistingPart(part.eventId)}
+                      aria-label={`Reuse ${part.meta.name}`}
+                    />
+                    <PartThumb file={part.meta} />
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate font-medium">{part.meta.name}</span>
+                      <span class="block text-xs text-base-content/60">
+                        {[
+                          formatBytes(part.meta.sizeBytes),
+                          part.meta.mime,
+                          formatDate(part.createdAt),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                      {#if part.description}
+                        <span class="mt-1 block line-clamp-2 text-sm text-base-content/70">
+                          {part.description}
+                        </span>
+                      {/if}
+                    </span>
+                  </label>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+
+          {#if selectedExistingParts.length > 0}
+            <p class="text-sm text-base-content/70" data-testid="selected-existing-parts">
+              {selectedExistingParts.length} existing part{selectedExistingParts.length === 1
+                ? ''
+                : 's'} selected for this print.
+            </p>
+          {/if}
+        </section>
       </section>
     {:else}
       <section class="grid gap-4" aria-label="Review and publish">
@@ -572,7 +910,10 @@
           </div>
           <div class="grid gap-1 md:grid-cols-[8rem_1fr]">
             <dt>Resources</dt>
-            <dd>{resources.length} NIP-94 file event{resources.length === 1 ? '' : 's'}</dd>
+            <dd>
+              {resources.length} new upload{resources.length === 1 ? '' : 's'}, {selectedExistingParts.length}
+              existing part{selectedExistingParts.length === 1 ? '' : 's'}
+            </dd>
           </div>
           <div class="grid gap-1 md:grid-cols-[8rem_1fr]">
             <dt>Tags</dt>

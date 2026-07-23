@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'print-create',
-      requires: ['upload', 'outbox', 'identity', 'storage', 'intent'],
+      requires: ['upload', 'outbox', 'identity', 'storage', 'intent', 'resource'],
       artifactMode: 'single-file',
       archetypes: [
         {

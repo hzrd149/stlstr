@@ -1,7 +1,7 @@
 <script lang="ts">
   import { inc, link, resource } from '@napplet/sdk';
+  import { looksLikeStl, parseStl } from '@stlstr/napplet-kit/stl';
   import { onMount, tick } from 'svelte';
-  import { looksLikeStl, parseStl } from './stl';
   import { createViewer, type Viewer } from './viewer';
 
   /**

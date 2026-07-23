@@ -1,21 +1,11 @@
 /**
- * STL parsing.
- *
- * Both STL flavors are handled here because neither is reliably identifiable from its
- * first bytes: binary STL has an 80-byte free-form header that some exporters fill with
- * the word "solid", which is also exactly how an ASCII file starts. The only sound test is
- * arithmetic — a binary file's length is exactly `84 + 50 * triangleCount` — so that is
- * what `parseStl` checks first, and the textual sniff is the fallback.
+ * STL parsing shared by STL preview and publish-time thumbnail generation.
  */
 
-/** Flat-shaded triangle soup, ready to hand straight to a vertex buffer. */
 export type Mesh = {
-  /** Triangle vertices, 9 floats per triangle. */
   positions: Float32Array;
-  /** Per-vertex normals, parallel to `positions`. */
   normals: Float32Array;
   triangleCount: number;
-  /** Axis-aligned bounds, used to frame the camera. */
   min: [number, number, number];
   max: [number, number, number];
 };
@@ -24,10 +14,6 @@ const HEADER_BYTES = 80;
 const COUNT_BYTES = 4;
 const TRIANGLE_BYTES = 50;
 
-/**
- * A facet normal is publisher-supplied and frequently wrong — zero, denormalized, or
- * inverted. Recompute from the winding when it is not a usable unit vector.
- */
 function faceNormal(
   ax: number,
   ay: number,
@@ -45,20 +31,16 @@ function faceNormal(
   const vx = cx - ax;
   const vy = cy - ay;
   const vz = cz - az;
-
   const nx = uy * vz - uz * vy;
   const ny = uz * vx - ux * vz;
   const nz = ux * vy - uy * vx;
-
   const length = Math.hypot(nx, ny, nz);
-  // A degenerate triangle has no normal; point it at the camera rather than emitting NaN.
   if (!length) return [0, 0, 1];
   return [nx / length, ny / length, nz / length];
 }
 
 function isBinaryStl(bytes: Uint8Array): boolean {
   if (bytes.byteLength < HEADER_BYTES + COUNT_BYTES) return false;
-
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const count = view.getUint32(HEADER_BYTES, true);
   return bytes.byteLength === HEADER_BYTES + COUNT_BYTES + count * TRIANGLE_BYTES;
@@ -82,12 +64,10 @@ function buildMesh(positions: Float32Array, normals: Float32Array, triangleCount
 function parseBinary(bytes: Uint8Array): Mesh {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const triangleCount = view.getUint32(HEADER_BYTES, true);
-
   const positions = new Float32Array(triangleCount * 9);
   const normals = new Float32Array(triangleCount * 9);
 
   for (let triangle = 0; triangle < triangleCount; triangle += 1) {
-    // Skip the stored facet normal; it is recomputed below from the winding.
     const base = HEADER_BYTES + COUNT_BYTES + triangle * TRIANGLE_BYTES + 12;
     const out = triangle * 9;
 
@@ -117,11 +97,6 @@ function parseBinary(bytes: Uint8Array): Mesh {
   return buildMesh(positions, normals, triangleCount);
 }
 
-/**
- * Reads every `vertex x y z` in document order. ASCII STL nests those inside `facet`
- * blocks, but the block structure carries no information a flat scan misses: vertices
- * always come in threes, and the facet normal is recomputed anyway.
- */
 function parseAscii(text: string): Mesh {
   const vertices: number[] = [];
   const pattern = /vertex\s+(-?[\d.eE+-]+)\s+(-?[\d.eE+-]+)\s+(-?[\d.eE+-]+)/g;
@@ -132,7 +107,6 @@ function parseAscii(text: string): Mesh {
 
   const triangleCount = Math.floor(vertices.length / 9);
   if (triangleCount === 0) throw new Error('No triangles found in this STL.');
-
   const positions = new Float32Array(vertices.slice(0, triangleCount * 9));
   const normals = new Float32Array(positions.length);
 
@@ -160,10 +134,8 @@ function parseAscii(text: string): Mesh {
   return buildMesh(positions, normals, triangleCount);
 }
 
-/** True when these bytes look like either STL flavor. Cheap enough to run before parsing. */
 export function looksLikeStl(bytes: Uint8Array): boolean {
   if (isBinaryStl(bytes)) return true;
-
   const head = new TextDecoder('utf-8', { fatal: false })
     .decode(bytes.subarray(0, 512))
     .trimStart()
@@ -171,7 +143,6 @@ export function looksLikeStl(bytes: Uint8Array): boolean {
   return head.startsWith('solid') && head.includes('facet');
 }
 
-/** Parses either STL flavor into a flat-shaded mesh. Throws with a displayable message. */
 export function parseStl(bytes: Uint8Array): Mesh {
   if (isBinaryStl(bytes)) {
     const mesh = parseBinary(bytes);
