@@ -3,6 +3,7 @@ import type { CountQueryMessage } from '@napplet/nap/count/types';
 import type { ServiceHandler } from '@kehto/runtime';
 import type { Filter } from 'applesauce-core/helpers/filter';
 import { relayPool } from './nostr';
+import { normalizeFilters } from './relay-query';
 import { getAppRelays } from './settings';
 
 type RelayCountResponse = {
@@ -10,10 +11,6 @@ type RelayCountResponse = {
 };
 
 const DEFAULT_TIMEOUT_MS = 8_000;
-
-function normalizeFilters(filters: NostrFilter | NostrFilter[]): NostrFilter[] {
-  return Array.isArray(filters) ? filters : [filters];
-}
 
 function countRelays(
   relays: string[],

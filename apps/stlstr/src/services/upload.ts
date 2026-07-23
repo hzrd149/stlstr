@@ -17,11 +17,8 @@ import { Actions, createUploadAuth } from 'blossom-client-sdk';
 import type { BlobDescriptor, EventTemplate, SignedEvent, UploadType } from 'blossom-client-sdk';
 import { mergeBlossomServers } from 'applesauce-common/helpers/blossom';
 import { STLSTR_DEV_MODE } from './nostr';
+import { firstDefinedValue } from './observable';
 import { getFallbackBlossomServers } from './settings';
-
-type ObservableLike<T> = {
-  subscribe(observer: (value: T) => void): { unsubscribe(): void };
-};
 
 type UploadRecord = UploadStatus & {
   windowId: string;
@@ -31,26 +28,6 @@ export type UploadServiceOptions = {
   getActiveUser: () => User | null;
   getSigner: () => ISigner | null;
 };
-
-function firstDefinedValue<T>(observable: ObservableLike<T | undefined>, timeoutMs = 1_500) {
-  return new Promise<T | undefined>((resolve) => {
-    let settled = false;
-    const subscription = observable.subscribe((value) => {
-      if (value === undefined || settled) return;
-      settled = true;
-      window.clearTimeout(timeout);
-      subscription.unsubscribe();
-      resolve(value);
-    });
-
-    const timeout = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      subscription.unsubscribe();
-      resolve(undefined);
-    }, timeoutMs);
-  });
-}
 
 async function getBlossomServers(user: User | null): Promise<string[]> {
   const fallback = mergeBlossomServers(getFallbackBlossomServers());

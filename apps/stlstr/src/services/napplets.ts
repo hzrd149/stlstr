@@ -3,7 +3,8 @@ import { mergeRelaySets } from 'applesauce-core/helpers/relays';
 import type { NostrEvent } from 'nostr-tools';
 import { nip19 } from 'nostr-tools';
 import { ARCHETYPES, conventionsFor } from './intent-map';
-import { STLSTR_DEV_MODE, eventStore, relayPool } from './nostr';
+import { STLSTR_DEV_MODE } from './nostr';
+import { collectRequest } from './relay-query';
 import { getLookupRelays, getSettings, type NappletOverride } from './settings';
 
 const NIP5A_KIND = 35129;
@@ -147,25 +148,7 @@ async function fetchManifest(
   relays: string[],
 ): Promise<NostrEvent | null> {
   const filters: Filter[] = [{ kinds: [NIP5A_KIND], authors: [pubkey], '#d': [identifier], limit: 1 }];
-  const candidates: NostrEvent[] = [];
-
-  await new Promise<void>((resolve, reject) => {
-    const subscription = relayPool
-      .request(relays, filters, { timeout: MANIFEST_TIMEOUT_MS, eventStore })
-      .subscribe({
-        next: (event) => {
-          eventStore.add(event);
-          candidates.push(event as NostrEvent);
-        },
-        error: reject,
-        complete: resolve,
-      });
-
-    window.setTimeout(() => {
-      subscription.unsubscribe();
-      resolve();
-    }, MANIFEST_TIMEOUT_MS + 250);
-  });
+  const candidates = await collectRequest(relays, filters, MANIFEST_TIMEOUT_MS);
 
   return candidates.sort((a, b) => b.created_at - a.created_at)[0] ?? null;
 }
@@ -222,25 +205,7 @@ export async function resolveNappletNaddr(
 export async function discoverCompatibleNapplets(archetype: string): Promise<ResolvedNapplet[]> {
   const relays = getLookupRelays();
   const filters: Filter[] = [{ kinds: [NIP5A_KIND], limit: 80 }];
-  const events: NostrEvent[] = [];
-
-  await new Promise<void>((resolve, reject) => {
-    const subscription = relayPool
-      .request(relays, filters, { timeout: MANIFEST_TIMEOUT_MS, eventStore })
-      .subscribe({
-        next: (event) => {
-          eventStore.add(event);
-          events.push(event as NostrEvent);
-        },
-        error: reject,
-        complete: resolve,
-      });
-
-    window.setTimeout(() => {
-      subscription.unsubscribe();
-      resolve();
-    }, MANIFEST_TIMEOUT_MS + 250);
-  });
+  const events = await collectRequest(relays, filters, MANIFEST_TIMEOUT_MS);
 
   const seen = new Set<string>();
   const resolved: ResolvedNapplet[] = [];

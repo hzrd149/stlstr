@@ -14,11 +14,9 @@ import type { NostrEvent as ApplesauceNostrEvent } from 'nostr-tools';
 import type { Filter } from 'applesauce-core/helpers/filter';
 import { mergeRelaySets } from 'applesauce-core/helpers/relays';
 import { eventStore, STLSTR_DEV_MODE, relayPool } from './nostr';
+import { firstDefinedValue } from './observable';
+import { collectRequest, normalizeFilters } from './relay-query';
 import { getAppRelays } from './settings';
-
-type ObservableLike<T> = {
-  subscribe(observer: (value: T) => void): { unsubscribe(): void };
-};
 
 type ActiveUserProvider = () => User | null;
 type SignerProvider = () => ISigner | null;
@@ -40,32 +38,8 @@ export type OutboxServiceOptions = {
 
 const DEFAULT_TIMEOUT_MS = 8_000;
 
-function normalizeFilters(filters: NostrFilter | NostrFilter[]): NostrFilter[] {
-  return Array.isArray(filters) ? filters : [filters];
-}
-
 function relayResult(event: NostrEvent, relays: string[]): RelayEventResult {
   return { event, sidecar: { relayHints: relays } };
-}
-
-function firstDefinedValue<T>(observable: ObservableLike<T | undefined>, timeoutMs = 1_500) {
-  return new Promise<T | undefined>((resolve) => {
-    let settled = false;
-    const subscription = observable.subscribe((value) => {
-      if (value === undefined || settled) return;
-      settled = true;
-      window.clearTimeout(timeout);
-      subscription.unsubscribe();
-      resolve(value);
-    });
-
-    const timeout = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      subscription.unsubscribe();
-      resolve(undefined);
-    }, timeoutMs);
-  });
 }
 
 async function getUserOutboxes(user: User | null): Promise<string[]> {
@@ -152,27 +126,8 @@ async function resolvePublishRelays(
 }
 
 async function queryRelays(relays: string[], filters: NostrFilter[], timeoutMs: number) {
-  const events: RelayEventResult[] = [];
-
-  await new Promise<void>((resolve, reject) => {
-    const subscription = relayPool
-      .request(relays, filters as Filter[], { timeout: timeoutMs, eventStore })
-      .subscribe({
-        next: (event) => {
-          eventStore.add(event as ApplesauceNostrEvent);
-          events.push(relayResult(event as NostrEvent, relays));
-        },
-        error: reject,
-        complete: resolve,
-      });
-
-    window.setTimeout(() => {
-      subscription.unsubscribe();
-      resolve();
-    }, timeoutMs + 250);
-  });
-
-  return events;
+  const events = await collectRequest(relays, filters as Filter[], timeoutMs);
+  return events.map((event) => relayResult(event as NostrEvent, relays));
 }
 
 async function publishToRelays(event: NostrEvent, relays: string[]): Promise<PublishOutcome> {
