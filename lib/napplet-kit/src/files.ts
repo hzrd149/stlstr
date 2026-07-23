@@ -33,6 +33,19 @@ export type FileMeta = {
   sizeBytes: number;
   /** SHA-256 of the file, used to recognise the same bytes across events. */
   sha256: string;
+  /**
+   * Preview image URL, or an empty string when the publisher supplied none.
+   *
+   * A printable file has no inherent preview — an STL is raw geometry — so per NIP.md this
+   * is the only affordable way to show one in a list. Rendering the model instead would
+   * mean fetching and parsing every file on the page, and files above the shell's resource
+   * ceiling could not be shown at all.
+   */
+  thumb: string;
+  /** Placeholder to show while `thumb` loads. Empty when not published. */
+  blurhash: string;
+  /** Description of the preview, for accessibility. Empty when not published. */
+  alt: string;
 };
 
 /** Extensions treated as 3D models, for previewability and the library's model filter. */
@@ -71,6 +84,10 @@ export function readFileMeta(tags: string[][]): FileMeta | null {
     mime: tagValue(tags, 'm'),
     sizeBytes: Number.isFinite(size) && size > 0 ? size : 0,
     sha256: tagValue(tags, 'x'),
+    // `image` is the larger preview; it stands in when only it was published.
+    thumb: tagValue(tags, 'thumb') || tagValue(tags, 'image'),
+    blurhash: tagValue(tags, 'blurhash'),
+    alt: tagValue(tags, 'alt'),
   };
 }
 

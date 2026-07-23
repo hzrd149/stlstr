@@ -249,14 +249,41 @@ the attach flow, not here.
     ["x", "<sha256>"],
     ["size", "<bytes>"],
     ["name", "<filename>"],
+    ["thumb", "<blossom url>", "<sha256>"],
+    ["blurhash", "<blurhash>"],
+    ["alt", "<description of the preview>"],
     ["fallback", "<other blossom url>"]
   ]
 }
 ```
 
-`name` is the fix from §2.2 and is not optional here.
+`name` is the fix from §2.2 and is not optional here. NIP-94 does not define it;
+NIP.md §File References does, because a content-addressed URL cannot carry a
+filename.
 
-### 4.3 Deduplication
+### 4.3 Thumbnails
+
+`part-upload` is the only place with the file's bytes in hand, so it is the only
+place a thumbnail can be produced without re-fetching. NIP.md §File Thumbnails
+defines the tags; this is where they get written.
+
+Two sources, in order of preference:
+
+1. **Extract an embedded thumbnail.** 3MF packages carry
+   `/Metadata/thumbnail.png`, and most slicers embed a base64 PNG in G-code
+   comments. Preferred because it is what the author's own tooling produced.
+2. **Render one.** Parse the STL and draw it offscreen with the machinery
+   `stl-preview` already has (`src/stl.ts`, `src/viewer.ts`), then
+   `canvas.toBlob()`. Both are candidates for the kit rather than a third copy.
+
+The thumbnail uploads as its own Blossom blob and its URL goes in `thumb`.
+
+This only helps files uploaded after it ships. Older parts have no `thumb`, and
+files with no meaningful visual form — slicer profiles, README text — never
+will, so `PartThumb` treats a missing thumbnail as an ordinary state and shows a
+type-derived placeholder. That is already built and in use.
+
+### 4.4 Deduplication
 
 Blossom is content-addressed, so re-uploading a file is cheap and yields the same
 blob. Publishing a **second** `kind:1063` for it is not cheap: it splits the
@@ -281,7 +308,7 @@ Two caveats:
   post-upload detection — upload first, then match on the returned `sha256` — which
   still prevents the duplicate _event_, just not the duplicate transfer.
 
-### 4.4 Failure handling
+### 4.5 Failure handling
 
 Per-file state, kept across retries. A file that has already published its
 `kind:1063` is marked done and is not re-uploaded when the user retries the ones
@@ -446,13 +473,13 @@ land everywhere instead of only in the new code.
 
 ## 8. Phasing
 
-| Phase | Work                                                                                | Notes                                                           |
-| ----- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 1     | Kit file module + `name` tag fix; migrate `create-object`; fix `edit-object` `naps` | Prerequisite. A library of unnamed files is not worth building. |
-| 2     | `part-upload` napplet, archetype, route, nav                                        | Includes dedupe (§4.3) and per-file retry (§4.4).               |
-| 3     | `part-library` list, preview, download, usage badges and expansion                  | Read-only. Delivers most of the ask with none of the risk.      |
-| 4     | Removal with the §6.3 usage gate, and honest copy about §6.1                        | Separate phase on purpose — it is the only irreversible action. |
-| 5     | Duplicate grouping and orphan filter                                                | Needs the library to exist before the mess is visible.          |
+| Phase | Work                                                                                | Notes                                                             |
+| ----- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 1     | Kit file module + `name` tag fix; migrate `create-object`; fix `edit-object` `naps` | Prerequisite. A library of unnamed files is not worth building.   |
+| 2     | `part-upload` napplet, archetype, route, nav                                        | Includes thumbnails (§4.3), dedupe (§4.4), per-file retry (§4.5). |
+| 3     | `part-library` list, preview, download, usage badges and expansion                  | Read-only. Delivers most of the ask with none of the risk.        |
+| 4     | Removal with the §6.3 usage gate, and honest copy about §6.1                        | Separate phase on purpose — it is the only irreversible action.   |
+| 5     | Duplicate grouping and orphan filter                                                | Needs the library to exist before the mess is visible.            |
 
 Deliberately **not** scheduled: real Blossom blob deletion (§6.1), attach-existing
 in the object editors (§9), public file libraries on profiles, `part-detail`.

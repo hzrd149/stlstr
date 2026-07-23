@@ -136,6 +136,14 @@ Defined roles:
 
 Clients MAY ignore unknown roles. Clients that do not understand this NIP can still treat these as normal `e` references.
 
+File events SHOULD carry a `name` tag holding the file's name, including its extension:
+
+```json
+["name", "phone-stand-body.stl"]
+```
+
+NIP-94 does not define `name`; this NIP adds it, because a printable file's name is meaningful to the person downloading it in a way a URL is not. Publishers uploading to content-addressed storage in particular MUST NOT rely on the URL to carry the name, since it encodes a hash. Clients SHOULD fall back to `alt`, then to the final path segment of `url`, when no `name` is present.
+
 ### Imported Source URL
 
 Objects imported from another platform MAY include an `i` tag pointing to the canonical source URL:
@@ -157,6 +165,34 @@ Objects that remix, derive from, or depend on another printable object SHOULD re
 ```
 
 Clients MAY ignore unknown `a` tag markers. Clients can query remixes of an object using `#a` filters.
+
+### File Thumbnails
+
+A printable file has no inherent preview. STL carries only raw geometry, and rendering one requires parsing the whole file and drawing it — which a client cannot reasonably do for every entry in a list, and cannot do at all for files too large to fetch.
+
+Publishing clients SHOULD therefore include a `thumb` tag on `kind:1063` file events for printable parts, using the NIP-94 fields:
+
+```json
+["thumb", "https://cdn.example/phone-stand-body.png", "<sha256>"],
+["image", "https://cdn.example/phone-stand-body-large.png", "<sha256>"],
+["blurhash", "<blurhash>"],
+["alt", "Rendered view of the phone stand body"]
+```
+
+- `thumb`: a small preview with the same aspect ratio as `image`. This is what clients render in file lists.
+- `image`: a larger preview, for a file detail view.
+- `blurhash`: a placeholder to show while the preview loads.
+- `alt`: a description of the preview, for accessibility.
+
+Thumbnails SHOULD be a raster format such as `image/png`, `image/webp`, or `image/jpeg`. Clients that refuse to render SVG — a reasonable policy, since SVG is an active document format — would otherwise be unable to show the preview at all.
+
+A thumbnail MAY be rendered by the publishing client from the file's geometry, or extracted from formats that already embed one, such as the thumbnail image inside a 3MF package or the preview a slicer writes into G-code. An extracted thumbnail SHOULD be preferred, because it depicts what the author's own tooling produced.
+
+Thumbnails are **not** part of the object's image gallery. The object's ordered `imeta` tags are its gallery, as defined in [Image Metadata](#image-metadata); clients SHOULD NOT promote a file thumbnail into it, in the same way they do not promote images embedded in Markdown.
+
+A thumbnail is author-supplied metadata and is not verifiable against the file it describes: nothing prevents a `thumb` that depicts geometry the file does not contain. Clients MUST NOT present a thumbnail as evidence of what a file will print, and SHOULD apply the same fetching policy they apply to any other remote image referenced by an untrusted author.
+
+Clients SHOULD fall back to a placeholder derived from the file's `m` type or filename when no thumbnail is published. Files with no meaningful visual form, such as slicer profiles, are expected to have none.
 
 ### Optional Print Metadata on File Events
 
@@ -189,6 +225,10 @@ Example NIP-94 part event:
     ["m", "model/stl"],
     ["x", "<sha256>"],
     ["size", "1234567"],
+    ["name", "phone-stand-body.stl"],
+    ["thumb", "https://cdn.example/phone-stand-body.png", "<sha256>"],
+    ["blurhash", "<blurhash>"],
+    ["alt", "Rendered view of the phone stand body"],
     ["material", "PLA"],
     ["layer_height", "0.2mm"],
     ["supports", "no"]
@@ -364,6 +404,10 @@ Clients SHOULD render remaining image `imeta` tags as the gallery.
 Clients SHOULD resolve role-marked `e` tags to NIP-94 file metadata events before presenting downloads.
 
 Clients SHOULD allow objects to reference NIP-94 file events authored by other users. This enables multiple objects to share the same part file.
+
+Clients SHOULD render a file's `thumb` tag when listing files, and SHOULD fall back to a placeholder derived from `m` or `name` when there is none. See [File Thumbnails](#file-thumbnails).
+
+Clients that publish files SHOULD write a `name` tag, and SHOULD generate or extract a `thumb` for printable parts. Neither is required to publish a valid file event, and neither may be required to read one.
 
 Clients SHOULD treat `i` source URL tags as unverified provenance metadata. They do not prove authorship or ownership of the external source.
 

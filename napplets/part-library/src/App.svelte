@@ -11,6 +11,7 @@
     type FileMeta,
   } from '@stlstr/napplet-kit/files';
   import { fetchMakers, makerDisplayName, type MakerProfile } from '@stlstr/napplet-kit/profiles';
+  import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { onMount } from 'svelte';
 
   /**
@@ -435,25 +436,28 @@
         {@const duplicates = duplicateCounts.get(file.meta.sha256) ?? 1}
         <li class="rounded-box border border-base-300 p-3" data-testid="part-row">
           <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="truncate font-medium" data-testid="part-name">{file.meta.name}</span>
-                {#if duplicates > 1}
-                  <!-- Same bytes, several events. Only visible from here, so it is named
-                       rather than silently rendered as unrelated rows. -->
-                  <span class="badge badge-warning badge-sm" data-testid="part-duplicate">
-                    {duplicates} copies
-                  </span>
+            <div class="flex min-w-0 gap-3">
+              <PartThumb file={file.meta} />
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="truncate font-medium" data-testid="part-name">{file.meta.name}</span>
+                  {#if duplicates > 1}
+                    <!-- Same bytes, several events. Only visible from here, so it is named
+                         rather than silently rendered as unrelated rows. -->
+                    <span class="badge badge-warning badge-sm" data-testid="part-duplicate">
+                      {duplicates} copies
+                    </span>
+                  {/if}
+                </div>
+                <div class="text-xs text-base-content/60">
+                  {[formatBytes(file.meta.sizeBytes), file.meta.mime, formatDate(file.createdAt)]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
+                {#if file.description}
+                  <p class="mt-1 line-clamp-2 text-sm text-base-content/70">{file.description}</p>
                 {/if}
               </div>
-              <div class="text-xs text-base-content/60">
-                {[formatBytes(file.meta.sizeBytes), file.meta.mime, formatDate(file.createdAt)]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
-              {#if file.description}
-                <p class="mt-1 line-clamp-2 text-sm text-base-content/70">{file.description}</p>
-              {/if}
             </div>
 
             <div class="flex flex-wrap gap-2">

@@ -6,6 +6,8 @@
   "sideEffects": false,
   "exports": {
     "./files": "./src/files.ts",
+    "./images": "./src/images.ts",
+    "./components/PartThumb.svelte": "./src/components/PartThumb.svelte",
     "./profiles": "./src/profiles.ts",
     "./components/MakerLink.svelte": "./src/components/MakerLink.svelte"
   },
