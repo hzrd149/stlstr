@@ -37,6 +37,15 @@
 - Browser smoke tests are separate: `pnpm test:browser` requires a system Chromium or `PUPPETEER_EXECUTABLE_PATH`, writes the dev registry, builds `counter`, and serves the host on `127.0.0.1:5174` by default (`STLSTR_TEST_HOST` / `STLSTR_TEST_PORT` override it).
 - Formatting is Prettier via `pnpm format:check` / `pnpm format`; `pnpm-lock.yaml`, `dist`, `.turbo`, and napplet sidecar manifests are ignored by Prettier.
 
+## Source Control
+
+- **Commit every finished feature.** As soon as a unit of work builds and its checks pass, commit it. Uncommitted work is the only work that can be lost, and this tree has already lost a day's worth once.
+- Do not batch a whole session into one commit at the end. Commit at each point the tree is coherent — a shell service, a napplet, a test suite — so any single mistake costs one step instead of everything.
+- **More than one agent may be editing this tree at the same time.** Before running anything that discards working-tree state, assume someone else has uncommitted work in it and check `git status` first. `git reset --hard`, `git checkout -- .`, `git clean`, and `git stash` all destroy other agents' changes without warning; a stash is not safe just because it is reversible in principle, because the next `git stash drop` makes it unreachable.
+- Prefer committing over stashing. If you need a clean tree, commit the current state (a WIP commit is fine and can be amended) rather than shelving it.
+- If work does go missing, it is usually still in the object store: `git reflog` shows resets, and `git fsck --unreachable --dangling` finds dropped stash commits and orphaned blobs. Back up the working tree before attempting any recovery.
+- Never commit generated artifacts — `dist`, `.turbo`, `apps/stlstr/public/napplets.dev.json`, and napplet sidecar manifests are all ignored on purpose.
+
 ## Napplet Workflow
 
 - Scaffold new napplets with `pnpm new <name> ["Display Title"] [-- <generator flags>]`; this wraps `npx @napplet/boilerplate` and then `scripts/lib/adopt.mjs` normalizes the package for this monorepo.
@@ -51,7 +60,8 @@
 
 - `apps/stlstr/src/App.tsx` routes each path to a napplet in a sandboxed iframe with `sandbox="allow-scripts"`, injecting only the NAP domains that route grants.
 - `@kehto/runtime` handles `storage`, `media`, `keys`, `notify`, and `theme` itself; every other domain (`outbox`, `upload`, `resource`, `intent`, `common`, `count`, `lists`, `link`, ...) is **service-only** and does nothing until the shell registers a handler in `createStlstrAdapter().services`. Unhandled messages surface through `onUnroutedMessage`.
-- Registered so far: `outbox` and `upload` (Applesauce/Blossom backed), `resource` (`services/resource.ts`), and `intent` (`services/intent.ts`). `common` and `count` are granted on some routes but still unregistered.
+- Registered so far: `outbox` and `upload` (Applesauce/Blossom backed), `resource` (`services/resource.ts`), `intent` (`services/intent.ts`), `identity` (`@kehto/services`, signer-backed), and `link` (`services/links.ts`). `common` and `count` are granted on some routes but still unregistered.
+- NAP-IDENTITY is read-only and request/response, so a napplet that asked "who is signed in?" at mount holds a stale answer until the shell pushes `bridge.injectEvent('identity:changed', { pubkey })`. That push is what lets owner-gated actions appear on login without a reload.
 - NAP-RESOURCE is the shell's fetch boundary: any `https` origin is grantable, but the host `fetch` enforces scheme, private-host, 10 MiB, 30s, and concurrency limits and re-types every response by sniffing so upstream `Content-Type` never reaches a napplet. Dev builds also allow `http` to private hosts for the local Blossom server.
 - NAP-INTENT resolves archetypes to shell routes rather than new windows, so `intent.open('object-detail', { address })` is a navigation. Navigation is deferred a tick so the caller's result arrives before its iframe unmounts.
 - `apps/stlstr/vite.config.ts` has a dev-only middleware for `/napplets.dev.json` and `/napplets.dev/<name>/*`; if a napplet 404s in the host, build/watch its `dist` first.
