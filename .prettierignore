@@ -1,0 +1,14 @@
+# Dependencies & build output
+node_modules
+dist
+.turbo
+coverage
+
+# Generated / lockfiles / sidecars
+pnpm-lock.yaml
+.nip5a-manifest.json
+
+# Symlink (its target AGENTS.md is formatted directly)
+CLAUDE.md
+.agents
+.claude

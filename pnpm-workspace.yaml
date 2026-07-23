@@ -1,0 +1,21 @@
+packages:
+  - 'apps/*'
+  - 'lib/*'
+  - 'napplets/*'
+  # Local repo tooling (e.g. the `napplet` launcher that runs @napplet/cli from JSR).
+  - 'tools/*'
+
+allowBuilds:
+  esbuild: true
+  puppeteer: false
+
+# This is a development workspace: we deliberately do NOT pin or override any
+# versions so napplets are always tested against the real, latest resolved
+# versions of `@napplet/*` from JSR and their transitive deps. If a real
+# incompatibility surfaces, fix it at the source, not with an override here.
+
+# esbuild's postinstall fetches its platform binary (vite depends on it), so it
+# must be allow-listed. Puppeteer uses the system Chromium found by
+# scripts/test-browser.mjs, so its browser download postinstall stays disabled.
+onlyBuiltDependencies:
+  - esbuild

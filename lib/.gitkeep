@@ -1,0 +1,2 @@
+# Shared workspace library packages used by the stlstr app and napplets.
+# Add a new package with: pnpm gts init ./lib/<name>  (or your preferred scaffold)
