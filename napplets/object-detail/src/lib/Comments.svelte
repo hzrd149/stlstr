@@ -121,6 +121,7 @@
    */
   $effect(() => {
     const scope = address;
+    const author = object?.pubkey ?? '';
 
     comments = new Map();
     replyTo = null;
@@ -136,7 +137,10 @@
 
     loading = true;
 
-    const subscription = outbox.subscribe([threadFilter(scope)]);
+    // A root-scope filter names no authors, so the shell has nothing to route on by
+    // itself. The hint points it at the object author's relays instead of the app's
+    // fallback set — the thread lives where the object was published.
+    const subscription = outbox.subscribe([threadFilter(scope)], { authors: [author] });
     subscription.on('event', (result) => ingest(result.event));
     subscription.on('closed', (reason) => {
       loading = false;
