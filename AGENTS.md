@@ -11,7 +11,7 @@
 - Shell stack: Kehto hosts and dispatches napplet protocol messages; Applesauce is the intended Nostr engine behind shell services, not direct `nostr-tools` or ad hoc relay code.
 - Use Applesauce docs/MCP before designing shell-side Nostr behavior. Relevant surfaces include `EventStore`, relay pools/loaders, models/casting, account/signing helpers, actions, React bindings, content parsing, encrypted-content caching, event caching, and Blossom/file examples.
 - NAP boundary: napplets should be small contained UX pieces that call `@napplet/sdk`; the shell translates those NAP calls into identity, config, Nostr, Blossom, storage, cache, media, and relay behavior.
-- Planned napplet domains are product slices such as browsing parts, uploading STL/files, thing/detail views, maker profiles, collections, comments/reactions, and makes. `counter` is only the current reference napplet proving NAP-STORAGE wiring.
+- Planned napplet domains are product slices such as browsing parts, uploading STL/files, thing/detail views, maker profiles, collections, comments/reactions, and makes.
 
 ## Product UX
 
@@ -31,10 +31,10 @@
 - Full local dev is `pnpm dev`: starts `@apps/stlstr` on `127.0.0.1:5173`, builds every napplet with `vite build --watch`, writes `apps/stlstr/public/napplets.dev.json`, and starts Kehto Paja on `127.0.0.1:5197`.
 - Use `pnpm dev --no-paja` for host + napplet build-watch only. Dev ports can be overridden with `--host`, `--app-port`, `--paja-port` or `STLSTR_DEV_HOST`, `STLSTR_APP_PORT`, `STLSTR_PAJA_PORT`, `STLSTR_NO_PAJA=1`.
 - Root `pnpm build` only builds napplets. Build the host with `pnpm build:app` or `pnpm --filter @apps/stlstr build`.
-- Focused napplet verification: `pnpm --filter counter verify`; conformance: `pnpm --filter counter test:conformance`.
+- Focused napplet verification: `pnpm --filter part-preview verify`; conformance: `pnpm --filter part-preview test:conformance`.
 - Root verification: `pnpm verify` runs `pnpm test`, then turbo `type-check` and `build` for `napplets/*` and `lib/*`; it does not build/lint the host app.
 - Host lint/build checks are separate: `pnpm --filter @apps/stlstr lint` and `pnpm --filter @apps/stlstr build`.
-- Browser smoke tests are separate: `pnpm test:browser` requires a system Chromium or `PUPPETEER_EXECUTABLE_PATH`, writes the dev registry, builds `counter`, and serves the host on `127.0.0.1:5174` by default (`STLSTR_TEST_HOST` / `STLSTR_TEST_PORT` override it).
+- Browser smoke tests are separate: `pnpm test:browser` requires a system Chromium or `PUPPETEER_EXECUTABLE_PATH`, writes the dev registry, builds the napplets under test (`testNapplets` in `scripts/test-browser.mjs`), and serves the host on `127.0.0.1:5174` by default (`STLSTR_TEST_HOST` / `STLSTR_TEST_PORT` override it).
 - Formatting is Prettier via `pnpm format:check` / `pnpm format`; `pnpm-lock.yaml`, `dist`, `.turbo`, and napplet sidecar manifests are ignored by Prettier.
 
 ## Publishing Napplets
