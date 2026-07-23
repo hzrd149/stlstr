@@ -1,7 +1,7 @@
 /**
  * Gallery image loading through NAP-RESOURCE.
  *
- * `<img src="https://…">` is outside the napplet's authority boundary, so every image —
+ * Direct remote image URLs are outside the napplet's authority boundary, so every image —
  * cover, thumbnail, avatar — is fetched as bytes by the shell and turned into an object URL
  * here. Loads are gated so a large gallery does not burst the shell with fetches.
  */
