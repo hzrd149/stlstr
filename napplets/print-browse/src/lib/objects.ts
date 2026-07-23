@@ -111,18 +111,19 @@ export function sortByNewest(objects: Iterable<PrintableObject>): PrintableObjec
 }
 
 /**
- * Client-side filtering over what has already streamed in. Relay-side search (NIP-50) is a
- * follow-up; this keeps the feed responsive while the subscription is still open.
+ * Client-side post-filtering over what has streamed in. Relays get NIP-50 search and
+ * NIP-91 `&t` filters too, but local filtering keeps results precise when a relay ignores
+ * either extension and falls back to broader NIP-01 `#t` semantics.
  */
 export function filterObjects(
   objects: PrintableObject[],
-  { query = '', topic = '' }: { query?: string; topic?: string },
+  { query = '', topics = [] }: { query?: string; topics?: string[] },
 ): PrintableObject[] {
   const needle = query.trim().toLowerCase();
-  const wanted = topic.trim().toLowerCase();
+  const wanted = topics.map((topic) => topic.trim().toLowerCase()).filter(Boolean);
 
   return objects.filter((object) => {
-    if (wanted && !object.topics.includes(wanted)) return false;
+    if (wanted.some((topic) => !object.topics.includes(topic))) return false;
     if (!needle) return true;
     return (
       object.title.toLowerCase().includes(needle) ||

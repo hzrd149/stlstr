@@ -2,6 +2,7 @@
   import { inc, intent, outbox } from '@napplet/sdk';
   import MakerLink from '@stlstr/napplet-kit/components/MakerLink.svelte';
   import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
+  import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import { onMount } from 'svelte';
   import CoverImage from './lib/CoverImage.svelte';
   import {
@@ -30,35 +31,68 @@
   /** Names are looked up in batches so a fast-streaming feed does not fan out per card. */
   const MAKER_LOOKUP_DELAY_MS = 300;
 
+  type BrowseFilter = {
+    kinds: number[];
+    limit: number;
+    search?: string;
+    [key: `#${string}`]: string[] | undefined;
+    [key: `&${string}`]: string[] | undefined;
+  };
+
   let objects = $state(new Map<string, PrintableObject>());
   let makers = $state(new Map<string, MakerProfile>());
   let query = $state('');
   let searchInput = $state('');
-  let topic = $state('');
+  let topics = $state<string[]>([]);
+  let sortMode = $state<'relevance' | 'newest'>('newest');
   let status = $state('');
   let loading = $state(true);
 
-  const feed = $derived(filterObjects(sortByNewest(objects.values()), { query, topic }));
+  const orderedObjects = $derived(
+    query && sortMode === 'relevance' ? [...objects.values()] : sortByNewest(objects.values()),
+  );
+  const feed = $derived(filterObjects(orderedObjects, { query, topics }));
 
-  function napplets(): Record<string, unknown> {
-    return ((window as Window & { napplet?: Record<string, unknown> }).napplet ?? {}) as Record<
-      string,
-      unknown
-    >;
+  const hasInc = () => hasMethods('inc', 'emit', 'on');
+  const hasIntent = () => hasMethods('intent', 'open');
+  const hasOutbox = () => hasMethods('outbox', 'subscribe');
+
+  function normalizeTopic(value: string): string {
+    return value.trim().replace(/^#+/, '').toLowerCase();
   }
 
-  const hasInc = () => {
-    const domain = napplets().inc as { emit?: unknown; on?: unknown } | undefined;
-    return typeof domain?.emit === 'function' && typeof domain?.on === 'function';
-  };
-  const hasIntent = () => {
-    const domain = napplets().intent as { open?: unknown } | undefined;
-    return typeof domain?.open === 'function';
-  };
-  const hasOutbox = () => {
-    const domain = napplets().outbox as { subscribe?: unknown } | undefined;
-    return typeof domain?.subscribe === 'function';
-  };
+  function normalizeTopics(values: unknown[]): string[] {
+    return [
+      ...new Set(
+        values
+          .filter((value): value is string => typeof value === 'string')
+          .map(normalizeTopic)
+          .filter(Boolean),
+      ),
+    ];
+  }
+
+  function parseSearchInput(input: string): { query: string; topics: string[] } {
+    const topics = normalizeTopics(input.match(/(^|\s)#([^\s#]+)/g)?.map((tag) => tag.trim()) ?? []);
+    const query = input.replace(/(^|\s)#[^\s#]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return { query, topics };
+  }
+
+  function searchText(nextQuery: string, nextTopics: string[]): string {
+    return `${nextQuery.trim()}${nextTopics.map((tag) => ` #${tag}`).join('')}`.trim();
+  }
+
+  function buildFilter(): BrowseFilter {
+    const filter: BrowseFilter = { kinds: [OBJECT_KIND], limit: FEED_LIMIT };
+    if (query) filter.search = query;
+    if (topics.length === 1) filter['#t'] = topics;
+    if (topics.length > 1) {
+      filter['&t'] = topics;
+      // NIP-91 requires clients to include the equivalent OR tag for older relays.
+      filter['#t'] = topics;
+    }
+    return filter;
+  }
 
   // ---------------------------------------------------------------- maker names
 
@@ -83,6 +117,8 @@
 
   // ---------------------------------------------------------------- the feed
 
+  let closeFeed: (() => void) | undefined;
+
   function ingest(event: Parameters<typeof toPrintableObject>[0]): void {
     const object = toPrintableObject(event);
     if (!object) return;
@@ -102,7 +138,7 @@
       return undefined;
     }
 
-    const subscription = outbox.subscribe([{ kinds: [OBJECT_KIND], limit: FEED_LIMIT }]);
+    const subscription = outbox.subscribe([buildFilter()]);
     subscription.on('event', (result) => ingest(result.event));
     subscription.on('closed', (reason) => {
       loading = false;
@@ -119,6 +155,15 @@
       window.clearTimeout(deadline);
       subscription.close();
     };
+  }
+
+  function restartFeed(): void {
+    closeFeed?.();
+    closeFeed = undefined;
+    objects = new Map();
+    status = '';
+    loading = true;
+    closeFeed = openFeed();
   }
 
   // ---------------------------------------------------------------- navigation
@@ -140,29 +185,64 @@
    * Enter key instead.
    */
   function onSearch(): void {
-    const next = searchInput.trim();
+    const raw = searchInput.trim();
+    const next = parseSearchInput(raw);
+    openSearch(next.query, next.topics);
+  }
 
+  function openSearch(nextQuery: string, nextTopics: string[]): void {
+    const normalized = normalizeTopics(nextTopics);
+    const raw = searchText(nextQuery, normalized);
     // Route through the shell so the URL matches what is shown and the search is linkable.
-    if (hasIntent()) void intent.open('printable-browse', next ? { query: next } : {});
-    else query = next;
+    if (hasIntent()) void intent.open('printable-browse', raw ? { query: raw } : {});
+    else {
+      query = nextQuery.trim();
+      topics = normalized;
+      searchInput = raw;
+      restartFeed();
+    }
+  }
+
+  function removeTopic(topic: string): void {
+    openSearch(
+      query,
+      topics.filter((entry) => entry !== topic),
+    );
+  }
+
+  function clearSearch(): void {
+    openSearch('', []);
   }
 
   function openTopic(next: string): void {
     if (hasIntent()) void intent.open('printable-browse', { tag: next });
-    else topic = next;
+    else {
+      query = '';
+      topics = normalizeTopics([next]);
+      searchInput = '';
+      restartFeed();
+    }
   }
 
   // ---------------------------------------------------------------- lifecycle
 
   function applyIntent(payload: unknown): void {
-    const values = (payload ?? {}) as { query?: unknown; tag?: unknown };
-    query = typeof values.query === 'string' ? values.query : '';
-    topic = typeof values.tag === 'string' ? values.tag : '';
-    searchInput = query;
+    const values = (payload ?? {}) as { query?: unknown; tag?: unknown; tags?: unknown };
+    const parsed = parseSearchInput(typeof values.query === 'string' ? values.query : '');
+    query = parsed.query;
+    topics = normalizeTopics([
+      ...parsed.topics,
+      ...(typeof values.tag === 'string' ? [values.tag] : []),
+      ...(typeof values.tags === 'string' ? values.tags.split(',') : []),
+      ...(Array.isArray(values.tags) ? values.tags : []),
+    ]);
+    sortMode = query ? 'relevance' : 'newest';
+    searchInput = searchText(query, topics);
+    restartFeed();
   }
 
   onMount(() => {
-    const closeFeed = openFeed();
+    closeFeed = openFeed();
 
     if (!hasInc()) return closeFeed;
 
@@ -179,22 +259,66 @@
 </script>
 
 <main class="min-h-screen bg-base-100 p-4">
-  <div class="join w-full" role="search">
-    <input
-      class="input join-item w-full"
-      placeholder="Search phone stands, minis, brackets..."
-      aria-label="Search prints"
-      bind:value={searchInput}
-      onkeydown={(event) => event.key === 'Enter' && onSearch()}
-    />
-    <button type="button" class="btn btn-primary join-item" onclick={onSearch}>Search</button>
+  <div class="flex flex-col gap-2 sm:flex-row" role="search">
+    <div class="join min-w-0 flex-1">
+      <input
+        class="input join-item w-full"
+        placeholder="Search phone stands, minis, brackets... add #tags to narrow"
+        aria-label="Search prints"
+        bind:value={searchInput}
+        onkeydown={(event) => event.key === 'Enter' && onSearch()}
+      />
+      <button type="button" class="btn btn-primary join-item" onclick={onSearch}>Search</button>
+    </div>
+
+    <label class="select w-full sm:w-44" aria-label="Sort results">
+      <span class="label">Sort</span>
+      <select bind:value={sortMode}>
+        <option value="relevance">Relevance</option>
+        <option value="newest">Newest</option>
+      </select>
+    </label>
   </div>
 
-  {#if topic}
+  <p class="mt-2 text-xs text-base-content/60">
+    Use hashtags together, like <span class="font-mono">#desk #organizer</span>, to ask NIP-91
+    relays for prints matching every tag.
+  </p>
+
+  {#if query || topics.length > 0}
+    <div class="mt-3 flex flex-wrap items-center gap-2" aria-label="Active search filters">
+      {#if query}
+        <span class="badge badge-primary badge-soft gap-1" data-testid="browse-query-chip">
+          {query}
+        </span>
+      {/if}
+
+      {#each topics as entry (entry)}
+        <button
+          type="button"
+          class="badge badge-secondary badge-soft gap-1"
+          data-testid="browse-tag-chip"
+          aria-label={`Remove #${entry}`}
+          onclick={() => removeTopic(entry)}
+        >
+          #{entry} <span aria-hidden="true">x</span>
+        </button>
+      {/each}
+
+      <button type="button" class="btn btn-ghost btn-xs" onclick={clearSearch}>Clear</button>
+      <span class="text-xs text-base-content/60" data-testid="browse-result-count">
+        {loading ? 'Searching...' : `${feed.length} ${feed.length === 1 ? 'result' : 'results'}`}
+      </span>
+    </div>
+  {/if}
+
+  {#if topics.length > 0}
     <p class="mt-3 text-sm text-base-content/70" data-testid="browse-tag">
-      Showing prints tagged #{topic}
+      Showing prints tagged {topics.map((entry) => `#${entry}`).join(' + ')}
     </p>
-  {:else if query}
+  {/if}
+
+  {#if query}
     <p class="mt-3 text-sm text-base-content/70" data-testid="browse-query">
       Showing results for {query}
     </p>
@@ -212,7 +336,7 @@
     </section>
   {:else if feed.length === 0}
     <p class="mt-6 text-base-content/70" data-testid="browse-empty">
-      {#if query || topic}
+      {#if query || topics.length > 0}
         Nothing published here matches that yet. Try a broader search.
       {:else}
         No prints have been published to these relays yet. Be the first to share one.
@@ -221,7 +345,7 @@
   {:else}
     <section
       class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-      aria-label="Recently published prints"
+      aria-label={query ? 'Search results' : 'Recently published prints'}
       data-testid="browse-results"
     >
       {#each feed as object (object.address)}
