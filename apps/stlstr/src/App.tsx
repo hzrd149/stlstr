@@ -673,7 +673,6 @@ function NappletFrame({
   title,
   intent,
   frameKey,
-  fill = false,
 }: {
   napplet: string;
   routeId: string;
@@ -690,8 +689,6 @@ function NappletFrame({
    * constant so a base-route change underneath it cannot destroy an open preview.
    */
   frameKey?: string;
-  /** Size to the containing box rather than the viewport. Used inside the preview dialog. */
-  fill?: boolean;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const bridgeRef = useRef<ShellBridge | null>(null);
@@ -863,17 +860,13 @@ function NappletFrame({
   }, [intent, intentKey]);
 
   return (
-    <section className={fill ? 'flex h-full flex-col bg-base-100' : 'bg-base-100'}>
+    <section className="flex h-full flex-col bg-base-100">
       <iframe
         key={identity}
         ref={iframeRef}
         title={`${title} napplet`}
         sandbox="allow-scripts"
-        className={
-          fill
-            ? 'h-full w-full flex-1 border-0 bg-base-100'
-            : 'min-h-screen w-full border-0 bg-base-100'
-        }
+        className="h-full w-full flex-1 border-0 bg-base-100"
       />
       <span className="sr-only" aria-live="polite">
         {status}
@@ -960,7 +953,6 @@ function PreviewDialog() {
             // Constant: the dialog outlives base-route changes underneath it, and a new
             // file is redelivered to the live napplet rather than rebuilding the viewer.
             frameKey="overlay-preview"
-            fill
           />
         </div>
       </div>
@@ -1163,9 +1155,9 @@ function ShellLayout() {
   );
 
   return (
-    <div className="drawer min-h-screen bg-base-200">
+    <div className="drawer h-dvh overflow-hidden bg-base-200">
       <input id="stlstr-drawer" type="checkbox" className="drawer-toggle" />
-      <div className="drawer-content flex min-h-screen flex-col">
+      <div className="drawer-content flex h-dvh flex-col">
         <header className="navbar bg-base-100 shadow-sm">
           <div className="flex-none lg:hidden">
             <label
@@ -1193,7 +1185,7 @@ function ShellLayout() {
           </div>
         </header>
 
-        <main className="flex-1 bg-base-100">
+        <main className="min-h-0 flex-1 overflow-auto bg-base-100">
           <Outlet />
         </main>
 
