@@ -9,9 +9,25 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'object-detail',
-      requires: ['outbox'],
+      // The shell grants exactly this list; optional domains stay optional by
+      // being guarded at runtime (`if (window.napplet?.count)`), not by being
+      // absent here. `inc` is the NAP-INTENT payload delivery seam.
+      requires: [
+        'outbox',
+        'inc',
+        'identity',
+        'common',
+        'count',
+        'resource',
+        'link',
+        'intent',
+        'theme',
+        'storage',
+      ],
       artifactMode: 'single-file',
-      archetypes: [{ slug: 'object-detail', naps: ['outbox'] }],
+      // The protocol names the payload SHAPE this role accepts — an unnumbered
+      // convention per the naps repo, not a NAP domain.
+      archetypes: [{ slug: 'object-detail', naps: ['napplet:object-detail/open'] }],
     }),
   ],
   build: {

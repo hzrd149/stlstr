@@ -15,6 +15,19 @@
     { id: 'files', title: 'Files', helper: 'Attach printable resources.' },
     { id: 'review', title: 'Review', helper: 'Publish the Nostr events.' },
   ];
+  const CUSTOM_LICENSE = '__custom';
+  const LICENSE_OPTIONS: Array<{ id: string; label: string }> = [
+    { id: 'CC0-1.0', label: 'CC0 1.0 — public domain' },
+    { id: 'CC-BY-4.0', label: 'CC BY 4.0 — credit required' },
+    { id: 'CC-BY-SA-4.0', label: 'CC BY-SA 4.0 — credit, share alike' },
+    { id: 'CC-BY-NC-4.0', label: 'CC BY-NC 4.0 — credit, noncommercial' },
+    { id: 'CC-BY-NC-SA-4.0', label: 'CC BY-NC-SA 4.0 — credit, noncommercial, share alike' },
+    { id: 'CC-BY-ND-4.0', label: 'CC BY-ND 4.0 — credit, no derivatives' },
+    { id: 'CC-BY-NC-ND-4.0', label: 'CC BY-NC-ND 4.0 — credit, noncommercial, no derivatives' },
+    { id: 'MIT', label: 'MIT' },
+    { id: 'Apache-2.0', label: 'Apache 2.0' },
+    { id: 'GPL-3.0-or-later', label: 'GPL 3.0 or later' },
+  ];
   const ROLE_LABELS: Record<FileRole, string> = {
     part: 'Part file',
     instructions: 'Instructions',
@@ -29,6 +42,7 @@
   let summary = $state('');
   let description = $state('');
   let license = $state('CC-BY-4.0');
+  let customLicense = $state(false);
   let tagsText = $state('');
   let sourceUrl = $state('');
   let imageFiles = $state<File[]>([]);
@@ -70,8 +84,10 @@
       .slice(0, 80);
   }
 
-  function updateSlugFromTitle(): void {
-    if (!slug.trim()) slug = slugify(title);
+  function onLicenseChange(event: Event): void {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    customLicense = value === CUSTOM_LICENSE;
+    license = customLicense ? '' : value;
   }
 
   function stepComplete(step: StepId): boolean {
@@ -82,7 +98,7 @@
   }
 
   function stepMessage(step: StepId): string {
-    if (step === 'basics') return 'Add a title, slug, and description before continuing.';
+    if (step === 'basics') return 'Add a title and description before continuing.';
     if (step === 'images') return 'Add at least one image. The first image is the cover.';
     if (step === 'files')
       return 'Add at least one printable part, instruction, video, or auxiliary file.';
@@ -304,6 +320,7 @@
     summary = draft.summary ?? summary;
     description = draft.description ?? description;
     license = draft.license ?? license;
+    customLicense = !LICENSE_OPTIONS.some((option) => option.id === license);
     tagsText = draft.tagsText ?? tagsText;
     sourceUrl = draft.sourceUrl ?? sourceUrl;
     status = 'Loaded saved text draft. Reselect files before publishing.';
@@ -311,7 +328,7 @@
 
   async function openPublishedObject(): Promise<void> {
     if (!publishedAddress || !hasIntent()) return;
-    await intent.open('printable-object', { address: publishedAddress });
+    await intent.open('object-detail', { address: publishedAddress });
   }
 
   onMount(() => {
@@ -350,40 +367,25 @@
           Add the human-facing metadata for this printable object.
         </p>
 
-        <div class="grid gap-4 md:grid-cols-2">
-          <label class="form-control">
-            <span class="label-text">Title</span>
-            <input
-              id="object-title"
-              class="input input-bordered"
-              bind:value={title}
-              onblur={updateSlugFromTitle}
-              placeholder="Adjustable phone stand"
-            />
-          </label>
-          <label class="form-control">
-            <span class="label-text">Slug / d tag</span>
-            <input
-              class="input input-bordered"
-              bind:value={slug}
-              placeholder="adjustable-phone-stand"
-            />
-          </label>
-        </div>
-
-        <label class="form-control">
-          <span class="label-text">Summary</span>
+        <label class="fieldset">
+          <span class="fieldset-legend">Title</span>
           <input
-            class="input input-bordered"
-            bind:value={summary}
-            placeholder="A short object tagline"
+            id="object-title"
+            class="input w-full"
+            bind:value={title}
+            placeholder="Adjustable phone stand"
           />
         </label>
 
-        <label class="form-control">
-          <span class="label-text">Description and print instructions</span>
+        <label class="fieldset">
+          <span class="fieldset-legend">Summary</span>
+          <input class="input w-full" bind:value={summary} placeholder="A short object tagline" />
+        </label>
+
+        <label class="fieldset">
+          <span class="fieldset-legend">Description and print instructions</span>
           <textarea
-            class="textarea textarea-bordered"
+            class="textarea w-full"
             bind:value={description}
             rows="9"
             placeholder="Markdown description, print orientation, assembly notes, attribution, and settings."
@@ -391,28 +393,59 @@
         </label>
 
         <div class="grid gap-4 md:grid-cols-2">
-          <label class="form-control">
-            <span class="label-text">License</span>
-            <input class="input input-bordered" bind:value={license} placeholder="CC-BY-4.0" />
-          </label>
-          <label class="form-control">
-            <span class="label-text">Tags</span>
-            <input
-              class="input input-bordered"
-              bind:value={tagsText}
-              placeholder="desk, organizer, pla"
-            />
+          <div class="fieldset">
+            <span class="fieldset-legend">License</span>
+            <select
+              class="select w-full"
+              aria-label="License"
+              value={customLicense ? CUSTOM_LICENSE : license}
+              onchange={onLicenseChange}
+            >
+              {#each LICENSE_OPTIONS as option}
+                <option value={option.id}>{option.label}</option>
+              {/each}
+              <option value={CUSTOM_LICENSE}>Other (SPDX identifier)</option>
+            </select>
+            {#if customLicense}
+              <input
+                class="input w-full"
+                aria-label="Custom SPDX license identifier"
+                bind:value={license}
+                placeholder="GPL-3.0-or-later"
+              />
+            {/if}
+          </div>
+          <label class="fieldset">
+            <span class="fieldset-legend">Tags</span>
+            <input class="input w-full" bind:value={tagsText} placeholder="desk, organizer, pla" />
           </label>
         </div>
 
-        <label class="form-control">
-          <span class="label-text">Imported source URL</span>
+        <label class="fieldset">
+          <span class="fieldset-legend">Imported source URL</span>
           <input
-            class="input input-bordered"
+            class="input w-full"
             bind:value={sourceUrl}
             placeholder="https://www.printables.com/model/..."
           />
         </label>
+
+        <details class="collapse-arrow collapse border border-base-300 bg-base-200">
+          <summary class="collapse-title text-sm font-medium">Advanced settings</summary>
+          <div class="collapse-content">
+            <label class="fieldset">
+              <span class="fieldset-legend">Slug / d tag</span>
+              <input
+                class="input w-full"
+                bind:value={slug}
+                placeholder={slugify(title) || 'adjustable-phone-stand'}
+              />
+              <span class="fieldset-label">
+                Identifies the object. Derived from the title unless you set it here.
+              </span>
+            </label>
+          </div>
+        </details>
       </section>
     {:else if currentStep === 'images'}
       <section class="grid gap-4" aria-label="Object images">
@@ -420,16 +453,16 @@
           Images stay inline as ordered imeta tags. The first image is the cover.
         </p>
 
-        <label class="form-control">
-          <span class="label-text">Select images</span>
+        <label class="fieldset">
+          <span class="fieldset-legend">Select images</span>
           <input
-            class="file-input file-input-bordered w-full"
+            class="file-input w-full"
             type="file"
             accept="image/*"
             multiple
             onchange={onImageChange}
           />
-          <span class="label-text-alt"
+          <span class="fieldset-label"
             >Use the file picker order for cover and gallery sequencing.</span
           >
         </label>
@@ -458,15 +491,10 @@
           Files become NIP-94 events and are referenced by role from the object.
         </p>
 
-        <label class="form-control">
-          <span class="label-text">Select parts and resources</span>
-          <input
-            class="file-input file-input-bordered w-full"
-            type="file"
-            multiple
-            onchange={onResourceChange}
-          />
-          <span class="label-text-alt"
+        <label class="fieldset">
+          <span class="fieldset-legend">Select parts and resources</span>
+          <input class="file-input w-full" type="file" multiple onchange={onResourceChange} />
+          <span class="fieldset-label"
             >STL, 3MF, PDF, videos, slicer profiles, support files, and related assets.</span
           >
         </label>
@@ -482,7 +510,7 @@
                   </div>
                 </div>
                 <select
-                  class="select select-bordered"
+                  class="select w-full"
                   aria-label={`Role for ${resource.file.name}`}
                   value={resource.role}
                   onchange={(event) =>
@@ -496,7 +524,7 @@
                   {/each}
                 </select>
                 <textarea
-                  class="textarea textarea-bordered md:col-span-3"
+                  class="textarea md:col-span-3 w-full"
                   rows="2"
                   placeholder="Optional file-specific print notes"
                   value={resource.description}

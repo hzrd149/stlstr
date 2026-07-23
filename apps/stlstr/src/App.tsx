@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import {
   createShellBridge,
   injectNappletNamespacePrelude,
@@ -13,6 +13,17 @@ import { NostrConnectSigner } from 'applesauce-signers/signers';
 import { verifyEvent } from 'nostr-tools';
 import { toDataURL } from 'qrcode';
 import {
+  Link,
+  NavLink,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router';
+import {
   accountManager,
   accountManagerReady,
   createNostrConnectLogin,
@@ -21,15 +32,22 @@ import {
   loginWithExtension,
   type StlstrAccount,
 } from './services/accounts';
+import { createIdentityService } from '@kehto/services';
+import { createIntentDelivery, type IntentDelivery } from './services/intent-delivery';
+import { createStlstrIntentService } from './services/intent';
+import { createStlstrLinkService } from './services/links';
 import {
-  NOSTR_EXTRA_RELAYS,
-  NOSTR_LOOKUP_RELAYS,
-  STLSTR_DEV_MODE,
-  getUser,
-  relayPool,
-} from './services/nostr';
+  baseHref,
+  hasPreview,
+  overlayFromLocation,
+  type StlstrIntent,
+} from './services/intent-map';
+import { STLSTR_DEV_MODE, getUser, relayPool } from './services/nostr';
 import { createOutboxService } from './services/outbox';
+import { createStlstrResourceService } from './services/resource';
+import { getAppRelays, getLookupRelays, getSettings } from './services/settings';
 import { createUploadService } from './services/upload';
+import SettingsView from './SettingsView';
 
 declare global {
   interface Window {
@@ -46,51 +64,27 @@ type DevRegistry = {
   napplets?: DevNapplet[];
 };
 
-type AppRoute = {
-  id: string;
-  path: string;
-  title: string;
-  description: string;
-  nav?: 'browse' | 'create';
-  nappletName?: string;
-  domains?: string[];
-  params?: Record<string, string>;
+type AdapterOptions = {
+  /** Pushes a shell route. NAP-INTENT resolves archetypes by navigating the shell. */
+  navigate: (href: string) => void;
+  /** Resolves a napplet window to its NIP-5D identity for NAP-RESOURCE grant checks. */
+  resolveIdentity: (windowId: string) => { dTag: string; aggregateHash: string } | null;
 };
 
-const DEFAULT_ROUTE: AppRoute = {
-  id: 'browse',
-  path: '/',
-  title: 'Browse objects',
-  description: 'Find printable objects published as Nostr events.',
-  nav: 'browse',
-  nappletName: 'browse-objects',
-  domains: ['outbox', 'identity', 'common', 'count', 'resource', 'intent'],
-};
-
-const CREATE_ROUTE: AppRoute = {
-  id: 'create',
-  path: '/create',
-  title: 'Create object',
-  description: 'Publish a new 3D printable object with images and files.',
-  nav: 'create',
-  nappletName: 'create-object',
-  domains: ['storage', 'identity', 'upload', 'outbox', 'intent'],
-};
-
-function createStlstrAdapter(): ShellAdapter {
+function createStlstrAdapter({ navigate, resolveIdentity }: AdapterOptions): ShellAdapter {
   const subscriptions = new Map<string, () => void>();
 
   const getActiveUser = () => {
     const pubkey = accountManager.active?.pubkey;
     return pubkey ? getUser(pubkey) : null;
   };
-  const routeRelayUrls = (relayUrls: string[]) =>
-    STLSTR_DEV_MODE ? NOSTR_EXTRA_RELAYS : relayUrls;
+  const routeRelayUrls = (relayUrls: string[]) => (STLSTR_DEV_MODE ? getAppRelays() : relayUrls);
 
   return {
     relayPool: {
       getRelayPool: () => ({
-        subscription: (relayUrls, filters) => relayPool.subscription(routeRelayUrls(relayUrls), filters),
+        subscription: (relayUrls, filters) =>
+          relayPool.subscription(routeRelayUrls(relayUrls), filters),
         publish: (relayUrls, event) => {
           void relayPool.publish(routeRelayUrls(relayUrls), event);
         },
@@ -104,15 +98,16 @@ function createStlstrAdapter(): ShellAdapter {
       openScopedRelay: () => {},
       closeScopedRelay: () => {},
       publishToScopedRelay: () => false,
-      selectRelayTier: () => NOSTR_EXTRA_RELAYS,
+      selectRelayTier: () => getAppRelays(),
     },
     relayConfig: {
+      // Relay lists are owned by the settings view; napplets only read them.
       addRelay: () => {},
       removeRelay: () => {},
       getRelayConfig: () => ({
-        discovery: NOSTR_LOOKUP_RELAYS,
-        super: NOSTR_EXTRA_RELAYS,
-        outbox: NOSTR_EXTRA_RELAYS,
+        discovery: getLookupRelays(),
+        super: getAppRelays(),
+        outbox: getAppRelays(),
       }),
       getNip66Suggestions: () => [],
     },
@@ -124,7 +119,7 @@ function createStlstrAdapter(): ShellAdapter {
       getSigner: () => accountManager.active?.signer ?? null,
     },
     config: {
-      getNappUpdateBehavior: () => 'banner',
+      getNappUpdateBehavior: () => getSettings().nappletUpdateBehavior,
     },
     hotkeys: {
       executeHotkeyFromForward: () => {},
@@ -147,6 +142,14 @@ function createStlstrAdapter(): ShellAdapter {
         getActiveUser,
         getSigner: () => accountManager.active?.signer ?? null,
       }),
+      resource: createStlstrResourceService({ resolveIdentity }),
+      intent: createStlstrIntentService({ navigate }),
+      // NAP-IDENTITY is read-only: napplets learn who the user is, never act as them.
+      // This is what lets a napplet gate an owner-only action such as "Edit".
+      identity: createIdentityService({
+        getSigner: () => accountManager.active?.signer ?? null,
+      }),
+      link: createStlstrLinkService(),
     },
     onUnroutedMessage: (info) => {
       console.warn('[stlstr] dropped napplet message', info);
@@ -166,76 +169,35 @@ async function resolveNappletUrl(name: string, fallbackUrl: string): Promise<str
   }
 }
 
-function normalizePath(pathname: string) {
-  if (pathname.length > 1 && pathname.endsWith('/')) return pathname.slice(0, -1);
-  return pathname || '/';
+/**
+ * Read the NAP domains a napplet declares in its NIP-5A manifest meta tag.
+ *
+ * Each napplet's `nip5aManifest({ requires })` is the single source of truth for
+ * what it needs; the shell grants exactly that instead of duplicating a list per
+ * route. Domains a napplet treats as optional still appear here — optionality is
+ * a runtime guard (`if (window.napplet?.count)`) inside the napplet, not an
+ * absence from the manifest.
+ *
+ * `DOMParser` does not execute scripts, so parsing the artifact is inert.
+ */
+function readNappletDomains(html: string): string[] {
+  const content = new DOMParser()
+    .parseFromString(html, 'text/html')
+    .querySelector('meta[name="napplet-requires"]')
+    ?.getAttribute('content');
+
+  if (!content) return [];
+
+  return content
+    .split(',')
+    .map((domain) => domain.trim())
+    .filter(Boolean);
 }
 
-function decodePart(value: string | undefined) {
-  return value ? decodeURIComponent(value) : '';
-}
-
-function routeFromLocation(location: Location): AppRoute {
-  const path = normalizePath(location.pathname);
-  const parts = path.split('/').filter(Boolean);
-
-  if (path === '/') return DEFAULT_ROUTE;
-  if (path === '/create') return CREATE_ROUTE;
-  if (path === '/search') {
-    const query = new URLSearchParams(location.search).get('q')?.trim() ?? '';
-    return {
-      ...DEFAULT_ROUTE,
-      id: 'search',
-      path: `${path}${location.search}`,
-      title: query ? `Search: ${query}` : 'Search objects',
-      description: 'Search printable objects by name, tag, maker, or file type.',
-      params: { query },
-    };
-  }
-  if (parts[0] === 'tags' && parts[1]) {
-    const tag = decodePart(parts[1]);
-    return {
-      ...DEFAULT_ROUTE,
-      id: 'tag',
-      path,
-      title: `#${tag}`,
-      description: 'Browse printable objects with this tag.',
-      params: { tag },
-    };
-  }
-  if (parts[0] === 'objects' && parts[1] && parts[2] && parts[3] === 'edit') {
-    const pubkey = decodePart(parts[1]);
-    const identifier = decodePart(parts[2]);
-    return {
-      id: 'object-edit',
-      path,
-      title: 'Edit object',
-      description: 'Load an owned printable object and publish a replacement event.',
-      nappletName: 'edit-object',
-      domains: ['outbox', 'upload', 'identity', 'storage', 'resource', 'intent'],
-      params: { pubkey, identifier, address: `33500:${pubkey}:${identifier}` },
-    };
-  }
-  if (parts[0] === 'objects' && parts[1] && parts[2]) {
-    const pubkey = decodePart(parts[1]);
-    const identifier = decodePart(parts[2]);
-    return {
-      id: 'object-detail',
-      path,
-      title: 'Object details',
-      description: 'View images, files, metadata, maker attribution, and object actions.',
-      nappletName: 'object-detail',
-      domains: ['outbox', 'identity', 'common', 'count', 'resource', 'intent', 'link'],
-      params: { pubkey, identifier, address: `33500:${pubkey}:${identifier}` },
-    };
-  }
-
-  return {
-    id: 'not-found',
-    path,
-    title: 'Page not found',
-    description: 'This stlstr route does not exist yet.',
-  };
+/** Collapses the mobile drawer. Navigating with it still open would hide the new page. */
+function closeDrawer() {
+  const drawerToggle = document.getElementById('stlstr-drawer');
+  if (drawerToggle instanceof HTMLInputElement) drawerToggle.checked = false;
 }
 
 function accountLabel(account: StlstrAccount) {
@@ -419,7 +381,7 @@ function LoginDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | n
           x
         </button>
 
-        <h2 className="text-2xl font-bold">Login to stlstr</h2>
+        <h2 className="text-2xl font-bold">Login to STLstr</h2>
         <p className="mt-2 text-sm text-base-content/65">
           Use a browser extension or remote signer. Accounts are saved locally in the shell.
         </p>
@@ -470,10 +432,10 @@ function LoginDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | n
 
         {mode === 'bunker' && (
           <form className="mt-6 grid gap-4" onSubmit={handleBunkerSubmit}>
-            <label className="form-control">
-              <span className="label-text mb-2">Bunker URI</span>
+            <label className="fieldset">
+              <span className="fieldset-legend mb-2">Bunker URI</span>
               <input
-                className="input input-bordered font-mono text-sm"
+                className="input font-mono text-sm w-full"
                 placeholder="bunker://..."
                 value={bunkerUri}
                 onChange={(event) => setBunkerUri(event.target.value)}
@@ -667,6 +629,17 @@ function AccountNav() {
               <button onClick={() => loginDialogRef.current?.showModal()}>Add account</button>
             </li>
             <li>
+              <Link
+                to="/settings"
+                onClick={() => {
+                  // Blur so the DaisyUI dropdown closes; it stays open while focused.
+                  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                }}
+              >
+                Settings
+              </Link>
+            </li>
+            <li>
               <button onClick={() => accountManager.clearActive()}>Disconnect</button>
             </li>
           </ul>
@@ -685,96 +658,209 @@ function AccountNav() {
   );
 }
 
-function NappletFrame({ route }: { route: AppRoute }) {
+/**
+ * Mounts one napplet in a sandboxed iframe and gives it a shell bridge.
+ *
+ * `routeId` names the shell route mounting the napplet; it distinguishes windows
+ * when several routes share one napplet (browse/search/tag all mount
+ * `browse`). The iframe is keyed by pathname, so navigating between two
+ * objects tears the napplet down and rebuilds it against the new address.
+ */
+function NappletFrame({
+  napplet,
+  routeId,
+  title,
+  intent,
+  frameKey,
+  fill = false,
+}: {
+  napplet: string;
+  routeId: string;
+  title: string;
+  /**
+   * The intent this route materializes. Delivered to the napplet once it signals
+   * readiness — see `services/intent-delivery.ts` for why this cannot ride NAP-INTENT.
+   */
+  intent?: StlstrIntent;
+  /**
+   * Identity of this frame. Changing it tears the napplet down and rebuilds it; a payload
+   * change alone does not (that redelivers in place). Defaults to the pathname, which is
+   * what distinguishes one routed napplet from the next. The preview dialog passes a
+   * constant so a base-route change underneath it cannot destroy an open preview.
+   */
+  frameKey?: string;
+  /** Size to the containing box rather than the viewport. Used inside the preview dialog. */
+  fill?: boolean;
+}) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const bridgeRef = useRef<ShellBridge | null>(null);
   const [status, setStatus] = useState('Loading napplet...');
+  const { pathname } = useLocation();
+  const navigate = useShellNavigate();
+  const identity = frameKey ?? pathname;
+
+  // Serializing keeps the effect dep stable across the fresh object each render builds.
+  const intentKey = intent ? JSON.stringify(intent) : '';
+
+  // The payload is NOT a mount dep: a new payload for the same frame is redelivered to the
+  // live napplet rather than remounting it, so an open 3D preview keeps its WebGL context
+  // when the user picks another part. The mount path reads the latest value through the ref.
+  const intentRef = useRef(intent);
+  intentRef.current = intent;
+  const deliveryRef = useRef<IntentDelivery | null>(null);
+  const deliveredKeyRef = useRef('');
+
+  // NAP-INTENT navigates the shell, but a new `navigate` identity must never tear
+  // down a live bridge — so the adapter reads it through a ref instead of a dep.
+  const navigateRef = useRef(navigate);
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
 
   useEffect(() => {
-    if (!route.nappletName) return;
-
     let cancelled = false;
-    const bridge = createShellBridge(createStlstrAdapter());
-    bridgeRef.current = bridge;
-    const windowId = `route-${route.id}-${route.nappletName}`;
-    const aggregateHash = `dev-${route.nappletName}-build`;
+    // The adapter needs the bridge's session registry, and the bridge needs the adapter,
+    // so identity is resolved lazily through this binding rather than at construction.
+    let bridge: ShellBridge | null = null;
+    const adapter = createStlstrAdapter({
+      navigate: (href) => navigateRef.current(href),
+      resolveIdentity: (windowId) => {
+        const entry = bridge?.runtime.sessionRegistry
+          .getAllEntries()
+          .find((session) => session.windowId === windowId);
+        return entry ? { dTag: entry.dTag, aggregateHash: entry.aggregateHash } : null;
+      },
+    });
 
-    const handleMessage = (event: MessageEvent) => bridge.handleMessage(event);
+    const shell = createShellBridge(adapter);
+    bridge = shell;
+    bridgeRef.current = shell;
+    const windowId = `route-${routeId}-${napplet}`;
+    const aggregateHash = `dev-${napplet}-build`;
+
+    const delivery = createIntentDelivery({
+      getTarget: () => iframeRef.current?.contentWindow ?? null,
+    });
+    deliveryRef.current = delivery;
+
+    // Observing the readiness signal is NON-consuming: the message still reaches the
+    // bridge so ordinary inc subscribers see it.
+    //
+    // The source check is load-bearing once more than one frame is mounted — the preview
+    // dialog puts a second napplet on this same `window`. Every frame installs its own
+    // listener and its own bridge, while `originRegistry` is a module-level singleton, so
+    // without this guard frame A's messages reach frame B's bridge, resolve to a windowId
+    // absent from B's session registry, and are either dropped as unrouted or serviced twice.
+    const handleMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      delivery.observeReady(event);
+      shell.handleMessage(event);
+    };
     window.addEventListener('message', handleMessage);
 
     async function loadNapplet() {
       const iframe = iframeRef.current;
-      if (!iframe?.contentWindow || !route.nappletName) return;
+      if (!iframe?.contentWindow) return;
 
-      const fallbackUrl = `/napplets.dev/${route.nappletName}/index.html`;
-      const url = await resolveNappletUrl(route.nappletName, fallbackUrl);
+      const fallbackUrl = `/napplets.dev/${napplet}/index.html`;
+      const url = await resolveNappletUrl(napplet, fallbackUrl);
       const response = await fetch(url, { cache: 'no-store' });
       if (!response.ok) {
-        throw new Error(
-          `Build ${route.nappletName} first: ${response.status} ${response.statusText}`,
-        );
+        throw new Error(`Build ${napplet} first: ${response.status} ${response.statusText}`);
       }
 
       const html = await response.text();
       if (cancelled) return;
 
-      originRegistry.register(iframe.contentWindow, windowId, {
-        dTag: route.nappletName,
-        aggregateHash,
-      });
-      bridge.runtime.sessionRegistry.register(windowId, {
+      const domains = readNappletDomains(html);
+      if (domains.length === 0) {
+        console.warn(
+          `[stlstr] ${napplet} declares no NAP domains; add them to its vite.config nip5aManifest({ requires }).`,
+        );
+      }
+
+      originRegistry.register(iframe.contentWindow, windowId, { dTag: napplet, aggregateHash });
+      shell.runtime.sessionRegistry.register(windowId, {
         pubkey: '',
         windowId,
         origin: window.location.origin,
-        type: route.nappletName,
-        dTag: route.nappletName,
+        type: napplet,
+        dTag: napplet,
         aggregateHash,
         registeredAt: Date.now(),
         instanceId: windowId,
         provenance: 'nip-5d',
       });
 
-      iframe.srcdoc = injectNappletNamespacePrelude(html, {
-        domains: route.domains ?? [],
-      });
-      setStatus(`Loaded ${route.nappletName}`);
+      // Buffer the payload BEFORE the napplet can boot and signal readiness. Read through
+      // the ref, so a payload that changed while this async load was in flight is the one
+      // that gets seeded — the redelivery effect below stands down until this point.
+      const seeded = intentRef.current;
+      if (seeded) {
+        delivery.seed(seeded);
+        deliveredKeyRef.current = JSON.stringify(seeded);
+      }
+
+      iframe.srcdoc = injectNappletNamespacePrelude(html, { domains });
+      setStatus(`Loaded ${napplet}`);
     }
 
     loadNapplet().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : `Failed to load ${route.nappletName}.`);
+      setStatus(error instanceof Error ? error.message : `Failed to load ${napplet}.`);
     });
 
     return () => {
       cancelled = true;
       window.removeEventListener('message', handleMessage);
       originRegistry.unregister(windowId);
-      bridge.runtime.sessionRegistry.unregister(windowId);
-      bridge.destroy();
+      shell.runtime.sessionRegistry.unregister(windowId);
+      shell.destroy();
+      delivery.dispose();
+      deliveryRef.current = null;
+      deliveredKeyRef.current = '';
+      bridge = null;
       bridgeRef.current = null;
     };
-  }, [route]);
+  }, [napplet, routeId, identity]);
 
-  if (!route.nappletName) {
-    return (
-      <section className="grid min-h-screen content-start gap-3 bg-base-100">
-        <div className="alert alert-warning">
-          <span>{route.description}</span>
-        </div>
-        <a className="btn btn-primary w-fit" href="/">
-          Browse objects
-        </a>
-      </section>
-    );
-  }
+  // NAP-IDENTITY is request/response, so a napplet that asked "who is signed in?" at mount
+  // would hold a stale answer forever. Pushing the canonical `identity:changed` topic is
+  // what lets an owner-gated action (object-detail's "Edit this object") appear the moment
+  // the owner signs in, instead of after a reload.
+  useEffect(() => {
+    const subscription = accountManager.active$.subscribe((account) => {
+      bridgeRef.current?.injectEvent('identity:changed', { pubkey: account?.pubkey ?? '' });
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // A payload change on a frame that is already up. `deliveredKeyRef` is the interlock
+  // against the mount seed: whichever of the two runs first records the key, and the other
+  // stands down rather than delivering the same payload twice.
+  useEffect(() => {
+    if (!intent || !intentKey) return;
+    if (deliveredKeyRef.current === intentKey) return;
+
+    // Still loading — `loadNapplet` seeds from the ref, which already holds this payload.
+    const delivery = deliveryRef.current;
+    if (!delivery || !deliveredKeyRef.current) return;
+
+    deliveredKeyRef.current = intentKey;
+    delivery.redeliver(intent);
+  }, [intent, intentKey]);
 
   return (
-    <section className="bg-base-100">
+    <section className={fill ? 'flex h-full flex-col bg-base-100' : 'bg-base-100'}>
       <iframe
-        key={route.path}
+        key={identity}
         ref={iframeRef}
-        title={`${route.title} napplet`}
+        title={`${title} napplet`}
         sandbox="allow-scripts"
-        className="min-h-screen w-full border-0 bg-base-100"
+        className={
+          fill
+            ? 'h-full w-full flex-1 border-0 bg-base-100'
+            : 'min-h-screen w-full border-0 bg-base-100'
+        }
       />
       <span className="sr-only" aria-live="polite">
         {status}
@@ -783,36 +869,267 @@ function NappletFrame({ route }: { route: AppRoute }) {
   );
 }
 
-function NavLink({
-  active,
-  href,
+/**
+ * The centered dialog that hosts an overlay napplet over the current page.
+ *
+ * The open preview lives in the URL (`?preview=<fileId>`), not in React state, so a
+ * preview is deep-linkable and Back closes it. That makes the URL the single source of
+ * truth, and dismissal must therefore go through history — calling `dialog.close()` alone
+ * would leave a closed dialog with `?preview=` still in the address bar, which Back would
+ * then re-open.
+ */
+function PreviewDialog() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const overlay = overlayFromLocation(location);
+  const open = Boolean(overlay);
+
+  const dismiss = useCallback(() => {
+    // A preview we pushed has a page beneath it in history, so Back is the dismissal that
+    // keeps the stack honest. A deep-linked preview has nothing behind it — going back
+    // would leave the app entirely — so it collapses to the base page instead.
+    const pushed = (location.state as { previewPushed?: boolean } | null)?.previewPushed;
+    if (pushed) void navigate(-1);
+    else void navigate(baseHref(`${location.pathname}${location.search}`), { replace: true });
+  }, [navigate, location.pathname, location.search, location.state]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (open && !dialog.open) {
+      // The click came from inside an iframe, so the browser cannot restore focus for us.
+      restoreFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      // `showModal` rather than the `modal-open` class alone: it is what makes the page
+      // behind inert and gives the focus trap and ESC handling.
+      dialog.showModal();
+    } else if (!open && dialog.open) {
+      dialog.close();
+      restoreFocusRef.current?.focus();
+      restoreFocusRef.current = null;
+    }
+  }, [open]);
+
+  if (!overlay) return null;
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="modal modal-bottom sm:modal-middle"
+      aria-label="Part preview"
+      onCancel={(event) => {
+        // ESC would close the dialog without touching the URL. Route it through dismiss.
+        event.preventDefault();
+        dismiss();
+      }}
+    >
+      <div className="modal-box flex h-[85vh] max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden p-0">
+        <div className="flex items-center justify-between border-b border-base-300 px-4 py-2">
+          <h2 className="font-semibold">Part preview</h2>
+          <button
+            className="btn btn-circle btn-ghost btn-sm"
+            aria-label="Close preview"
+            data-testid="preview-close"
+            onClick={dismiss}
+          >
+            x
+          </button>
+        </div>
+        <div className="min-h-0 flex-1">
+          <NappletFrame
+            napplet="part-preview"
+            routeId="overlay-preview"
+            title="Part preview"
+            intent={overlay}
+            // Constant: the dialog outlives base-route changes underneath it, and a new
+            // file is redelivered to the live napplet rather than rebuilding the viewer.
+            frameKey="overlay-preview"
+            fill
+          />
+        </div>
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Close preview"
+          data-testid="preview-backdrop"
+        >
+          close
+        </button>
+      </form>
+    </dialog>
+  );
+}
+
+/** Navigates, collapsing the mobile drawer first so the new page is visible. */
+function useShellNavigate() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  return useCallback(
+    (href: string) => {
+      closeDrawer();
+
+      // A navigation that opens a preview marks its history entry, so the dialog knows it
+      // has a page to go Back to. Derived from the two URLs rather than passed in, so any
+      // route into a preview — an intent, a Link, a share — is marked the same way.
+      const opensPreview = hasPreview(href) && !hasPreview(location.search);
+      void navigate(href, opensPreview ? { state: { previewPushed: true } } : undefined);
+    },
+    [navigate, location.search],
+  );
+}
+
+function BrowseRoute() {
+  return (
+    <NappletFrame
+      napplet="browse"
+      routeId="browse"
+      title="Browse objects"
+      intent={{ archetype: 'browse', action: 'open', payload: {} }}
+    />
+  );
+}
+
+function SearchRoute() {
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get('q')?.trim() ?? '';
+
+  return (
+    <NappletFrame
+      napplet="browse"
+      routeId="search"
+      title={query ? `Search: ${query}` : 'Search objects'}
+      intent={{ archetype: 'browse', action: 'open', payload: query ? { query } : {} }}
+    />
+  );
+}
+
+function TagRoute() {
+  const { tag = '' } = useParams();
+
+  return (
+    <NappletFrame
+      napplet="browse"
+      routeId="tag"
+      title={`#${tag}`}
+      intent={{ archetype: 'browse', action: 'open', payload: { tag } }}
+    />
+  );
+}
+
+function CreateRoute() {
+  const [searchParams] = useSearchParams();
+  const remixOf = searchParams.get('remix')?.trim() ?? '';
+
+  return (
+    <NappletFrame
+      napplet="create-object"
+      routeId="create"
+      title="Create object"
+      intent={{ archetype: 'create-object', action: 'open', payload: remixOf ? { remixOf } : {} }}
+    />
+  );
+}
+
+/** The maker behind an object: profile metadata, their objects, their collections. */
+function UserProfileRoute() {
+  const { pubkey = '' } = useParams();
+
+  return (
+    <NappletFrame
+      napplet="user-profile"
+      routeId="user-profile"
+      title="Maker profile"
+      intent={{ archetype: 'user-profile', action: 'open', payload: { pubkey } }}
+    />
+  );
+}
+
+function ObjectDetailRoute() {
+  const { pubkey = '', identifier = '' } = useParams();
+
+  return (
+    <NappletFrame
+      napplet="object-detail"
+      routeId="object-detail"
+      title="Object details"
+      intent={{
+        archetype: 'object-detail',
+        action: 'open',
+        payload: { address: `33500:${pubkey}:${identifier}` },
+      }}
+    />
+  );
+}
+
+function ObjectEditRoute() {
+  const { pubkey = '', identifier = '' } = useParams();
+
+  return (
+    <NappletFrame
+      napplet="edit-object"
+      routeId="object-edit"
+      title="Edit object"
+      intent={{
+        archetype: 'edit-object',
+        action: 'edit',
+        payload: { address: `33500:${pubkey}:${identifier}` },
+      }}
+    />
+  );
+}
+
+function NotFoundRoute() {
+  return (
+    <section className="grid min-h-screen content-start gap-3 bg-base-100 p-4">
+      <div className="alert alert-warning">
+        <span>This STLstr route does not exist yet.</span>
+      </div>
+      <Link className="btn btn-primary w-fit" to="/">
+        Browse objects
+      </Link>
+    </section>
+  );
+}
+
+/**
+ * A top-level nav entry. `alsoActiveOn` keeps a section highlighted on its
+ * sub-routes — Browse stays lit on /search and /tags/*, which are the same
+ * napplet under different framing.
+ */
+function ShellNavLink({
+  to,
   label,
-  navigate,
+  alsoActiveOn,
 }: {
-  active: boolean;
-  href: string;
+  to: string;
   label: string;
-  navigate: (href: string) => void;
+  alsoActiveOn?: RegExp;
 }) {
+  const { pathname } = useLocation();
+  const activeOnSubRoute = alsoActiveOn?.test(pathname) ?? false;
+
   return (
     <li>
-      <a
-        className={active ? 'active' : undefined}
-        href={href}
-        onClick={(event) => {
-          event.preventDefault();
-          navigate(href);
-        }}
+      <NavLink
+        to={to}
+        end
+        onClick={closeDrawer}
+        className={({ isActive }) => (isActive || activeOnSubRoute ? 'active' : undefined)}
       >
         {label}
-      </a>
+      </NavLink>
     </li>
   );
 }
 
-function App() {
+function ShellLayout() {
   const [accountsReady, setAccountsReady] = useState(false);
-  const [route, setRoute] = useState(() => routeFromLocation(window.location));
 
   useEffect(() => {
     let cancelled = false;
@@ -824,27 +1141,16 @@ function App() {
     };
   }, []);
 
-  useEffect(() => {
-    const onPopState = () => setRoute(routeFromLocation(window.location));
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
-
-  function navigate(href: string) {
-    if (href === `${window.location.pathname}${window.location.search}`) return;
-    window.history.pushState(null, '', href);
-    setRoute(routeFromLocation(window.location));
-  }
-
-  const nav = (
-    <ul className="menu menu-horizontal gap-1 px-1">
-      <NavLink active={route.nav === 'browse'} href="/" label="Browse" navigate={navigate} />
-      <NavLink active={route.nav === 'create'} href="/create" label="Create" navigate={navigate} />
-    </ul>
+  const navLinks = (
+    <>
+      <ShellNavLink to="/" label="Browse" alsoActiveOn={/^\/(search|tags)(\/|$)/} />
+      <ShellNavLink to="/create" label="Create" />
+      <ShellNavLink to="/settings" label="Settings" />
+    </>
   );
 
   return (
-    <div className="drawer min-h-screen bg-base-200 lg:drawer-open">
+    <div className="drawer min-h-screen bg-base-200">
       <input id="stlstr-drawer" type="checkbox" className="drawer-toggle" />
       <div className="drawer-content flex min-h-screen flex-col">
         <header className="navbar bg-base-100 shadow-sm">
@@ -858,18 +1164,13 @@ function App() {
             </label>
           </div>
           <div className="flex-1">
-            <a
-              className="btn btn-ghost text-xl"
-              href="/"
-              onClick={(event) => {
-                event.preventDefault();
-                navigate('/');
-              }}
-            >
-              stlstr
-            </a>
+            <Link className="btn btn-ghost text-xl" to="/" onClick={closeDrawer}>
+              STLstr
+            </Link>
           </div>
-          <nav className="hidden flex-none lg:block">{nav}</nav>
+          <nav className="hidden flex-none lg:block">
+            <ul className="menu menu-horizontal gap-1 px-1">{navLinks}</ul>
+          </nav>
           <div className="flex-none">
             {accountsReady ? (
               <AccountNav />
@@ -880,34 +1181,55 @@ function App() {
         </header>
 
         <main className="flex-1 bg-base-100">
-          <NappletFrame route={route} />
+          <Outlet />
         </main>
+
+        {/* Outside the Outlet: the overlay is layered over whatever route is beneath it,
+            and must survive that route being swapped. */}
+        <PreviewDialog />
       </div>
 
-      <aside className="drawer-side">
+      <aside className="drawer-side lg:hidden">
         <label
           htmlFor="stlstr-drawer"
           aria-label="Close navigation"
           className="drawer-overlay"
         ></label>
         <div className="min-h-full w-72 bg-base-100 p-4">
-          <div className="mb-4 text-2xl font-bold">stlstr</div>
-          <ul className="menu gap-1">
-            <NavLink active={route.nav === 'browse'} href="/" label="Browse" navigate={navigate} />
-            <NavLink
-              active={route.nav === 'create'}
-              href="/create"
-              label="Create"
-              navigate={navigate}
-            />
-          </ul>
-          <div className="divider"></div>
-          <div className="alert alert-warning text-sm">
-            <span>Blossom and outbox service adapters are still pending.</span>
-          </div>
+          <div className="mb-1 text-2xl font-bold">STLstr</div>
+          <p className="mb-4 text-xs text-base-content/60">
+            The worst named nostr app for 3d printing
+          </p>
+          <ul className="menu gap-1">{navLinks}</ul>
         </div>
       </aside>
     </div>
+  );
+}
+
+/**
+ * The shell route table. Every route renders inside `ShellLayout`, so the navbar
+ * and drawer persist across navigations. Settings is the one route the shell
+ * renders itself; everything else mounts a napplet.
+ *
+ * Route ranking is by specificity, not declaration order, so `objects/:pubkey/
+ * :identifier/edit` wins over `objects/:pubkey/:identifier` on its own.
+ */
+function App() {
+  return (
+    <Routes>
+      <Route element={<ShellLayout />}>
+        <Route index element={<BrowseRoute />} />
+        <Route path="search" element={<SearchRoute />} />
+        <Route path="tags/:tag" element={<TagRoute />} />
+        <Route path="create" element={<CreateRoute />} />
+        <Route path="settings" element={<SettingsView />} />
+        <Route path="profiles/:pubkey" element={<UserProfileRoute />} />
+        <Route path="objects/:pubkey/:identifier" element={<ObjectDetailRoute />} />
+        <Route path="objects/:pubkey/:identifier/edit" element={<ObjectEditRoute />} />
+        <Route path="*" element={<NotFoundRoute />} />
+      </Route>
+    </Routes>
   );
 }
 

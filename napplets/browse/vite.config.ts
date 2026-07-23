@@ -8,10 +8,12 @@ export default defineConfig({
     svelte(),
     tailwindcss(),
     nip5aManifest({
-      nappletType: 'browse-objects',
-      requires: ['outbox'],
+      nappletType: 'browse',
+      requires: ['outbox', 'inc', 'identity', 'common', 'count', 'resource', 'intent'],
       artifactMode: 'single-file',
-      archetypes: [{ slug: 'browse-objects', naps: ['outbox'] }],
+      // The protocol names the payload SHAPE this role accepts — an unnumbered
+      // convention per the naps repo, not a NAP domain.
+      archetypes: [{ slug: 'browse', naps: ['napplet:browse/open'] }],
     }),
   ],
   build: {

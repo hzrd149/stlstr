@@ -4,17 +4,27 @@ import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildFixtureEvents } from './lib/test-fixtures.mjs';
+import { seedTestRelay } from './lib/test-relay.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const host = process.env.STLSTR_TEST_HOST || '127.0.0.1';
 const port = Number(process.env.STLSTR_TEST_PORT || 5174);
 const baseUrl = `http://${host}:${port}`;
+/**
+ * The local dev relay, which is expected to already be running — the same one dev builds
+ * read from via `STLSTR_DEV_RELAY`. Fixtures are seeded into it rather than served from a
+ * throwaway relay, so tests and manual development see the same objects.
+ */
+const relayUrl = process.env.STLSTR_TEST_RELAY_URL || 'ws://localhost:4869';
 const registryPath = join(root, 'apps', 'stlstr', 'public', 'napplets.dev.json');
 const testNapplets = [
-  { name: 'browse-objects', title: 'Browse Objects' },
+  { name: 'browse', title: 'Browse Objects' },
   { name: 'create-object', title: 'Create Object' },
   { name: 'object-detail', title: 'Object Detail' },
+  { name: 'user-profile', title: 'User Profile' },
   { name: 'edit-object', title: 'Edit Object' },
+  { name: 'part-preview', title: 'Part Preview' },
 ];
 
 function run(command, args, options = {}) {
@@ -121,6 +131,9 @@ async function main() {
     }
   }
 
+  const seeded = await seedTestRelay({ relayUrl, events: buildFixtureEvents(baseUrl) });
+  console.error(`Seeded ${seeded.published} fixture events into ${relayUrl}`);
+
   const server = spawn(
     'pnpm',
     [
@@ -134,7 +147,11 @@ async function main() {
       String(port),
       '--strictPort',
     ],
-    { cwd: root, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] },
+    {
+      cwd: root,
+      env: { ...process.env, VITE_STLSTR_DEV_RELAY: relayUrl },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
   );
 
   server.stdout.pipe(process.stderr);
@@ -157,6 +174,7 @@ async function main() {
     await run('node', ['--test', ...testFiles], {
       env: {
         STLSTR_TEST_BASE_URL: baseUrl,
+        STLSTR_TEST_RELAY_URL: relayUrl,
         PUPPETEER_EXECUTABLE_PATH: chromiumPath,
       },
     });

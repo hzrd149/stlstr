@@ -1,4 +1,10 @@
-import type { NappletMessage, NostrTag, UploadInfo, UploadResult, UploadStatus } from '@napplet/core';
+import type {
+  NappletMessage,
+  NostrTag,
+  UploadInfo,
+  UploadResult,
+  UploadStatus,
+} from '@napplet/core';
 import type {
   UploadInfoMessage,
   UploadStatusMessage,
@@ -9,7 +15,9 @@ import type { User } from 'applesauce-common/casts';
 import type { ISigner } from 'applesauce-signers';
 import { Actions, createUploadAuth } from 'blossom-client-sdk';
 import type { BlobDescriptor, EventTemplate, SignedEvent, UploadType } from 'blossom-client-sdk';
-import { STLSTR_DEV_BLOSSOM_SERVER, STLSTR_DEV_MODE } from './nostr';
+import { mergeBlossomServers } from 'applesauce-common/helpers/blossom';
+import { STLSTR_DEV_MODE } from './nostr';
+import { getFallbackBlossomServers } from './settings';
 
 type ObservableLike<T> = {
   subscribe(observer: (value: T) => void): { unsubscribe(): void };
@@ -44,32 +52,16 @@ function firstDefinedValue<T>(observable: ObservableLike<T | undefined>, timeout
   });
 }
 
-function normalizeServerUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
-    parsed.hash = '';
-    parsed.search = '';
-    return parsed.toString().replace(/\/$/, '');
-  } catch {
-    return null;
-  }
-}
-
-function uniqueServers(servers: Iterable<string | URL | undefined>): string[] {
-  const unique = new Set<string>();
-  for (const server of servers) {
-    if (!server) continue;
-    const normalized = normalizeServerUrl(String(server));
-    if (normalized) unique.add(normalized);
-  }
-  return [...unique];
-}
-
 async function getBlossomServers(user: User | null): Promise<string[]> {
-  if (STLSTR_DEV_MODE) return [STLSTR_DEV_BLOSSOM_SERVER];
-  if (!user) return [];
-  return uniqueServers((await firstDefinedValue(user.blossomServers$)) ?? []);
+  const fallback = mergeBlossomServers(getFallbackBlossomServers());
+  // Dev builds always upload to the local Blossom server.
+  if (!user || STLSTR_DEV_MODE) return fallback;
+
+  // The account's own media server list wins; app settings only fill the gap.
+  const listed = mergeBlossomServers(await firstDefinedValue(user.blossomServers$)).map((server) =>
+    server.toString(),
+  );
+  return listed.length > 0 ? listed : fallback;
 }
 
 async function requestToBlob(message: UploadUploadMessage): Promise<UploadType> {
@@ -126,27 +118,44 @@ function signerAdapter(signer: ISigner) {
   };
 }
 
-export function createUploadService({ getActiveUser, getSigner }: UploadServiceOptions): ServiceHandler {
+export function createUploadService({
+  getActiveUser,
+  getSigner,
+}: UploadServiceOptions): ServiceHandler {
   const uploads = new Map<string, UploadRecord>();
 
   function sendStatus(status: UploadRecord, send: (msg: NappletMessage) => void) {
     send({ type: 'upload.status.changed', status } as NappletMessage);
   }
 
-  async function handleUpload(windowId: string, message: UploadUploadMessage, send: (msg: NappletMessage) => void) {
+  async function handleUpload(
+    windowId: string,
+    message: UploadUploadMessage,
+    send: (msg: NappletMessage) => void,
+  ) {
     const uploadId = `${windowId}-${message.id}`;
     const signer = getSigner();
     if (!signer) {
       const result = failedUpload(uploadId, 'Login required to upload files.');
       uploads.set(uploadId, createStatus(windowId, result));
-      send({ type: 'upload.upload.result', id: message.id, result, error: result.error } as NappletMessage);
+      send({
+        type: 'upload.upload.result',
+        id: message.id,
+        result,
+        error: result.error,
+      } as NappletMessage);
       return;
     }
 
     if (message.request.rail && message.request.rail !== 'blossom') {
       const result = failedUpload(uploadId, `Unsupported upload rail: ${message.request.rail}`);
       uploads.set(uploadId, createStatus(windowId, result));
-      send({ type: 'upload.upload.result', id: message.id, result, error: result.error } as NappletMessage);
+      send({
+        type: 'upload.upload.result',
+        id: message.id,
+        result,
+        error: result.error,
+      } as NappletMessage);
       return;
     }
 
@@ -154,7 +163,12 @@ export function createUploadService({ getActiveUser, getSigner }: UploadServiceO
     if (servers.length === 0) {
       const result = failedUpload(uploadId, 'No Blossom servers are configured for this account.');
       uploads.set(uploadId, createStatus(windowId, result));
-      send({ type: 'upload.upload.result', id: message.id, result, error: result.error } as NappletMessage);
+      send({
+        type: 'upload.upload.result',
+        id: message.id,
+        result,
+        error: result.error,
+      } as NappletMessage);
       return;
     }
 
@@ -200,11 +214,19 @@ export function createUploadService({ getActiveUser, getSigner }: UploadServiceO
       sendStatus(status, send);
       send({ type: 'upload.upload.result', id: message.id, result } as NappletMessage);
     } catch (cause) {
-      const result = failedUpload(uploadId, cause instanceof Error ? cause.message : 'Upload failed.');
+      const result = failedUpload(
+        uploadId,
+        cause instanceof Error ? cause.message : 'Upload failed.',
+      );
       const status = createStatus(windowId, result);
       uploads.set(uploadId, status);
       sendStatus(status, send);
-      send({ type: 'upload.upload.result', id: message.id, result, error: result.error } as NappletMessage);
+      send({
+        type: 'upload.upload.result',
+        id: message.id,
+        result,
+        error: result.error,
+      } as NappletMessage);
     }
   }
 
@@ -213,9 +235,19 @@ export function createUploadService({ getActiveUser, getSigner }: UploadServiceO
     handleMessage(windowId, message, send) {
       if (message.type === 'upload.info') {
         const info: UploadInfo = {
-          rails: [{ rail: 'blossom', enabled: true, returns: ['url', 'fallbackUrls', 'sha256', 'size', 'mimeType', 'nip94'] }],
+          rails: [
+            {
+              rail: 'blossom',
+              enabled: true,
+              returns: ['url', 'fallbackUrls', 'sha256', 'size', 'mimeType', 'nip94'],
+            },
+          ],
         };
-        send({ type: 'upload.info.result', id: (message as UploadInfoMessage).id, info } as NappletMessage);
+        send({
+          type: 'upload.info.result',
+          id: (message as UploadInfoMessage).id,
+          info,
+        } as NappletMessage);
       } else if (message.type === 'upload.upload') {
         void handleUpload(windowId, message as UploadUploadMessage, send);
       } else if (message.type === 'upload.status') {

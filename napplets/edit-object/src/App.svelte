@@ -5,17 +5,17 @@
     </div>
 
     <div class="grid gap-4 md:grid-cols-2">
-      <label class="form-control">
-        <span class="label-text">Title</span>
-        <input class="input input-bordered" disabled placeholder="Existing object title" />
+      <label class="fieldset">
+        <span class="fieldset-legend">Title</span>
+        <input class="input w-full" disabled placeholder="Existing object title" />
       </label>
-      <label class="form-control">
-        <span class="label-text">License</span>
-        <input class="input input-bordered" disabled placeholder="CC-BY-4.0" />
+      <label class="fieldset">
+        <span class="fieldset-legend">License</span>
+        <input class="input w-full" disabled placeholder="CC-BY-4.0" />
       </label>
-      <label class="form-control md:col-span-2">
-        <span class="label-text">Description</span>
-        <textarea class="textarea textarea-bordered" disabled placeholder="Existing object markdown"
+      <label class="fieldset md:col-span-2">
+        <span class="fieldset-legend">Description</span>
+        <textarea class="textarea w-full" disabled placeholder="Existing object markdown"
         ></textarea>
       </label>
     </div>

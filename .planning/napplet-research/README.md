@@ -15,13 +15,13 @@ A complete reference for future agents working on stlstr, covering:
 
 ## File index
 
-| File | Contents |
-|------|----------|
-| `01-nap-system.md` | NAP governance, layering, the two axes (NAP-WORD / Convention / NAAT), boundary rule, web projection |
-| `02-nap-specs.md` | Full text of every NAP spec (SHELL, INTENT, INC, RELAY, OUTBOX, STORAGE, IDENTITY, KEYS, THEME, MEDIA, NOTIFY, CONFIG, RESOURCE, UPLOAD, VALUE, CVM, LINK, POW) |
-| `03-packages.md` | All @napplet/* packages: core, shim, sdk, nap, vite-plugin, cli, conformance, conformance-cli, conformance-web, boilerplate, skills |
-| `04-guide.md` | NIP-5D explained, core concepts, getting started, spec status |
-| `05-archetypes.md` | NAAT archetype registry and entry schema |
+| File               | Contents                                                                                                                                                        |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `01-nap-system.md` | NAP governance, layering, the two axes (NAP-WORD / Convention / NAAT), boundary rule, web projection                                                            |
+| `02-nap-specs.md`  | Full text of every NAP spec (SHELL, INTENT, INC, RELAY, OUTBOX, STORAGE, IDENTITY, KEYS, THEME, MEDIA, NOTIFY, CONFIG, RESOURCE, UPLOAD, VALUE, CVM, LINK, POW) |
+| `03-packages.md`   | All @napplet/* packages: core, shim, sdk, nap, vite-plugin, cli, conformance, conformance-cli, conformance-web, boilerplate, skills                             |
+| `04-guide.md`      | NIP-5D explained, core concepts, getting started, spec status                                                                                                   |
+| `05-archetypes.md` | NAAT archetype registry and entry schema                                                                                                                        |
 
 ## Quick orientation
 

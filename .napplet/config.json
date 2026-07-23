@@ -16,7 +16,7 @@
   },
   "signing": {
     "mode": "interactive",
-    "keyReference": "publisher",
+    "keyReference": "stlstr",
     "relays": ["wss://relay.ditto.pub"]
   },
   "conformance": {

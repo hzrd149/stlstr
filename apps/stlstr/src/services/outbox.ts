@@ -12,7 +12,9 @@ import type { User } from 'applesauce-common/casts';
 import type { ISigner } from 'applesauce-signers';
 import type { NostrEvent as ApplesauceNostrEvent } from 'nostr-tools';
 import type { Filter } from 'applesauce-core/helpers/filter';
-import { eventStore, NOSTR_EXTRA_RELAYS, STLSTR_DEV_MODE, relayPool } from './nostr';
+import { mergeRelaySets } from 'applesauce-core/helpers/relays';
+import { eventStore, STLSTR_DEV_MODE, relayPool } from './nostr';
+import { getAppRelays } from './settings';
 
 type ObservableLike<T> = {
   subscribe(observer: (value: T) => void): { unsubscribe(): void };
@@ -42,27 +44,6 @@ function normalizeFilters(filters: NostrFilter | NostrFilter[]): NostrFilter[] {
   return Array.isArray(filters) ? filters : [filters];
 }
 
-function normalizeRelayUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'wss:' && parsed.protocol !== 'ws:') return null;
-    parsed.hash = '';
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
-function uniqueRelays(relays: Iterable<string | undefined>): string[] {
-  const unique = new Set<string>();
-  for (const relay of relays) {
-    if (!relay) continue;
-    const normalized = normalizeRelayUrl(relay);
-    if (normalized) unique.add(normalized);
-  }
-  return [...unique];
-}
-
 function relayResult(event: NostrEvent, relays: string[]): RelayEventResult {
   return { event, sidecar: { relayHints: relays } };
 }
@@ -89,12 +70,12 @@ function firstDefinedValue<T>(observable: ObservableLike<T | undefined>, timeout
 
 async function getUserOutboxes(user: User | null): Promise<string[]> {
   if (!user) return [];
-  return uniqueRelays((await firstDefinedValue(user.outboxes$)) ?? []);
+  return mergeRelaySets(await firstDefinedValue(user.outboxes$));
 }
 
 async function getUserInboxes(user: User | null): Promise<string[]> {
   if (!user) return [];
-  return uniqueRelays((await firstDefinedValue(user.inboxes$)) ?? []);
+  return mergeRelaySets(await firstDefinedValue(user.inboxes$));
 }
 
 function collectAuthors(filters: NostrFilter[], hints: string[] = []): string[] {
@@ -106,22 +87,35 @@ async function resolveReadRelays(
   filters: NostrFilter[],
   options?: { authors?: string[]; relays?: string[] },
 ) {
-  if (STLSTR_DEV_MODE) return { relays: NOSTR_EXTRA_RELAYS, source: 'policy' as const, missingAuthors: [] };
+  if (STLSTR_DEV_MODE)
+    return { relays: getAppRelays(), source: 'policy' as const, missingAuthors: [] };
 
   const authors = collectAuthors(filters, options?.authors);
-  const relays = uniqueRelays([...(options?.relays ?? []), ...NOSTR_EXTRA_RELAYS]);
+  const relays = mergeRelaySets(options?.relays);
   const missingAuthors: string[] = [];
 
-  if (authors.length === 0) return { relays, source: 'fallback' as const, missingAuthors };
+  if (authors.length === 0) {
+    return {
+      relays: mergeRelaySets(relays, getAppRelays()),
+      source: 'fallback' as const,
+      missingAuthors,
+    };
+  }
 
   for (const author of authors) {
-    const outboxes = await getUserOutboxes(author === getActiveUser()?.pubkey ? getActiveUser() : null);
+    const outboxes = await getUserOutboxes(
+      author === getActiveUser()?.pubkey ? getActiveUser() : null,
+    );
     if (outboxes.length === 0) missingAuthors.push(author);
     for (const relay of outboxes) relays.push(relay);
   }
 
+  // The authors' own relay lists are authoritative; app relays only cover authors we
+  // could not resolve a list for.
+  const unresolved = missingAuthors.length > 0;
+
   return {
-    relays: uniqueRelays(relays),
+    relays: unresolved ? mergeRelaySets(relays, getAppRelays()) : mergeRelaySets(relays),
     source: missingAuthors.length === authors.length ? ('fallback' as const) : ('nip65' as const),
     missingAuthors,
   };
@@ -131,22 +125,30 @@ async function resolvePublishRelays(
   getActiveUser: ActiveUserProvider,
   options?: { relays?: string[]; toOutbox?: boolean; toInboxes?: string[] },
 ) {
-  if (STLSTR_DEV_MODE) return NOSTR_EXTRA_RELAYS;
+  if (STLSTR_DEV_MODE) return getAppRelays();
 
   const activeUser = getActiveUser();
-  const relays = uniqueRelays([...(options?.relays ?? [])]);
+  const relays = mergeRelaySets(options?.relays);
+  let usedAccountList = false;
 
   if (options?.toOutbox !== false) {
-    for (const relay of await getUserOutboxes(activeUser)) relays.push(relay);
+    const outboxes = await getUserOutboxes(activeUser);
+    usedAccountList ||= outboxes.length > 0;
+    for (const relay of outboxes) relays.push(relay);
   }
 
   // V1 only has the active user's reactive cast hydrated. Unknown recipient inboxes
   // fall back to explicit relays and the app's broad relay set until settings/loading expands.
   if ((options?.toInboxes ?? []).includes(activeUser?.pubkey ?? '')) {
-    for (const relay of await getUserInboxes(activeUser)) relays.push(relay);
+    const inboxes = await getUserInboxes(activeUser);
+    usedAccountList ||= inboxes.length > 0;
+    for (const relay of inboxes) relays.push(relay);
   }
 
-  return uniqueRelays([...relays, ...NOSTR_EXTRA_RELAYS]);
+  // Publish to the account's own relays when it has a list; app relays are the fallback.
+  if (usedAccountList) return mergeRelaySets(relays);
+
+  return mergeRelaySets(relays, getAppRelays());
 }
 
 async function queryRelays(relays: string[], filters: NostrFilter[], timeoutMs: number) {
@@ -191,27 +193,55 @@ async function publishToRelays(event: NostrEvent, relays: string[]): Promise<Pub
   }
 }
 
-export function createOutboxService({ getActiveUser, getSigner }: OutboxServiceOptions): ServiceHandler {
+export function createOutboxService({
+  getActiveUser,
+  getSigner,
+}: OutboxServiceOptions): ServiceHandler {
   const subscriptions = new Map<string, TrackedSubscription>();
 
-  async function handleGetEvent(message: OutboxGetEventMessage, send: (msg: NappletMessage) => void) {
-    const filters: NostrFilter[] = [{ ids: [message.eventId], authors: message.options?.author ? [message.options.author] : undefined, limit: 1 }];
+  async function handleGetEvent(
+    message: OutboxGetEventMessage,
+    send: (msg: NappletMessage) => void,
+  ) {
+    const filters: NostrFilter[] = [
+      {
+        ids: [message.eventId],
+        authors: message.options?.author ? [message.options.author] : undefined,
+        limit: 1,
+      },
+    ];
     const plan = await resolveReadRelays(getActiveUser, filters, {
       authors: message.options?.author ? [message.options.author] : [],
       relays: message.options?.relays,
     });
-    const events = await queryRelays(plan.relays, filters, message.options?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-    send({ type: 'outbox.getEvent.result', id: message.id, result: events[0], incomplete: false } as NappletMessage);
+    const events = await queryRelays(
+      plan.relays,
+      filters,
+      message.options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    );
+    send({
+      type: 'outbox.getEvent.result',
+      id: message.id,
+      result: events[0],
+      incomplete: false,
+    } as NappletMessage);
   }
 
   async function handleQuery(message: OutboxQueryMessage, send: (msg: NappletMessage) => void) {
     const filters = normalizeFilters(message.filters);
     const plan = await resolveReadRelays(getActiveUser, filters, message.options);
-    const events = await queryRelays(plan.relays, filters, message.options?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    const events = await queryRelays(
+      plan.relays,
+      filters,
+      message.options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    );
     send({
       type: 'outbox.query.result',
       id: message.id,
-      events: typeof message.options?.limit === 'number' ? events.slice(0, message.options.limit) : events,
+      events:
+        typeof message.options?.limit === 'number'
+          ? events.slice(0, message.options.limit)
+          : events,
       incomplete: false,
     } as NappletMessage);
   }
@@ -231,7 +261,11 @@ export function createOutboxService({ getActiveUser, getSigner }: OutboxServiceO
       .subscribe({
         next: (event) => {
           eventStore.add(event as ApplesauceNostrEvent);
-          send({ type: 'outbox.event', subId: message.subId, result: relayResult(event as NostrEvent, plan.relays) } as NappletMessage);
+          send({
+            type: 'outbox.event',
+            subId: message.subId,
+            result: relayResult(event as NostrEvent, plan.relays),
+          } as NappletMessage);
         },
         error: (cause) => {
           subscriptions.delete(key);
@@ -253,7 +287,12 @@ export function createOutboxService({ getActiveUser, getSigner }: OutboxServiceO
   async function handlePublish(message: OutboxPublishMessage, send: (msg: NappletMessage) => void) {
     const signer = getSigner();
     if (!signer) {
-      send({ type: 'outbox.publish.result', id: message.id, ok: false, error: 'Login required to publish.' } as NappletMessage);
+      send({
+        type: 'outbox.publish.result',
+        id: message.id,
+        ok: false,
+        error: 'Login required to publish.',
+      } as NappletMessage);
       return;
     }
 
@@ -284,23 +323,35 @@ export function createOutboxService({ getActiveUser, getSigner }: OutboxServiceO
     message: OutboxResolveRelaysMessage,
     send: (msg: NappletMessage) => void,
   ) {
-    const targetAuthors = message.target.authors ?? (message.target.pubkey ? [message.target.pubkey] : []);
-    const plan = await resolveReadRelays(getActiveUser, [{ authors: targetAuthors }], { authors: targetAuthors });
+    const targetAuthors =
+      message.target.authors ?? (message.target.pubkey ? [message.target.pubkey] : []);
+    const plan = await resolveReadRelays(getActiveUser, [{ authors: targetAuthors }], {
+      authors: targetAuthors,
+    });
     send({ type: 'outbox.resolveRelays.result', id: message.id, plan } as NappletMessage);
   }
 
   return {
-    descriptor: { name: 'outbox', version: '0.1.0', description: 'stlstr Applesauce outbox routing' },
+    descriptor: {
+      name: 'outbox',
+      version: '0.1.0',
+      description: 'stlstr Applesauce outbox routing',
+    },
     handleMessage(windowId, message, send) {
-      if (message.type === 'outbox.getEvent') void handleGetEvent(message as OutboxGetEventMessage, send);
-      else if (message.type === 'outbox.query') void handleQuery(message as OutboxQueryMessage, send);
-      else if (message.type === 'outbox.subscribe') void handleSubscribe(windowId, message as OutboxSubscribeMessage, send);
+      if (message.type === 'outbox.getEvent')
+        void handleGetEvent(message as OutboxGetEventMessage, send);
+      else if (message.type === 'outbox.query')
+        void handleQuery(message as OutboxQueryMessage, send);
+      else if (message.type === 'outbox.subscribe')
+        void handleSubscribe(windowId, message as OutboxSubscribeMessage, send);
       else if (message.type === 'outbox.close') {
         const close = message as OutboxCloseMessage;
         subscriptions.get(`${windowId}:${close.subId}`)?.unsubscribe();
         subscriptions.delete(`${windowId}:${close.subId}`);
-      } else if (message.type === 'outbox.publish') void handlePublish(message as OutboxPublishMessage, send);
-      else if (message.type === 'outbox.resolveRelays') void handleResolveRelays(message as OutboxResolveRelaysMessage, send);
+      } else if (message.type === 'outbox.publish')
+        void handlePublish(message as OutboxPublishMessage, send);
+      else if (message.type === 'outbox.resolveRelays')
+        void handleResolveRelays(message as OutboxResolveRelaysMessage, send);
     },
     onWindowDestroyed(windowId) {
       for (const [key, subscription] of subscriptions) {

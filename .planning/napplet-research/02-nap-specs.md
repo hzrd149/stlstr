@@ -19,23 +19,24 @@ The napplet signals readiness (`shell.ready`). The runtime replies once with the
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `supports` | `domain` (`tstr`) | `bool` | local query against cached `shell.init` |
-| `services` | none | list of `tstr` service names | local read against cached `shell.init` |
-| `ready` | none | `ShellEnvironment` | resolves after `shell.ready` / `shell.init` |
-| `onReady` | handler for `ShellEnvironment` | `Subscription` handle | fires after `shell.init` |
+| Operation  | Parameters                     | Result                       | Wire                                        |
+| ---------- | ------------------------------ | ---------------------------- | ------------------------------------------- |
+| `supports` | `domain` (`tstr`)              | `bool`                       | local query against cached `shell.init`     |
+| `services` | none                           | list of `tstr` service names | local read against cached `shell.init`      |
+| `ready`    | none                           | `ShellEnvironment`           | resolves after `shell.ready` / `shell.init` |
+| `onReady`  | handler for `ShellEnvironment` | `Subscription` handle        | fires after `shell.init`                    |
 
 `ShellEnvironment` fields:
+
 - `capabilities` (yes, `ShellCapabilities`) — runtime-internal, sufficient to answer `supports(domain)`
 - `services` (yes, list of text) — named services the runtime exposes
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `shell.ready` | napplet -> runtime | *(none)* |
-| `shell.init` | runtime -> napplet | `capabilities`, `services` |
+| Type          | Direction          | Payload fields             |
+| ------------- | ------------------ | -------------------------- |
+| `shell.ready` | napplet -> runtime | _(none)_                   |
+| `shell.init`  | runtime -> napplet | `capabilities`, `services` |
 
 The handshake is two fire-and-forget messages; neither carries a correlation `id`.
 
@@ -81,21 +82,22 @@ Failure is expressed by **absence**: if `shell.init` never arrives, `supports()`
 
 ### Description
 
-NAP-INTENT provides shell-mediated invocation of *another* napplet by its **archetype** — a shared role name such as `note`, `profile`, or `emoji-list`. The napplet describes *what role* it wants, *what action* to perform, and *what payload* to deliver; the shell resolves the role to an installed napplet, applies the user's default-handler preference, creates or focuses the window, and delivers the payload. This is the napplet equivalent of Android-style implicit intents.
+NAP-INTENT provides shell-mediated invocation of _another_ napplet by its **archetype** — a shared role name such as `note`, `profile`, or `emoji-list`. The napplet describes _what role_ it wants, _what action_ to perform, and _what payload_ to deliver; the shell resolves the role to an installed napplet, applies the user's default-handler preference, creates or focuses the window, and delivers the payload. This is the napplet equivalent of Android-style implicit intents.
 
 The **archetype** is the intent category, the **action** is the intent action, the **payload** is the extras, and the user's default handler is the default app. NAP-INTENT standardizes the **envelope**, not the payload. The `payload` is opaque and MAY be tagged by a `convention` field naming the unnumbered payload shape.
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `invoke` | `request` (`IntentRequest`) | `IntentResult` | `intent.invoke` / `intent.invoke.result` |
-| `open` | `archetype`, optional `payload`, optional `opts` | `IntentResult` | sugar over `invoke` with action `"open"` |
-| `available` | `archetype` (`tstr`) | `IntentAvailability` | `intent.available` / `.result` |
-| `handlers` | none | list of `IntentAvailability` | `intent.handlers` / `.result` |
-| `onChanged` | handler for `IntentAvailability` | `Subscription` | `intent.changed` |
+| Operation   | Parameters                                       | Result                       | Wire                                     |
+| ----------- | ------------------------------------------------ | ---------------------------- | ---------------------------------------- |
+| `invoke`    | `request` (`IntentRequest`)                      | `IntentResult`               | `intent.invoke` / `intent.invoke.result` |
+| `open`      | `archetype`, optional `payload`, optional `opts` | `IntentResult`               | sugar over `invoke` with action `"open"` |
+| `available` | `archetype` (`tstr`)                             | `IntentAvailability`         | `intent.available` / `.result`           |
+| `handlers`  | none                                             | list of `IntentAvailability` | `intent.handlers` / `.result`            |
+| `onChanged` | handler for `IntentAvailability`                 | `Subscription`               | `intent.changed`                         |
 
 Key schemas:
+
 - `IntentRequest`: `archetype` (yes, text), `action` (no, defaults `open`), `convention` (no), `payload` (no, any), `handler` (no, `default`/`choose`/dTag), `behavior` (no, `IntentBehavior`)
 - `IntentResult`: `ok` (yes, bool), `archetype` (yes), `action` (yes), `handled` (yes, bool), `handler` (no, dTag), `windowId` (no), `convention` (no), `error` (no)
 - `IntentAvailability`: `archetype` (yes), `available` (yes, bool), `candidates` (yes, list of `IntentCandidate`), `hasDefault` (yes, bool)
@@ -103,15 +105,15 @@ Key schemas:
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `intent.invoke` | napplet -> shell | `id`, `request` |
-| `intent.invoke.result` | shell -> napplet | `id`, `result`, `error?` |
-| `intent.available` | napplet -> shell | `id`, `archetype` |
+| Type                      | Direction        | Payload fields                 |
+| ------------------------- | ---------------- | ------------------------------ |
+| `intent.invoke`           | napplet -> shell | `id`, `request`                |
+| `intent.invoke.result`    | shell -> napplet | `id`, `result`, `error?`       |
+| `intent.available`        | napplet -> shell | `id`, `archetype`              |
 | `intent.available.result` | shell -> napplet | `id`, `availability`, `error?` |
-| `intent.handlers` | napplet -> shell | `id` |
-| `intent.handlers.result` | shell -> napplet | `id`, `handlers`, `error?` |
-| `intent.changed` | shell -> napplet | `availability` |
+| `intent.handlers`         | napplet -> shell | `id`                           |
+| `intent.handlers.result`  | shell -> napplet | `id`, `handlers`, `error?`     |
+| `intent.changed`          | shell -> napplet | `availability`                 |
 
 The **action is a field** (`request.action`), never part of the message type. `intent.invoke` is the single dispatch verb for `open`, `edit`, `pick`, `share`, and any future action.
 
@@ -170,46 +172,57 @@ interface NappletInc {
   };
 }
 
-interface IncEvent { topic: string; sender: string; payload: unknown; }  // sender = dTag
-interface ChannelHandle { id: string; peer: string; emit(payload): void; on(callback): Subscription; close(): void; }
+interface IncEvent {
+  topic: string;
+  sender: string;
+  payload: unknown;
+} // sender = dTag
+interface ChannelHandle {
+  id: string;
+  peer: string;
+  emit(payload): void;
+  on(callback): Subscription;
+  close(): void;
+}
 ```
 
 ### Wire Protocol — Topics
 
-| Type | Direction | Payload |
-|------|-----------|---------|
-| `inc.emit` | napplet -> shell | `topic`, `payload?` |
-| `inc.subscribe` | napplet -> shell | `id`, `topic` |
-| `inc.subscribe.result` | shell -> napplet | `id` |
-| `inc.unsubscribe` | napplet -> shell | `topic` |
-| `inc.event` | shell -> napplet | `topic`, `sender` (dTag), `payload?` |
+| Type                   | Direction        | Payload                              |
+| ---------------------- | ---------------- | ------------------------------------ |
+| `inc.emit`             | napplet -> shell | `topic`, `payload?`                  |
+| `inc.subscribe`        | napplet -> shell | `id`, `topic`                        |
+| `inc.subscribe.result` | shell -> napplet | `id`                                 |
+| `inc.unsubscribe`      | napplet -> shell | `topic`                              |
+| `inc.event`            | shell -> napplet | `topic`, `sender` (dTag), `payload?` |
 
 ### Wire Protocol — Channels
 
-| Type | Direction | Payload |
-|------|-----------|---------|
-| `inc.channel.open` | napplet -> shell | `id`, `target` (dTag) |
-| `inc.channel.open.result` | shell -> napplet | `id`, `channelId?`, `peer?`, `error?` |
-| `inc.channel.emit` | napplet -> shell | `channelId`, `payload?` |
-| `inc.channel.event` | shell -> napplet | `channelId`, `sender` (dTag), `payload?` |
-| `inc.channel.broadcast` | napplet -> shell | `payload?` |
-| `inc.channel.list` | napplet -> shell | `id` |
-| `inc.channel.list.result` | shell -> napplet | `id`, `channels` |
-| `inc.channel.close` | napplet -> shell | `channelId` |
-| `inc.channel.closed` | shell -> napplet | `channelId`, `reason?` |
+| Type                      | Direction        | Payload                                  |
+| ------------------------- | ---------------- | ---------------------------------------- |
+| `inc.channel.open`        | napplet -> shell | `id`, `target` (dTag)                    |
+| `inc.channel.open.result` | shell -> napplet | `id`, `channelId?`, `peer?`, `error?`    |
+| `inc.channel.emit`        | napplet -> shell | `channelId`, `payload?`                  |
+| `inc.channel.event`       | shell -> napplet | `channelId`, `sender` (dTag), `payload?` |
+| `inc.channel.broadcast`   | napplet -> shell | `payload?`                               |
+| `inc.channel.list`        | napplet -> shell | `id`                                     |
+| `inc.channel.list.result` | shell -> napplet | `id`, `channels`                         |
+| `inc.channel.close`       | napplet -> shell | `channelId`                              |
+| `inc.channel.closed`      | shell -> napplet | `channelId`, `reason?`                   |
 
 Key notes:
+
 - `inc.emit`, `inc.channel.emit`, `inc.channel.broadcast`, `inc.unsubscribe`, `inc.channel.close` are fire-and-forget (no `id`).
 - `inc.event` and `inc.channel.event` are shell-initiated deliveries (no `id`), identified by `topic`/`sender` or `channelId`/`sender`.
 - Shell MUST NOT deliver `inc.event` back to the emitting napplet (sender exclusion).
 
 ### Topic conventions
 
-| Prefix | Direction | Meaning |
-|--------|-----------|---------|
-| `shell:*` | napplet -> shell | Commands to the shell |
-| `napplet:*` | shell -> napplet | Responses/notifications from shell |
-| `{domain}:*` | bidirectional | Domain-scoped messages between napplets |
+| Prefix       | Direction        | Meaning                                 |
+| ------------ | ---------------- | --------------------------------------- |
+| `shell:*`    | napplet -> shell | Commands to the shell                   |
+| `napplet:*`  | shell -> napplet | Responses/notifications from shell      |
+| `{domain}:*` | bidirectional    | Domain-scoped messages between napplets |
 
 ### Security
 
@@ -231,13 +244,13 @@ NAP-RELAY provides relay access through the shell. Sandboxed iframes cannot open
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `subscribe` | `filters`, optional `options` (`RelaySubscribeOptions`) | `Subscription` handle streaming `RelayEventResult` | `relay.subscribe` + `relay.event`/`relay.eose` |
-| `publish` | `template` (`EventTemplate`) | `NostrEvent` | `relay.publish` / `.result` |
-| `publishEncrypted` | `template`, `recipient`, optional `encryption` | `NostrEvent` | `relay.publishEncrypted` / `.result` |
-| `query` | `filters` | list of `RelayEventResult` | `relay.query` / `.result` |
-| `Subscription.close` | none | none | `relay.close` |
+| Operation            | Parameters                                              | Result                                             | Wire                                           |
+| -------------------- | ------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------- |
+| `subscribe`          | `filters`, optional `options` (`RelaySubscribeOptions`) | `Subscription` handle streaming `RelayEventResult` | `relay.subscribe` + `relay.event`/`relay.eose` |
+| `publish`            | `template` (`EventTemplate`)                            | `NostrEvent`                                       | `relay.publish` / `.result`                    |
+| `publishEncrypted`   | `template`, `recipient`, optional `encryption`          | `NostrEvent`                                       | `relay.publishEncrypted` / `.result`           |
+| `query`              | `filters`                                               | list of `RelayEventResult`                         | `relay.query` / `.result`                      |
+| `Subscription.close` | none                                                    | none                                               | `relay.close`                                  |
 
 `RelayEventResult` = `{ event: NostrEvent, ? sidecar: RelayEventSidecar }`
 `RelayEventSidecar` = `{ ? resources: [* ResourceSidecarEntry], ? relayHints: [* tstr] }`
@@ -247,23 +260,24 @@ The shell signs event templates. The shell encrypts content for `publishEncrypte
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `relay.subscribe` | napplet -> shell | `id`, `subId`, `filters`, `relay?` |
-| `relay.close` | napplet -> shell | `id`, `subId` |
-| `relay.publish` | napplet -> shell | `id`, `event` (EventTemplate) |
-| `relay.publishEncrypted` | napplet -> shell | `id`, `event`, `recipient`, `encryption?` |
-| `relay.query` | napplet -> shell | `id`, `filters` |
-| `relay.event` | shell -> napplet | `subId`, `result` (RelayEventResult) |
-| `relay.eose` | shell -> napplet | `subId` |
-| `relay.closed` | shell -> napplet | `subId`, `reason?` |
-| `relay.publish.result` | shell -> napplet | `id`, `ok`, `event?`, `eventId?`, `error?` |
+| Type                            | Direction        | Payload fields                             |
+| ------------------------------- | ---------------- | ------------------------------------------ |
+| `relay.subscribe`               | napplet -> shell | `id`, `subId`, `filters`, `relay?`         |
+| `relay.close`                   | napplet -> shell | `id`, `subId`                              |
+| `relay.publish`                 | napplet -> shell | `id`, `event` (EventTemplate)              |
+| `relay.publishEncrypted`        | napplet -> shell | `id`, `event`, `recipient`, `encryption?`  |
+| `relay.query`                   | napplet -> shell | `id`, `filters`                            |
+| `relay.event`                   | shell -> napplet | `subId`, `result` (RelayEventResult)       |
+| `relay.eose`                    | shell -> napplet | `subId`                                    |
+| `relay.closed`                  | shell -> napplet | `subId`, `reason?`                         |
+| `relay.publish.result`          | shell -> napplet | `id`, `ok`, `event?`, `eventId?`, `error?` |
 | `relay.publishEncrypted.result` | shell -> napplet | `id`, `ok`, `event?`, `eventId?`, `error?` |
-| `relay.query.result` | shell -> napplet | `id`, `events` (RelayEventResult[]) |
+| `relay.query.result`            | shell -> napplet | `id`, `events` (RelayEventResult[])        |
 
 ### Sidecar Pre-Resolution
 
 Shells MAY attach sidecar metadata to `RelayEventResult`:
+
 - `sidecar.resources?: ResourceSidecarEntry[]` — pre-fetched byte resources (type owned by NAP-RESOURCE). Napplet's subsequent `resource.bytes(url)` resolves from cache without a round-trip.
 - `sidecar.relayHints?: [* tstr]` — relay URLs where the event was observed.
 
@@ -294,35 +308,36 @@ The shell owns relay discovery, routing, fallback, deduplication, signature vali
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `getEvent` | `eventId`, optional `options` (`OutboxEventOptions`) | `OutboxEventResult` | `outbox.getEvent` / `.result` |
-| `query` | `filters`, optional `options` (`OutboxQueryOptions`) | `OutboxResult` | `outbox.query` / `.result` |
-| `subscribe` | `filters`, optional `options` (`OutboxSubscribeOptions`) | `OutboxSubscription` handle | `outbox.subscribe` + push messages |
-| `publish` | `template`, optional `options` (`OutboxPublishOptions`) | `OutboxPublishResult` | `outbox.publish` / `.result` |
-| `resolveRelays` | `target` (`OutboxTarget`) | `OutboxRelayPlan` | `outbox.resolveRelays` / `.result` |
+| Operation       | Parameters                                               | Result                      | Wire                               |
+| --------------- | -------------------------------------------------------- | --------------------------- | ---------------------------------- |
+| `getEvent`      | `eventId`, optional `options` (`OutboxEventOptions`)     | `OutboxEventResult`         | `outbox.getEvent` / `.result`      |
+| `query`         | `filters`, optional `options` (`OutboxQueryOptions`)     | `OutboxResult`              | `outbox.query` / `.result`         |
+| `subscribe`     | `filters`, optional `options` (`OutboxSubscribeOptions`) | `OutboxSubscription` handle | `outbox.subscribe` + push messages |
+| `publish`       | `template`, optional `options` (`OutboxPublishOptions`)  | `OutboxPublishResult`       | `outbox.publish` / `.result`       |
+| `resolveRelays` | `target` (`OutboxTarget`)                                | `OutboxRelayPlan`           | `outbox.resolveRelays` / `.result` |
 
 Key options:
+
 - `OutboxQueryOptions`: `authors?`, `relays?`, `limit?`, `timeoutMs?`
 - `OutboxPublishOptions`: `relays?` (explicit fanout candidates), `toOutbox?` (default `true` — publish to user's NIP-65 write relays), `toInboxes?` (author pubkeys whose NIP-65 read relays are required fanout targets)
 - `OutboxRelayPlan`: `relays` (yes), `source` (`nip65`/`cache`/`policy`/`fallback`), `missingAuthors?`
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `outbox.getEvent` | napplet -> shell | `id`, `eventId`, `options?` |
-| `outbox.getEvent.result` | shell -> napplet | `id`, `result?`, `incomplete?`, `error?` |
-| `outbox.query` | napplet -> shell | `id`, `filters`, `options?` |
-| `outbox.query.result` | shell -> napplet | `id`, `events`, `incomplete?`, `error?` |
-| `outbox.subscribe` | napplet -> shell | `id`, `subId`, `filters`, `options?` |
-| `outbox.event` | shell -> napplet | `subId`, `result` |
-| `outbox.closed` | shell -> napplet | `subId`, `reason?` |
-| `outbox.close` | napplet -> shell | `id`, `subId` |
-| `outbox.publish` | napplet -> shell | `id`, `event`, `options?` |
-| `outbox.publish.result` | shell -> napplet | `id`, `ok`, `event?`, `eventId?`, `relays?`, `error?` |
-| `outbox.resolveRelays` | napplet -> shell | `id`, `target` |
-| `outbox.resolveRelays.result` | shell -> napplet | `id`, `plan`, `error?` |
+| Type                          | Direction        | Payload fields                                        |
+| ----------------------------- | ---------------- | ----------------------------------------------------- |
+| `outbox.getEvent`             | napplet -> shell | `id`, `eventId`, `options?`                           |
+| `outbox.getEvent.result`      | shell -> napplet | `id`, `result?`, `incomplete?`, `error?`              |
+| `outbox.query`                | napplet -> shell | `id`, `filters`, `options?`                           |
+| `outbox.query.result`         | shell -> napplet | `id`, `events`, `incomplete?`, `error?`               |
+| `outbox.subscribe`            | napplet -> shell | `id`, `subId`, `filters`, `options?`                  |
+| `outbox.event`                | shell -> napplet | `subId`, `result`                                     |
+| `outbox.closed`               | shell -> napplet | `subId`, `reason?`                                    |
+| `outbox.close`                | napplet -> shell | `id`, `subId`                                         |
+| `outbox.publish`              | napplet -> shell | `id`, `event`, `options?`                             |
+| `outbox.publish.result`       | shell -> napplet | `id`, `ok`, `event?`, `eventId?`, `relays?`, `error?` |
+| `outbox.resolveRelays`        | napplet -> shell | `id`, `target`                                        |
+| `outbox.resolveRelays.result` | shell -> napplet | `id`, `plan`, `error?`                                |
 
 ### Shell Behavior
 
@@ -353,28 +368,28 @@ NAP-STORAGE provides an async localStorage-like API. Without `allow-same-origin`
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `getItem` | `key` (`tstr`) | `tstr` or `null` | `storage.get` / `.result` |
-| `setItem` | `key`, `value` (`tstr`) | none | `storage.set` / `.result` |
-| `removeItem` | `key` (`tstr`) | none | `storage.remove` / `.result` |
-| `keys` | none | list of `tstr` | `storage.keys` / `.result` |
-| `instance.*` | same as above, with `scope: "instance"` | same | same wire, `scope` field added |
+| Operation    | Parameters                              | Result           | Wire                           |
+| ------------ | --------------------------------------- | ---------------- | ------------------------------ |
+| `getItem`    | `key` (`tstr`)                          | `tstr` or `null` | `storage.get` / `.result`      |
+| `setItem`    | `key`, `value` (`tstr`)                 | none             | `storage.set` / `.result`      |
+| `removeItem` | `key` (`tstr`)                          | none             | `storage.remove` / `.result`   |
+| `keys`       | none                                    | list of `tstr`   | `storage.keys` / `.result`     |
+| `instance.*` | same as above, with `scope: "instance"` | same             | same wire, `scope` field added |
 
 **Instance scope:** When a napplet is open more than once (e.g. several feeds), `scope: "instance"` isolates a key to the calling instance while `scope: "shared"` (default) stays common to every instance. The choice is per call. Instance storage lives as long as the instance; the shell MAY reclaim it on destroy. State that must outlive the instance belongs in `shared`.
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `storage.get` | napplet -> shell | `id`, `key`, `scope?` |
-| `storage.set` | napplet -> shell | `id`, `key`, `value`, `scope?` |
-| `storage.remove` | napplet -> shell | `id`, `key`, `scope?` |
-| `storage.keys` | napplet -> shell | `id`, `scope?` |
-| `storage.get.result` | shell -> napplet | `id`, `value` (string or null) |
-| `storage.set.result` | shell -> napplet | `id` |
-| `storage.remove.result` | shell -> napplet | `id` |
-| `storage.keys.result` | shell -> napplet | `id`, `keys` (string array) |
+| Type                    | Direction        | Payload fields                 |
+| ----------------------- | ---------------- | ------------------------------ |
+| `storage.get`           | napplet -> shell | `id`, `key`, `scope?`          |
+| `storage.set`           | napplet -> shell | `id`, `key`, `value`, `scope?` |
+| `storage.remove`        | napplet -> shell | `id`, `key`, `scope?`          |
+| `storage.keys`          | napplet -> shell | `id`, `scope?`                 |
+| `storage.get.result`    | shell -> napplet | `id`, `value` (string or null) |
+| `storage.set.result`    | shell -> napplet | `id`                           |
+| `storage.remove.result` | shell -> napplet | `id`                           |
+| `storage.keys.result`   | shell -> napplet | `id`, `keys` (string array)    |
 
 `scope` is `"shared"` (default) or `"instance"`. Result messages carry no `scope`; the correlation `id` identifies the request.
 
@@ -399,7 +414,7 @@ NAP-IDENTITY provides read-only access to the shell-user identity: the connected
 
 ```typescript
 interface NappletIdentity {
-  getPublicKey(): Promise<string>;           // hex pubkey or "" when signed out
+  getPublicKey(): Promise<string>; // hex pubkey or "" when signed out
   onChanged(handler: (pubkey: string) => void): Subscription;
   getRelays(): Promise<Record<string, { read: boolean; write: boolean }>>;
   getProfile(): Promise<ProfileData | null>;
@@ -418,21 +433,22 @@ interface NappletIdentity {
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `identity.getPublicKey` | napplet -> shell | `id` |
-| `identity.getPublicKey.result` | shell -> napplet | `id`, `pubkey` |
-| `identity.changed` | shell -> napplet | `pubkey` |
-| `identity.getRelays` / `.result` | bidirectional | `id` / `id`, `relays`, `error?` |
-| `identity.getProfile` / `.result` | bidirectional | `id` / `id`, `profile?`, `error?` |
-| `identity.getFollows` / `.result` | bidirectional | `id` / `id`, `pubkeys`, `error?` |
-| `identity.getList` / `.result` | bidirectional | `id`, `listType` / `id`, `entries`, `error?` |
-| `identity.getZaps` / `.result` | bidirectional | `id` / `id`, `zaps`, `error?` |
-| `identity.getMutes` / `.result` | bidirectional | `id` / `id`, `pubkeys`, `error?` |
-| `identity.getBlocked` / `.result` | bidirectional | `id` / `id`, `pubkeys`, `error?` |
-| `identity.getBadges` / `.result` | bidirectional | `id` / `id`, `badges`, `error?` |
+| Type                              | Direction        | Payload fields                               |
+| --------------------------------- | ---------------- | -------------------------------------------- |
+| `identity.getPublicKey`           | napplet -> shell | `id`                                         |
+| `identity.getPublicKey.result`    | shell -> napplet | `id`, `pubkey`                               |
+| `identity.changed`                | shell -> napplet | `pubkey`                                     |
+| `identity.getRelays` / `.result`  | bidirectional    | `id` / `id`, `relays`, `error?`              |
+| `identity.getProfile` / `.result` | bidirectional    | `id` / `id`, `profile?`, `error?`            |
+| `identity.getFollows` / `.result` | bidirectional    | `id` / `id`, `pubkeys`, `error?`             |
+| `identity.getList` / `.result`    | bidirectional    | `id`, `listType` / `id`, `entries`, `error?` |
+| `identity.getZaps` / `.result`    | bidirectional    | `id` / `id`, `zaps`, `error?`                |
+| `identity.getMutes` / `.result`   | bidirectional    | `id` / `id`, `pubkeys`, `error?`             |
+| `identity.getBlocked` / `.result` | bidirectional    | `id` / `id`, `pubkeys`, `error?`             |
+| `identity.getBadges` / `.result`  | bidirectional    | `id` / `id`, `badges`, `error?`              |
 
 Key notes:
+
 - `identity.changed` is a push message (no `id`). Emitted when shell-user identity changes, with `pubkey: ""` on sign-out.
 - `getPublicKey` MUST always succeed (no `error` field) — returns `""` when no user connected.
 - `getProfile` returns `profile: null` if no kind 0 found (not an error).
@@ -457,29 +473,30 @@ NAP-KEYS provides bidirectional keyboard interaction. Sandboxed iframes capture 
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `registerAction` | `action` (`Action`) | `RegisterResult` | `keys.registerAction` / `.result` |
-| `unregisterAction` | `actionId` (`tstr`) | none | `keys.unregisterAction` |
-| `forward` | keyboard event fields | none | `keys.forward` |
-| `onAction` | `actionId`, local callback | `Subscription` | local helper; not a wire message |
+| Operation          | Parameters                 | Result           | Wire                              |
+| ------------------ | -------------------------- | ---------------- | --------------------------------- |
+| `registerAction`   | `action` (`Action`)        | `RegisterResult` | `keys.registerAction` / `.result` |
+| `unregisterAction` | `actionId` (`tstr`)        | none             | `keys.unregisterAction`           |
+| `forward`          | keyboard event fields      | none             | `keys.forward`                    |
+| `onAction`         | `actionId`, local callback | `Subscription`   | local helper; not a wire message  |
 
 `Action` = `{ id: tstr, label: tstr, ? defaultKey: tstr }` — `defaultKey` is a hint only; the shell decides the actual binding.
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `keys.forward` | napplet -> shell | `key`, `code`, `ctrl`, `alt`, `shift`, `meta` |
-| `keys.registerAction` | napplet -> shell | `id`, `action` |
-| `keys.registerAction.result` | shell -> napplet | `id`, `actionId`, `binding?` |
-| `keys.unregisterAction` | napplet -> shell | `actionId` |
-| `keys.bindings` | shell -> napplet | `bindings` (array of `{ actionId, key }`) |
-| `keys.action` | shell -> napplet | `actionId` |
+| Type                         | Direction        | Payload fields                                |
+| ---------------------------- | ---------------- | --------------------------------------------- |
+| `keys.forward`               | napplet -> shell | `key`, `code`, `ctrl`, `alt`, `shift`, `meta` |
+| `keys.registerAction`        | napplet -> shell | `id`, `action`                                |
+| `keys.registerAction.result` | shell -> napplet | `id`, `actionId`, `binding?`                  |
+| `keys.unregisterAction`      | napplet -> shell | `actionId`                                    |
+| `keys.bindings`              | shell -> napplet | `bindings` (array of `{ actionId, key }`)     |
+| `keys.action`                | shell -> napplet | `actionId`                                    |
 
 ### Smart Forwarding
 
 The napplet shim maintains a local suppress list from `keys.bindings`. On each keydown:
+
 1. If target is a text input, do not forward.
 2. If key is a bare modifier, do not forward.
 3. If `isComposing` is true (IME), do not forward.
@@ -515,14 +532,14 @@ NAP-THEME provides read-only access to the shell's active theme. The shell owns 
 
 ```typescript
 interface Theme {
-  colors: { background: string; text: string; primary: string; };  // required, hex colors
-  fonts?: { body?: ThemeFont; title?: ThemeFont; };
-  background?: { url: string; mode: string; mime: string; };
-  title?: string;  // human-readable theme name
+  colors: { background: string; text: string; primary: string }; // required, hex colors
+  fonts?: { body?: ThemeFont; title?: ThemeFont };
+  background?: { url: string; mode: string; mime: string };
+  title?: string; // human-readable theme name
 }
 
 interface NappletTheme {
-  get(): Promise<Theme>;  // via theme.get / theme.get.result
+  get(): Promise<Theme>; // via theme.get / theme.get.result
 }
 ```
 
@@ -530,15 +547,16 @@ interface NappletTheme {
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `theme.get` | napplet -> shell | `id` |
-| `theme.get.result` | shell -> napplet | `id`, `theme` |
-| `theme.changed` | shell -> napplet | `theme` |
+| Type               | Direction        | Payload fields |
+| ------------------ | ---------------- | -------------- |
+| `theme.get`        | napplet -> shell | `id`           |
+| `theme.get.result` | shell -> napplet | `id`, `theme`  |
+| `theme.changed`    | shell -> napplet | `theme`        |
 
 ### Kind 16767 Mapping
 
 Shells sourcing themes from Nostr kind 16767 events SHOULD map:
+
 - `["c", "<hex>", "background"]` -> `colors.background`
 - `["c", "<hex>", "text"]` -> `colors.text`
 - `["c", "<hex>", "primary"]` -> `colors.primary`
@@ -569,15 +587,15 @@ NAP-MEDIA provides media session management. Napplets create sessions, report st
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `createSession` | `options` (`MediaSessionCreate`) | `MediaSessionResult` | `media.session.create` / `.result` |
-| `updateSession` | `sessionId`, partial `metadata` | none | `media.session.update` |
-| `destroySession` | `sessionId` | none | `media.session.destroy` |
-| `reportState` | `sessionId`, `state` (`MediaState`) | none | `media.state` |
-| `reportCapabilities` | `sessionId`, `actions` | none | `media.capabilities` |
-| `onCommand` | `sessionId`, handler for `MediaCommand` | `Subscription` | `media.command` |
-| `onControls` | `sessionId`, handler for list of `MediaAction` | `Subscription` | `media.controls` |
+| Operation            | Parameters                                     | Result               | Wire                               |
+| -------------------- | ---------------------------------------------- | -------------------- | ---------------------------------- |
+| `createSession`      | `options` (`MediaSessionCreate`)               | `MediaSessionResult` | `media.session.create` / `.result` |
+| `updateSession`      | `sessionId`, partial `metadata`                | none                 | `media.session.update`             |
+| `destroySession`     | `sessionId`                                    | none                 | `media.session.destroy`            |
+| `reportState`        | `sessionId`, `state` (`MediaState`)            | none                 | `media.state`                      |
+| `reportCapabilities` | `sessionId`, `actions`                         | none                 | `media.capabilities`               |
+| `onCommand`          | `sessionId`, handler for `MediaCommand`        | `Subscription`       | `media.command`                    |
+| `onControls`         | `sessionId`, handler for list of `MediaAction` | `Subscription`       | `media.controls`                   |
 
 `MediaSessionCreate`: `owner` (required, `"shell"`/`"napplet"`), `sessionId?`, `source?` (`MediaSourceRef`), `metadata?` (`MediaMetadata`), `context?` (`MediaSessionContext`), `capabilities?`, `autoplay?`, `live?`
 
@@ -587,16 +605,16 @@ NAP-MEDIA provides media session management. Napplets create sessions, report st
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `media.session.create` | napplet -> shell | `id`, `owner`, `sessionId?`, `source?`, `metadata?`, `context?`, `capabilities?`, `autoplay?`, `live?` |
-| `media.session.create.result` | shell -> napplet | `id`, `sessionId?`, `owner?`, `error?` |
-| `media.session.update` | napplet -> shell | `sessionId`, `metadata` |
-| `media.session.destroy` | napplet -> shell | `sessionId` |
-| `media.state` | owner -> peer | `sessionId`, `status`, `position?`, `duration?`, `volume?` |
-| `media.capabilities` | owner -> peer | `sessionId`, `actions` |
-| `media.command` | controller -> owner | `sessionId`, `action`, `value?` |
-| `media.controls` | shell -> napplet | `sessionId`, `controls` |
+| Type                          | Direction           | Payload fields                                                                                         |
+| ----------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| `media.session.create`        | napplet -> shell    | `id`, `owner`, `sessionId?`, `source?`, `metadata?`, `context?`, `capabilities?`, `autoplay?`, `live?` |
+| `media.session.create.result` | shell -> napplet    | `id`, `sessionId?`, `owner?`, `error?`                                                                 |
+| `media.session.update`        | napplet -> shell    | `sessionId`, `metadata`                                                                                |
+| `media.session.destroy`       | napplet -> shell    | `sessionId`                                                                                            |
+| `media.state`                 | owner -> peer       | `sessionId`, `status`, `position?`, `duration?`, `volume?`                                             |
+| `media.capabilities`          | owner -> peer       | `sessionId`, `actions`                                                                                 |
+| `media.command`               | controller -> owner | `sessionId`, `action`, `value?`                                                                        |
+| `media.controls`              | shell -> napplet    | `sessionId`, `controls`                                                                                |
 
 For napplet-owned sessions: `media.state`/`media.capabilities` are napplet->shell, `media.command` is shell->napplet.
 For shell-owned sessions: `media.state`/`media.capabilities` are shell->napplet, `media.command` is napplet->shell (when requesting allowed actions).
@@ -620,35 +638,35 @@ NAP-NOTIFY provides notification delivery. Napplets send notification requests; 
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `send` | `notification` (`NotificationPayload`) | `NotificationResult` | `notify.send` / `.result` |
-| `dismiss` | `notificationId` | none | `notify.dismiss` |
-| `badge` | `count` (`uint`) | none | `notify.badge` |
-| `registerChannel` | `channel` (`NotificationChannel`) | none | `notify.channel.register` |
-| `requestPermission` | optional `channel` | `PermissionResult` | `notify.permission.request` / `.result` |
-| `onAction` | handler for `notificationId`, `actionId` | `Subscription` | `notify.action` |
-| `onClicked` | handler for `notificationId` | `Subscription` | `notify.clicked` |
-| `onDismissed` | handler for `notificationId`, optional `reason` | `Subscription` | `notify.dismissed` |
-| `onControls` | handler for list of `NotifyControl` | `Subscription` | `notify.controls` |
+| Operation           | Parameters                                      | Result               | Wire                                    |
+| ------------------- | ----------------------------------------------- | -------------------- | --------------------------------------- |
+| `send`              | `notification` (`NotificationPayload`)          | `NotificationResult` | `notify.send` / `.result`               |
+| `dismiss`           | `notificationId`                                | none                 | `notify.dismiss`                        |
+| `badge`             | `count` (`uint`)                                | none                 | `notify.badge`                          |
+| `registerChannel`   | `channel` (`NotificationChannel`)               | none                 | `notify.channel.register`               |
+| `requestPermission` | optional `channel`                              | `PermissionResult`   | `notify.permission.request` / `.result` |
+| `onAction`          | handler for `notificationId`, `actionId`        | `Subscription`       | `notify.action`                         |
+| `onClicked`         | handler for `notificationId`                    | `Subscription`       | `notify.clicked`                        |
+| `onDismissed`       | handler for `notificationId`, optional `reason` | `Subscription`       | `notify.dismissed`                      |
+| `onControls`        | handler for list of `NotifyControl`             | `Subscription`       | `notify.controls`                       |
 
 `NotificationPayload`: `title` (yes), `body?`, `icon?`, `actions?` (list of `NotificationAction`, max 3), `channel?`, `priority?` (`low`/`normal`/`high`/`urgent`)
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `notify.send` | napplet -> shell | `id`, `title`, `body?`, `icon?`, `actions?`, `channel?`, `priority?` |
-| `notify.send.result` | shell -> napplet | `id`, `notificationId?`, `error?` |
-| `notify.dismiss` | napplet -> shell | `notificationId` |
-| `notify.badge` | napplet -> shell | `count` |
-| `notify.channel.register` | napplet -> shell | `channelId`, `label`, `description?`, `defaultPriority?` |
-| `notify.permission.request` | napplet -> shell | `id`, `channel?` |
-| `notify.permission.result` | shell -> napplet | `id`, `granted` |
-| `notify.action` | shell -> napplet | `notificationId`, `actionId` |
-| `notify.clicked` | shell -> napplet | `notificationId` |
-| `notify.dismissed` | shell -> napplet | `notificationId`, `reason?` |
-| `notify.controls` | shell -> napplet | `controls` |
+| Type                        | Direction        | Payload fields                                                       |
+| --------------------------- | ---------------- | -------------------------------------------------------------------- |
+| `notify.send`               | napplet -> shell | `id`, `title`, `body?`, `icon?`, `actions?`, `channel?`, `priority?` |
+| `notify.send.result`        | shell -> napplet | `id`, `notificationId?`, `error?`                                    |
+| `notify.dismiss`            | napplet -> shell | `notificationId`                                                     |
+| `notify.badge`              | napplet -> shell | `count`                                                              |
+| `notify.channel.register`   | napplet -> shell | `channelId`, `label`, `description?`, `defaultPriority?`             |
+| `notify.permission.request` | napplet -> shell | `id`, `channel?`                                                     |
+| `notify.permission.result`  | shell -> napplet | `id`, `granted`                                                      |
+| `notify.action`             | shell -> napplet | `notificationId`, `actionId`                                         |
+| `notify.clicked`            | shell -> napplet | `notificationId`                                                     |
+| `notify.dismissed`          | shell -> napplet | `notificationId`, `reason?`                                          |
+| `notify.controls`           | shell -> napplet | `controls`                                                           |
 
 ### Security
 
@@ -668,56 +686,56 @@ NAP-RESOURCE lets a napplet request byte resources through the runtime. The napp
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `info` | none | `ResourceInfo` | `resource.info` / `.result` |
-| `bytes` | `url`, `opts?` | one Blob result | `resource.bytes` / `.result` |
-| `bytesMany` | non-empty `urls`, `opts?` | ordered per-URL results | `resource.bytesMany` / `.result` |
-| `bytesAsObjectURL` | `url` | `{ url, revoke }` helper | helper over `bytes` |
+| Operation          | Parameters                | Result                   | Wire                             |
+| ------------------ | ------------------------- | ------------------------ | -------------------------------- |
+| `info`             | none                      | `ResourceInfo`           | `resource.info` / `.result`      |
+| `bytes`            | `url`, `opts?`            | one Blob result          | `resource.bytes` / `.result`     |
+| `bytesMany`        | non-empty `urls`, `opts?` | ordered per-URL results  | `resource.bytesMany` / `.result` |
+| `bytesAsObjectURL` | `url`                     | `{ url, revoke }` helper | helper over `bytes`              |
 
 `opts.signal` MAY abort — sends `resource.cancel` for the request `id`.
 
 ### Schemes
 
-| Scheme | Rules |
-|--------|-------|
-| `data:` | MAY decode in the napplet shim. No network access. |
-| `https:` | Runtime fetch. Full Default Resource Policy applies. `mime` is sniffed, not upstream `Content-Type`. |
-| `blossom:` | Canonical `blossom:sha256:<hex>`. Runtime MUST verify SHA-256 before delivery. |
-| `htree:` | Hashtree reference. Runtime resolves and verifies every hash before delivery. |
-| `nostr:` | NIP-19 bech32. Runtime resolves one hop and returns referenced bytes. |
+| Scheme     | Rules                                                                                                |
+| ---------- | ---------------------------------------------------------------------------------------------------- |
+| `data:`    | MAY decode in the napplet shim. No network access.                                                   |
+| `https:`   | Runtime fetch. Full Default Resource Policy applies. `mime` is sniffed, not upstream `Content-Type`. |
+| `blossom:` | Canonical `blossom:sha256:<hex>`. Runtime MUST verify SHA-256 before delivery.                       |
+| `htree:`   | Hashtree reference. Runtime resolves and verifies every hash before delivery.                        |
+| `nostr:`   | NIP-19 bech32. Runtime resolves one hop and returns referenced bytes.                                |
 
 Unknown schemes return `unsupported-scheme`. `http:` is not canonical and MUST NOT be enabled by default.
 
 ### Wire Protocol
 
-| Type | Direction | Payload |
-|------|-----------|---------|
-| `resource.info` | napplet -> runtime | `id` |
-| `resource.info.result` | runtime -> napplet | `id`, `info` |
-| `resource.bytes` | napplet -> runtime | `id`, `url` |
-| `resource.bytesMany` | napplet -> runtime | `id`, `urls` |
-| `resource.cancel` | napplet -> runtime | `id` |
-| `resource.bytes.result` | runtime -> napplet | `id`, `blob`, `mime` |
-| `resource.bytes.error` | runtime -> napplet | `id`, `error`, `message?` |
-| `resource.bytesMany.result` | runtime -> napplet | `id`, `items` |
-| `resource.bytesMany.error` | runtime -> napplet | `id`, `error`, `message?` |
+| Type                        | Direction          | Payload                   |
+| --------------------------- | ------------------ | ------------------------- |
+| `resource.info`             | napplet -> runtime | `id`                      |
+| `resource.info.result`      | runtime -> napplet | `id`, `info`              |
+| `resource.bytes`            | napplet -> runtime | `id`, `url`               |
+| `resource.bytesMany`        | napplet -> runtime | `id`, `urls`              |
+| `resource.cancel`           | napplet -> runtime | `id`                      |
+| `resource.bytes.result`     | runtime -> napplet | `id`, `blob`, `mime`      |
+| `resource.bytes.error`      | runtime -> napplet | `id`, `error`, `message?` |
+| `resource.bytesMany.result` | runtime -> napplet | `id`, `items`             |
+| `resource.bytesMany.error`  | runtime -> napplet | `id`, `error`, `message?` |
 
 `ResourceBytesItem`: `url` (yes), `ok` (yes, bool), `blob?` + `mime?` (when ok), `error?` + `message?` (when not ok). Items MUST preserve input order and length.
 
 ### Default Resource Policy
 
-| Policy | Level | Rule |
-|--------|-------|------|
-| Private IP block | MUST | After DNS resolution, before connection. Block RFC1918, loopback, link-local, ULA, 169.254.169.254. Re-check every redirect. |
-| MIME sniffing | MUST | Classify by sniffing. Never pass upstream `Content-Type`. |
-| SVG rasterization | MUST | Raw `image/svg+xml` MUST NOT be delivered. Rasterize to PNG/WebP in sandboxed Worker. |
-| Blossom hash check | MUST | Hash mismatch returns `decode-failed`. |
-| Response size cap | SHOULD | 10 MiB. Exceed returns `too-large`. |
-| Fetch timeout | SHOULD | 30s per URL. Exceed returns `timeout`. |
-| Concurrency/rate limit | SHOULD | 10 in-flight, 60 req/min per napplet. |
-| Bulk URL cap | SHOULD | 100 URLs. |
-| Blob quota | SHOULD | 50 MiB outstanding per napplet. |
+| Policy                 | Level  | Rule                                                                                                                         |
+| ---------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Private IP block       | MUST   | After DNS resolution, before connection. Block RFC1918, loopback, link-local, ULA, 169.254.169.254. Re-check every redirect. |
+| MIME sniffing          | MUST   | Classify by sniffing. Never pass upstream `Content-Type`.                                                                    |
+| SVG rasterization      | MUST   | Raw `image/svg+xml` MUST NOT be delivered. Rasterize to PNG/WebP in sandboxed Worker.                                        |
+| Blossom hash check     | MUST   | Hash mismatch returns `decode-failed`.                                                                                       |
+| Response size cap      | SHOULD | 10 MiB. Exceed returns `too-large`.                                                                                          |
+| Fetch timeout          | SHOULD | 30s per URL. Exceed returns `timeout`.                                                                                       |
+| Concurrency/rate limit | SHOULD | 10 in-flight, 60 req/min per napplet.                                                                                        |
+| Bulk URL cap           | SHOULD | 100 URLs.                                                                                                                    |
+| Blob quota             | SHOULD | 50 MiB outstanding per napplet.                                                                                              |
 
 ### Sidecar Pre-Resolution
 
@@ -749,27 +767,27 @@ NAP-CONFIG provides per-napplet declarative configuration. A napplet declares a 
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `registerSchema` | `schema`, optional `version` | none; errors via `onSchemaError` | `config.registerSchema` / `.result` |
-| `get` | none | `ConfigValues` | `config.get` / `config.values` |
-| `subscribe` | handler for `ConfigValues` | `Subscription` | `config.subscribe` / `config.values` |
-| `onSchemaError` | handler for `ConfigSchemaError` | `Subscription` | `config.schemaError` |
-| `openSettings` | optional `section` | none | `config.openSettings` |
-| `schema` | none | `ConfigSchema` or `null` | local read |
+| Operation        | Parameters                      | Result                           | Wire                                 |
+| ---------------- | ------------------------------- | -------------------------------- | ------------------------------------ |
+| `registerSchema` | `schema`, optional `version`    | none; errors via `onSchemaError` | `config.registerSchema` / `.result`  |
+| `get`            | none                            | `ConfigValues`                   | `config.get` / `config.values`       |
+| `subscribe`      | handler for `ConfigValues`      | `Subscription`                   | `config.subscribe` / `config.values` |
+| `onSchemaError`  | handler for `ConfigSchemaError` | `Subscription`                   | `config.schemaError`                 |
+| `openSettings`   | optional `section`              | none                             | `config.openSettings`                |
+| `schema`         | none                            | `ConfigSchema` or `null`         | local read                           |
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `config.registerSchema` | napplet -> shell | `id`, `schema`, `version?` |
+| Type                           | Direction        | Payload fields                |
+| ------------------------------ | ---------------- | ----------------------------- |
+| `config.registerSchema`        | napplet -> shell | `id`, `schema`, `version?`    |
 | `config.registerSchema.result` | shell -> napplet | `id`, `ok`, `error?`, `code?` |
-| `config.get` | napplet -> shell | `id` |
-| `config.subscribe` | napplet -> shell | *(none)* |
-| `config.unsubscribe` | napplet -> shell | *(none)* |
-| `config.openSettings` | napplet -> shell | `section?` |
-| `config.values` | shell -> napplet | `id?`, `values` |
-| `config.schemaError` | shell -> napplet | `error`, `code` |
+| `config.get`                   | napplet -> shell | `id`                          |
+| `config.subscribe`             | napplet -> shell | _(none)_                      |
+| `config.unsubscribe`           | napplet -> shell | _(none)_                      |
+| `config.openSettings`          | napplet -> shell | `section?`                    |
+| `config.values`                | shell -> napplet | `id?`, `values`               |
+| `config.schemaError`           | shell -> napplet | `error`, `code`               |
 
 `config.values` is dual-use: with `id` it answers `config.get`; without `id` it is a subscription push. `config.subscribe` MUST produce an immediate initial `config.values` push (snapshot delivery).
 
@@ -784,6 +802,7 @@ NAP-CONFIG provides per-napplet declarative configuration. A napplet declares a 
 **Excluded from v1:** `pattern` (ReDoS risk), `$ref` (all forms), `definitions`/`$defs`, `oneOf`/`anyOf`/`allOf`/`not`, `if`/`then`/`else`, `patternProperties`, tuple-typed arrays, expression-valued defaults.
 
 **Standardized extensions (Potentialities):**
+
 - `x-napplet-secret` (boolean) — mask input, suppress logs, route to keychain
 - `x-napplet-section` (string) — group under section heading
 - `x-napplet-order` (non-negative number) — sort within section
@@ -816,12 +835,12 @@ Napplets never receive signing keys, server credentials, or direct network acces
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `info` | none | `UploadInfo` | `upload.info` / `.result` |
-| `upload` | `request` (`UploadRequest`) | `UploadResult` | `upload.upload` / `.result` |
-| `status` | `uploadId` | `UploadStatus` | `upload.status` / `.result` |
-| `onStatus` | handler for `UploadStatus` | `Subscription` | `upload.status.changed` |
+| Operation  | Parameters                  | Result         | Wire                        |
+| ---------- | --------------------------- | -------------- | --------------------------- |
+| `info`     | none                        | `UploadInfo`   | `upload.info` / `.result`   |
+| `upload`   | `request` (`UploadRequest`) | `UploadResult` | `upload.upload` / `.result` |
+| `status`   | `uploadId`                  | `UploadStatus` | `upload.status` / `.result` |
+| `onStatus` | handler for `UploadStatus`  | `Subscription` | `upload.status.changed`     |
 
 `UploadRequest`: `rail?` (`nip96`/`blossom`), `data` (yes, `bstr` — Blob/ArrayBuffer), `mimeType?`, `filename?`, `caption?`, `noTransform?`, `metadata?`
 
@@ -829,17 +848,18 @@ Napplets never receive signing keys, server credentials, or direct network acces
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `upload.info` | napplet -> shell | `id` |
-| `upload.info.result` | shell -> napplet | `id`, `info`, `error?` |
-| `upload.upload` | napplet -> shell | `id`, `request` |
-| `upload.upload.result` | shell -> napplet | `id`, `result`, `error?` |
-| `upload.status` | napplet -> shell | `id`, `uploadId` |
-| `upload.status.result` | shell -> napplet | `id`, `status`, `error?` |
-| `upload.status.changed` | shell -> napplet | `status` |
+| Type                    | Direction        | Payload fields           |
+| ----------------------- | ---------------- | ------------------------ |
+| `upload.info`           | napplet -> shell | `id`                     |
+| `upload.info.result`    | shell -> napplet | `id`, `info`, `error?`   |
+| `upload.upload`         | napplet -> shell | `id`, `request`          |
+| `upload.upload.result`  | shell -> napplet | `id`, `result`, `error?` |
+| `upload.status`         | napplet -> shell | `id`, `uploadId`         |
+| `upload.status.result`  | shell -> napplet | `id`, `status`, `error?` |
+| `upload.status.changed` | shell -> napplet | `status`                 |
 
 Key notes:
+
 - `request.data` crosses the boundary by structured clone — shells MUST NOT require base64-encoding.
 - Omitting `request.rail` lets the shell choose the best configured rail.
 - Shell SHOULD populate `nip94` so a napplet can attach the file to a Nostr event without recomputing hashes.
@@ -864,12 +884,12 @@ NAP-VALUE provides shell-mediated value transfer. The first use case is Nostr za
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `send` | `request` (`ValueRequest`) | `ValueResult` | `value.send` / `.result` |
-| `quote` | `request` (`ValueRequest`) | `ValueQuote` | `value.quote` / `.result` |
-| `status` | `transferId` | `ValueStatus` | `value.status` / `.result` |
-| `onStatus` | handler for `ValueStatus` | `Subscription` | `value.status.changed` |
+| Operation  | Parameters                 | Result         | Wire                       |
+| ---------- | -------------------------- | -------------- | -------------------------- |
+| `send`     | `request` (`ValueRequest`) | `ValueResult`  | `value.send` / `.result`   |
+| `quote`    | `request` (`ValueRequest`) | `ValueQuote`   | `value.quote` / `.result`  |
+| `status`   | `transferId`               | `ValueStatus`  | `value.status` / `.result` |
+| `onStatus` | handler for `ValueStatus`  | `Subscription` | `value.status.changed`     |
 
 `ValueRequest`: `rail` (yes, `zap`/`lnurl`/extension), `amountMsat` (yes, uint), `comment?`, `target` (yes, `ValueTarget`), `metadata?`
 
@@ -880,15 +900,15 @@ NAP-VALUE provides shell-mediated value transfer. The first use case is Nostr za
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `value.quote` | napplet -> shell | `id`, `request` |
-| `value.quote.result` | shell -> napplet | `id`, `quote`, `error?` |
-| `value.send` | napplet -> shell | `id`, `request` |
-| `value.send.result` | shell -> napplet | `id`, `result`, `error?` |
-| `value.status` | napplet -> shell | `id`, `transferId` |
-| `value.status.result` | shell -> napplet | `id`, `status`, `error?` |
-| `value.status.changed` | shell -> napplet | `status` |
+| Type                   | Direction        | Payload fields           |
+| ---------------------- | ---------------- | ------------------------ |
+| `value.quote`          | napplet -> shell | `id`, `request`          |
+| `value.quote.result`   | shell -> napplet | `id`, `quote`, `error?`  |
+| `value.send`           | napplet -> shell | `id`, `request`          |
+| `value.send.result`    | shell -> napplet | `id`, `result`, `error?` |
+| `value.status`         | napplet -> shell | `id`, `transferId`       |
+| `value.status.result`  | shell -> napplet | `id`, `status`, `error?` |
+| `value.status.changed` | shell -> napplet | `status`                 |
 
 ### Security
 
@@ -910,20 +930,20 @@ NAP-CVM provides native access to ContextVM servers (MCP over Nostr). The napple
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `discover` | optional `query` (`CvmDiscoverQuery`) | list of `CvmServer` | `cvm.discover` / `.result` |
-| `request` | `server`, `message` (`McpMessage`), optional `options` | `McpMessage` | `cvm.request` / `.result` |
-| `listTools` | `server`, optional `options` | list of `McpTool` | wrapper over `request` |
-| `callTool` | `server`, `name`, optional `args`, optional `options` | `McpToolResult` | wrapper over `request` |
-| `listResources` | `server`, optional `options` | list of `McpResource` | wrapper over `request` |
-| `readResource` | `server`, `uri`, optional `options` | `McpResourceContent` | wrapper over `request` |
-| `close` | `server` | none | `cvm.close` / `.result` |
-| `onEvent` | handler for `CvmEvent` | `CvmSubscription` | `cvm.event` |
-| `registry.list` | optional `query` | list of `CvmRegistryEntry` | `cvm.registry.list` / `.result` |
-| `registry.has` | `family`, optional `options` | `bool` | `cvm.registry.has` / `.result` |
-| `registry.describe` | `family`, optional `options` | `CvmRegistryEntry` | `cvm.registry.describe` / `.result` |
-| `registry.call` | `family`, `tool`, optional `args`, optional `options` | `McpToolResult` | `cvm.registry.call` / `.result` |
+| Operation           | Parameters                                             | Result                     | Wire                                |
+| ------------------- | ------------------------------------------------------ | -------------------------- | ----------------------------------- |
+| `discover`          | optional `query` (`CvmDiscoverQuery`)                  | list of `CvmServer`        | `cvm.discover` / `.result`          |
+| `request`           | `server`, `message` (`McpMessage`), optional `options` | `McpMessage`               | `cvm.request` / `.result`           |
+| `listTools`         | `server`, optional `options`                           | list of `McpTool`          | wrapper over `request`              |
+| `callTool`          | `server`, `name`, optional `args`, optional `options`  | `McpToolResult`            | wrapper over `request`              |
+| `listResources`     | `server`, optional `options`                           | list of `McpResource`      | wrapper over `request`              |
+| `readResource`      | `server`, `uri`, optional `options`                    | `McpResourceContent`       | wrapper over `request`              |
+| `close`             | `server`                                               | none                       | `cvm.close` / `.result`             |
+| `onEvent`           | handler for `CvmEvent`                                 | `CvmSubscription`          | `cvm.event`                         |
+| `registry.list`     | optional `query`                                       | list of `CvmRegistryEntry` | `cvm.registry.list` / `.result`     |
+| `registry.has`      | `family`, optional `options`                           | `bool`                     | `cvm.registry.has` / `.result`      |
+| `registry.describe` | `family`, optional `options`                           | `CvmRegistryEntry`         | `cvm.registry.describe` / `.result` |
+| `registry.call`     | `family`, `tool`, optional `args`, optional `options`  | `McpToolResult`            | `cvm.registry.call` / `.result`     |
 
 `CvmServerRef`: `pubkey` (yes), `relays?`
 `CvmServer`: `pubkey` (yes), `relays?`, `name?`, `description?`, `capabilities?`, `paymentRequired?`
@@ -931,21 +951,22 @@ NAP-CVM provides native access to ContextVM servers (MCP over Nostr). The napple
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `cvm.discover` | napplet -> shell | `id`, `query?` |
-| `cvm.discover.result` | shell -> napplet | `id`, `servers`, `error?` |
-| `cvm.request` | napplet -> shell | `id`, `server`, `message`, `options?` |
-| `cvm.request.result` | shell -> napplet | `id`, `message?`, `error?` |
-| `cvm.close` | napplet -> shell | `id`, `server` |
-| `cvm.close.result` | shell -> napplet | `id`, `error?` |
-| `cvm.event` | shell -> napplet | `server`, `message` |
-| `cvm.registry.list` / `.result` | bidirectional | `id`, `query?` / `id`, `entries?`, `error?` |
-| `cvm.registry.has` / `.result` | bidirectional | `id`, `family`, `options?` / `id`, `has?`, `error?` |
-| `cvm.registry.describe` / `.result` | bidirectional | `id`, `family`, `options?` / `id`, `entry?`, `error?` |
-| `cvm.registry.call` / `.result` | bidirectional | `id`, `family`, `tool`, `args?`, `options?` / `id`, `result?`, `error?` |
+| Type                                | Direction        | Payload fields                                                          |
+| ----------------------------------- | ---------------- | ----------------------------------------------------------------------- |
+| `cvm.discover`                      | napplet -> shell | `id`, `query?`                                                          |
+| `cvm.discover.result`               | shell -> napplet | `id`, `servers`, `error?`                                               |
+| `cvm.request`                       | napplet -> shell | `id`, `server`, `message`, `options?`                                   |
+| `cvm.request.result`                | shell -> napplet | `id`, `message?`, `error?`                                              |
+| `cvm.close`                         | napplet -> shell | `id`, `server`                                                          |
+| `cvm.close.result`                  | shell -> napplet | `id`, `error?`                                                          |
+| `cvm.event`                         | shell -> napplet | `server`, `message`                                                     |
+| `cvm.registry.list` / `.result`     | bidirectional    | `id`, `query?` / `id`, `entries?`, `error?`                             |
+| `cvm.registry.has` / `.result`      | bidirectional    | `id`, `family`, `options?` / `id`, `has?`, `error?`                     |
+| `cvm.registry.describe` / `.result` | bidirectional    | `id`, `family`, `options?` / `id`, `entry?`, `error?`                   |
+| `cvm.registry.call` / `.result`     | bidirectional    | `id`, `family`, `tool`, `args?`, `options?` / `id`, `result?`, `error?` |
 
 Key notes:
+
 - `cvm.request.result` correlates to the NIP-5D request `id`; the embedded MCP message retains its own JSON-RPC `id`.
 - `cvm.event` is for MCP notifications not correlated to a single request — fans out to every registered handler.
 - The shell owns all ContextVM event IDs, relay subscriptions, encryption state, and signing.
@@ -969,18 +990,18 @@ NAP-LINK lets a sandboxed napplet ask the shell to open an external URL for the 
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `open` | `url` (`tstr`), optional `options` (`LinkOpenOptions`) | `LinkOpenResult` | `link.open` / `.result` |
+| Operation | Parameters                                             | Result           | Wire                    |
+| --------- | ------------------------------------------------------ | ---------------- | ----------------------- |
+| `open`    | `url` (`tstr`), optional `options` (`LinkOpenOptions`) | `LinkOpenResult` | `link.open` / `.result` |
 
 `LinkOpenOptions`: `label?` (human-readable prompt text, not trusted policy input)
 `LinkOpenResult`: `status` (`"opened"` / `"denied"`)
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `link.open` | napplet -> shell | `id`, `url`, `options?` |
+| Type               | Direction        | Payload fields           |
+| ------------------ | ---------------- | ------------------------ |
+| `link.open`        | napplet -> shell | `id`, `url`, `options?`  |
 | `link.open.result` | shell -> napplet | `id`, `status`, `error?` |
 
 ### Shell Behavior
@@ -1011,17 +1032,17 @@ Two entry points: `mine` returns the mined unsigned event; `mineAndPublish` mine
 
 ### API Surface
 
-| Operation | Parameters | Result | Wire |
-|-----------|------------|--------|------|
-| `mine` | `template`, `target` (`uint`), optional `opts` (`PowOptions`) | `PowJob` handle | `pow.mine` + push messages |
-| `mineAndPublish` | `template`, `target`, optional `opts` | `PowJob` handle | `pow.mineAndPublish` + push messages |
-| `queue` | none | list of `PowJobSummary` | `pow.queue` / `.result` |
-| `job` | `jobId` | `PowProgress` | `pow.job` / `.result` |
-| `hashrate` | none | `PowHashrate` | `pow.hashrate` / `.result` |
-| `cancel` | `jobId` | `bool` | `pow.cancel` / `.result` |
-| `pause` | optional `jobId` | none | `pow.pause` / `.result` |
-| `resume` | optional `jobId` | none | `pow.resume` / `.result` |
-| `formatHashRate` | `hashesPerSecond` | `tstr` | local helper; no wire message |
+| Operation        | Parameters                                                    | Result                  | Wire                                 |
+| ---------------- | ------------------------------------------------------------- | ----------------------- | ------------------------------------ |
+| `mine`           | `template`, `target` (`uint`), optional `opts` (`PowOptions`) | `PowJob` handle         | `pow.mine` + push messages           |
+| `mineAndPublish` | `template`, `target`, optional `opts`                         | `PowJob` handle         | `pow.mineAndPublish` + push messages |
+| `queue`          | none                                                          | list of `PowJobSummary` | `pow.queue` / `.result`              |
+| `job`            | `jobId`                                                       | `PowProgress`           | `pow.job` / `.result`                |
+| `hashrate`       | none                                                          | `PowHashrate`           | `pow.hashrate` / `.result`           |
+| `cancel`         | `jobId`                                                       | `bool`                  | `pow.cancel` / `.result`             |
+| `pause`          | optional `jobId`                                              | none                    | `pow.pause` / `.result`              |
+| `resume`         | optional `jobId`                                              | none                    | `pow.resume` / `.result`             |
+| `formatHashRate` | `hashesPerSecond`                                             | `tstr`                  | local helper; no wire message        |
 
 `PowJob`: local handle for `jobId` and `target`. Exposes `started`, `completed`, event listeners (`state`, `progress`, `done`, `error`), and local `cancel`/`pause`/`resume` helpers.
 
@@ -1032,24 +1053,25 @@ Two entry points: `mine` returns the mined unsigned event; `mineAndPublish` mine
 
 ### Wire Protocol
 
-| Type | Direction | Payload fields |
-|------|-----------|----------------|
-| `pow.mine` | napplet -> shell | `id`, `jobId`, `template`, `target`, `options?` |
-| `pow.mine.result` | shell -> napplet | `id`, `jobId`, `accepted`, `state`, `position?`, `error?` |
-| `pow.mineAndPublish` | napplet -> shell | `id`, `jobId`, `template`, `target`, `options?` |
+| Type                        | Direction        | Payload fields                                            |
+| --------------------------- | ---------------- | --------------------------------------------------------- |
+| `pow.mine`                  | napplet -> shell | `id`, `jobId`, `template`, `target`, `options?`           |
+| `pow.mine.result`           | shell -> napplet | `id`, `jobId`, `accepted`, `state`, `position?`, `error?` |
+| `pow.mineAndPublish`        | napplet -> shell | `id`, `jobId`, `template`, `target`, `options?`           |
 | `pow.mineAndPublish.result` | shell -> napplet | `id`, `jobId`, `accepted`, `state`, `position?`, `error?` |
-| `pow.state` | shell -> napplet | `jobId`, `state`, `position?` |
-| `pow.progress` | shell -> napplet | `jobId`, `progress` |
-| `pow.done` | shell -> napplet | `jobId`, `result` |
-| `pow.error` | shell -> napplet | `jobId`, `error` |
-| `pow.queue` / `.result` | bidirectional | `id` / `id`, `jobs` |
-| `pow.job` / `.result` | bidirectional | `id`, `jobId` / `id`, `progress`, `error?` |
-| `pow.hashrate` / `.result` | bidirectional | `id` / `id`, `hashrate` |
-| `pow.cancel` / `.result` | bidirectional | `id`, `jobId` / `id`, `jobId`, `cancelled`, `error?` |
-| `pow.pause` / `.result` | bidirectional | `id`, `jobId?` / `id`, `jobId?`, `error?` |
-| `pow.resume` / `.result` | bidirectional | `id`, `jobId?` / `id`, `jobId?`, `error?` |
+| `pow.state`                 | shell -> napplet | `jobId`, `state`, `position?`                             |
+| `pow.progress`              | shell -> napplet | `jobId`, `progress`                                       |
+| `pow.done`                  | shell -> napplet | `jobId`, `result`                                         |
+| `pow.error`                 | shell -> napplet | `jobId`, `error`                                          |
+| `pow.queue` / `.result`     | bidirectional    | `id` / `id`, `jobs`                                       |
+| `pow.job` / `.result`       | bidirectional    | `id`, `jobId` / `id`, `progress`, `error?`                |
+| `pow.hashrate` / `.result`  | bidirectional    | `id` / `id`, `hashrate`                                   |
+| `pow.cancel` / `.result`    | bidirectional    | `id`, `jobId` / `id`, `jobId`, `cancelled`, `error?`      |
+| `pow.pause` / `.result`     | bidirectional    | `id`, `jobId?` / `id`, `jobId?`, `error?`                 |
+| `pow.resume` / `.result`    | bidirectional    | `id`, `jobId?` / `id`, `jobId?`, `error?`                 |
 
 Key notes:
+
 - The napplet generates `jobId` and uses it to correlate push messages.
 - `pow.mine.result` reports the job's **initial** state (`"queued"` with position, or `"mining"`). The mined event arrives later in `pow.done`.
 - `created_at` is committed when mining **starts**, not when submitted, so queue wait never produces a stale timestamp.

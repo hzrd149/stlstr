@@ -17,11 +17,13 @@
     "type-check": "turbo run type-check --filter={./napplets/*} --filter={./lib/*}",
     "discover": "napplet discover --all",
     "test:conformance": "pnpm build && napplet conformance --all",
-    "login": "napplet keys store --name publisher --prompt-sec && napplet keys use --name publisher",
-    "logout": "napplet keys delete --name publisher",
+    "login": "napplet keys store --name stlstr --prompt-sec && napplet keys use --name stlstr",
+    "logout": "napplet keys delete --name stlstr",
     "keys": "napplet keys",
     "deploy": "pnpm build && napplet deploy --all",
     "deploy:dry": "pnpm build && napplet deploy --all --dry-run",
+    "deploy:dev": "pnpm build && napplet deploy --all --config .napplet/config.dev.json",
+    "deploy:dev:dry": "pnpm build && napplet deploy --all --dry-run --config .napplet/config.dev.json",
     "debug": "napplet debug --all",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -35,10 +37,12 @@
     "@kehto/cli": "^0.2.16",
     "@napplelets/napplet-cli": "workspace:*",
     "@napplet/conformance-cli": "^0.2.15",
+    "nostr-tools": "^2.24.1",
     "prettier": "^3.9.5",
     "prettier-plugin-svelte": "^3.5.2",
     "puppeteer": "^24.31.0",
-    "turbo": "^2.10.5"
+    "turbo": "^2.10.5",
+    "ws": "^8.21.1"
   },
   "license": "MIT"
 }

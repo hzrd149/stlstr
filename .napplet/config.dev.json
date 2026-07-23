@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "sourceDir": ".",
+  "relays": ["ws://localhost:4869"],
+  "blossomServers": ["http://localhost:24242"],
+  "defaultTarget": "named",
+  "named": [],
+  "discover": {
+    "enabled": true,
+    "roots": ["napplets"]
+  },
+  "signing": {
+    "mode": "interactive",
+    "keyReference": "stlstr",
+    "relays": ["ws://localhost:4869"]
+  },
+  "conformance": {
+    "command": "napplet-conformance"
+  },
+  "paja": {
+    "command": "kehto"
+  }
+}

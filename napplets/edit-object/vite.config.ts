@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'edit-object',
-      requires: ['outbox', 'upload', 'identity'],
+      requires: ['outbox', 'upload', 'identity', 'storage', 'resource', 'intent'],
       artifactMode: 'single-file',
       archetypes: [{ slug: 'edit-object', naps: ['outbox', 'upload', 'identity'] }],
     }),

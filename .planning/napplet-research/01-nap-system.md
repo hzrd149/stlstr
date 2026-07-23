@@ -4,17 +4,17 @@
 
 ## Glossary
 
-| Term | Meaning |
-|------|---------|
-| **Seam** | The boundary between a napplet and its runtime — what's offered, and how it's asked for. Transport-agnostic. |
-| **Napplet** | A Nostr applet: a small, single-purpose app. Described by a NIP-5A manifest (kind 35128). |
-| **Runtime / Shell** | The host that composes napplets and provides their capabilities. |
-| **NAP** | One capability contract in the seam — operations, message schema, error model, trust boundary. Never the delivery mechanism. |
-| **Domain** | A capability's short name (`relay`, `intent`); how a NAP is referenced and discovered. |
-| **Projection** | A mapping of the seam onto one concrete host (web, native, WASM, ...). |
-| **NAP-WORD** | An interface spec — an API the runtime offers. One canonical spec per name. |
-| **Convention** | An unnumbered message shape napplets agree to use. Named as `napplet:<archetype>/<intent>[...?params]`. Not a NAP. |
-| **NAAT** | A Napplet Archetype: a canonical role name (`note`, `feed`) with a boundary. Not a NAP. |
+| Term                | Meaning                                                                                                                      |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Seam**            | The boundary between a napplet and its runtime — what's offered, and how it's asked for. Transport-agnostic.                 |
+| **Napplet**         | A Nostr applet: a small, single-purpose app. Described by a NIP-5A manifest (kind 35128).                                    |
+| **Runtime / Shell** | The host that composes napplets and provides their capabilities.                                                             |
+| **NAP**             | One capability contract in the seam — operations, message schema, error model, trust boundary. Never the delivery mechanism. |
+| **Domain**          | A capability's short name (`relay`, `intent`); how a NAP is referenced and discovered.                                       |
+| **Projection**      | A mapping of the seam onto one concrete host (web, native, WASM, ...).                                                       |
+| **NAP-WORD**        | An interface spec — an API the runtime offers. One canonical spec per name.                                                  |
+| **Convention**      | An unnumbered message shape napplets agree to use. Named as `napplet:<archetype>/<intent>[...?params]`. Not a NAP.           |
+| **NAAT**            | A Napplet Archetype: a canonical role name (`note`, `feed`) with a boundary. Not a NAP.                                      |
 
 ## What is a napplet?
 
@@ -24,11 +24,12 @@ A napplet is described and distributed as a NIP-5A manifest (a Nostr event, kind
 
 ## What is a NAP?
 
-A NAP is one capability contract in the seam. `NAP-RELAY` says *a runtime can proxy relay reads and writes, and here is exactly how a napplet requests them.* `NAP-INTENT` says *a runtime can open another napplet by role, and here is the request/result shape.*
+A NAP is one capability contract in the seam. `NAP-RELAY` says _a runtime can proxy relay reads and writes, and here is exactly how a napplet requests them._ `NAP-INTENT` says _a runtime can open another napplet by role, and here is the request/result shape._
 
 A NAP is **not**:
-- **the transport.** `postMessage`, iframes, and `window.napplet.*` are *projection* details, not the NAP. The same `NAP-RELAY` contract could be carried by IPC, an FFI call, or WASM imports.
-- **Nostr itself.** Napplets are Nostr-native — identities are pubkeys, manifests are events, payloads carry Nostr data. NAPs standardize the *runtime contract* around that data; they do not redefine Nostr.
+
+- **the transport.** `postMessage`, iframes, and `window.napplet.*` are _projection_ details, not the NAP. The same `NAP-RELAY` contract could be carried by IPC, an FFI call, or WASM imports.
+- **Nostr itself.** Napplets are Nostr-native — identities are pubkeys, manifests are events, payloads carry Nostr data. NAPs standardize the _runtime contract_ around that data; they do not redefine Nostr.
 
 ## Layering
 
@@ -38,11 +39,11 @@ NIP-5A   what a napplet IS / how it's described    manifest, identity   (substra
    └─ projection: web, native, WASM, ...             same contracts, different host
 ```
 
-NIP-5A defines the napplet. A NAP defines a capability the napplet can ask a runtime for. A *projection* implements that seam for a concrete host.
+NIP-5A defines the napplet. A NAP defines a capability the napplet can ask a runtime for. A _projection_ implements that seam for a concrete host.
 
 ## The two axes
 
-A complete napplet ecosystem needs two governed things: what the runtime *offers*, and what kind of napplet each *is*. Cross-napplet message shapes are conventions. They are not assigned NAP numbers.
+A complete napplet ecosystem needs two governed things: what the runtime _offers_, and what kind of napplet each _is_. Cross-napplet message shapes are conventions. They are not assigned NAP numbers.
 
 ### NAP-WORD — interfaces (what the runtime offers)
 
@@ -83,13 +84,13 @@ A napplet also declares the capabilities it needs in its NIP-5A manifest (`["req
 
 ## Web Projection (NIP-5D)
 
-| Concern | Web projection |
-|---------|----------------|
-| Host | Napplets run as `sandbox="allow-scripts"` iframes |
-| Carrier | Messages travel over `postMessage` |
-| Surface | Capabilities appear on a `window.napplet.*` object |
-| Discovery | `shell.supports("<domain>")` |
-| Identity | Runtime verifies `MessageEvent.source` and binds each message to a napplet |
+| Concern   | Web projection                                                             |
+| --------- | -------------------------------------------------------------------------- |
+| Host      | Napplets run as `sandbox="allow-scripts"` iframes                          |
+| Carrier   | Messages travel over `postMessage`                                         |
+| Surface   | Capabilities appear on a `window.napplet.*` object                         |
+| Discovery | `shell.supports("<domain>")`                                               |
+| Identity  | Runtime verifies `MessageEvent.source` and binds each message to a napplet |
 
 ### Domain surfacing
 
@@ -110,46 +111,47 @@ The shell verifies `MessageEvent.source` on every inbound message to bind it to 
 
 ## NAP-WORD registry
 
-| NAP ID | Domain | Req | Deps | Description | Status |
-|--------|--------|-----|------|-------------|--------|
-| NAP-SHELL | `shell` | yes | — | Bootstrap handshake and capability negotiation | Active |
-| NAP-INTENT | `intent` | — | — | Invoke a napplet by archetype (default-handler dispatch) | Active |
-| NAP-INC | `inc` | — | — | Inter-napplet communication | Active |
-| NAP-THEME | `theme` | — | — | Shell-provided theming | Active |
-| NAP-RELAY | `relay` | — | `resource` | Relay proxy (subscribe, publish, query, publishEncrypted) | Draft |
-| NAP-IDENTITY | `identity` | — | `resource` | Read-only user identity queries | Draft |
-| NAP-STORAGE | `storage` | — | — | Scoped key-value storage | Draft |
-| NAP-KEYS | `keys` | — | — | Keyboard forwarding and action keybindings | Draft |
-| NAP-MEDIA | `media` | — | `resource` | Media session control and playback | Draft |
-| NAP-NOTIFY | `notify` | — | — | Shell-rendered notifications | Draft |
-| NAP-RESOURCE | `resource` | — | — | Sandboxed resource fetching (https/blossom/nostr/data) | Draft |
-| NAP-CONFIG | `config` | — | — | Per-napplet declarative configuration (JSON Schema-driven) | Draft |
-| NAP-UPLOAD | `upload` | — | `relay` | Shell-mediated file and blob upload (NIP-96, Blossom) | Draft |
-| NAP-VALUE | `value` | — | `relay` | Shell-mediated value transfer and zaps | Draft |
-| NAP-OUTBOX | `outbox` | — | `relay` | Outbox-aware relay routing and queries | Draft |
-| NAP-CVM | `cvm` | — | `value` | Native ContextVM / MCP-over-Nostr bridge | Draft |
-| NAP-LINK | `link` | — | — | Shell-mediated external link opening | Draft |
-| NAP-POW | `pow` | — | `identity`, `relay`, `outbox` | NIP-13 proof-of-work miner | Draft |
-| NAP-CLASS | `class` | — | — | Napplet class authority (sub-track root) | Deferred |
-| NAP-CONNECT | `connect` | — | — | User-gated direct network access | Deferred |
+| NAP ID       | Domain     | Req | Deps                          | Description                                                | Status   |
+| ------------ | ---------- | --- | ----------------------------- | ---------------------------------------------------------- | -------- |
+| NAP-SHELL    | `shell`    | yes | —                             | Bootstrap handshake and capability negotiation             | Active   |
+| NAP-INTENT   | `intent`   | —   | —                             | Invoke a napplet by archetype (default-handler dispatch)   | Active   |
+| NAP-INC      | `inc`      | —   | —                             | Inter-napplet communication                                | Active   |
+| NAP-THEME    | `theme`    | —   | —                             | Shell-provided theming                                     | Active   |
+| NAP-RELAY    | `relay`    | —   | `resource`                    | Relay proxy (subscribe, publish, query, publishEncrypted)  | Draft    |
+| NAP-IDENTITY | `identity` | —   | `resource`                    | Read-only user identity queries                            | Draft    |
+| NAP-STORAGE  | `storage`  | —   | —                             | Scoped key-value storage                                   | Draft    |
+| NAP-KEYS     | `keys`     | —   | —                             | Keyboard forwarding and action keybindings                 | Draft    |
+| NAP-MEDIA    | `media`    | —   | `resource`                    | Media session control and playback                         | Draft    |
+| NAP-NOTIFY   | `notify`   | —   | —                             | Shell-rendered notifications                               | Draft    |
+| NAP-RESOURCE | `resource` | —   | —                             | Sandboxed resource fetching (https/blossom/nostr/data)     | Draft    |
+| NAP-CONFIG   | `config`   | —   | —                             | Per-napplet declarative configuration (JSON Schema-driven) | Draft    |
+| NAP-UPLOAD   | `upload`   | —   | `relay`                       | Shell-mediated file and blob upload (NIP-96, Blossom)      | Draft    |
+| NAP-VALUE    | `value`    | —   | `relay`                       | Shell-mediated value transfer and zaps                     | Draft    |
+| NAP-OUTBOX   | `outbox`   | —   | `relay`                       | Outbox-aware relay routing and queries                     | Draft    |
+| NAP-CVM      | `cvm`      | —   | `value`                       | Native ContextVM / MCP-over-Nostr bridge                   | Draft    |
+| NAP-LINK     | `link`     | —   | —                             | Shell-mediated external link opening                       | Draft    |
+| NAP-POW      | `pow`      | —   | `identity`, `relay`, `outbox` | NIP-13 proof-of-work miner                                 | Draft    |
+| NAP-CLASS    | `class`    | —   | —                             | Napplet class authority (sub-track root)                   | Deferred |
+| NAP-CONNECT  | `connect`  | —   | —                             | User-gated direct network access                           | Deferred |
 
 ### Additional package-level domains (no NAP spec yet)
 
 These domains ship in `@napplet/nap` and `@napplet/sdk` but do not yet have standalone NAP spec files in the naps repo:
 
-| Domain | Purpose |
-|--------|---------|
+| Domain   | Purpose                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------- |
 | `common` | Common social actions — NIP-19 helpers, profile lookup, follows, follow/unfollow, reactions, reports |
-| `lists` | NIP-51 list mutations (add/remove) |
-| `count` | Event count queries through the shell |
-| `dm` | Shell-mediated encrypted direct-message helpers |
-| `ble` | Runtime-mediated Bluetooth LE/GATT sessions |
-| `webrtc` | Runtime-mediated WebRTC data sessions |
-| `serial` | Runtime-mediated serial device access |
+| `lists`  | NIP-51 list mutations (add/remove)                                                                   |
+| `count`  | Event count queries through the shell                                                                |
+| `dm`     | Shell-mediated encrypted direct-message helpers                                                      |
+| `ble`    | Runtime-mediated Bluetooth LE/GATT sessions                                                          |
+| `webrtc` | Runtime-mediated WebRTC data sessions                                                                |
+| `serial` | Runtime-mediated serial device access                                                                |
 
 ## Governance
 
 NIP-style informal process:
+
 - Fork the repo, add a markdown file under `naps/` following the interface template, open a PR.
 - Community discusses via PR comments.
 - Maintainer (dskvr) merges when the spec makes sense and has at least one implementation.
@@ -159,6 +161,7 @@ NIP-style informal process:
 ## NAP-WORD Template structure
 
 Every NAP spec follows this shape:
+
 - **NAP ID**, **Domain**, **Depends** (by domain), **Web binding**
 - **Description** — what the interface provides and why a napplet needs it
 - **API Surface** — operation table (operation, parameters, result, wire message)

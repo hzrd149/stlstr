@@ -1,0 +1,13 @@
+@import 'tailwindcss';
+@plugin "daisyui" {
+  themes:
+    light --default,
+    dark --prefersdark;
+}
+
+/* The napplet fills the shell's dialog box rather than a page. */
+html,
+body,
+#app {
+  height: 100%;
+}

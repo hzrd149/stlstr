@@ -104,7 +104,7 @@ export function createNostrConnectLogin() {
     relays: NOSTR_CONNECT_RELAYS,
   });
   const uri = signer.getNostrConnectURI({
-    name: 'stlstr',
+    name: 'STLstr',
     url: window.location.origin,
     permissions: NOSTR_CONNECT_PERMISSIONS,
   });

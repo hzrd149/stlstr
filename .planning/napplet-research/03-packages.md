@@ -39,11 +39,20 @@ npm install @napplet/core
 
 ```typescript
 import {
-  type NappletMessage, type NapDomain, type NappletGlobal,
-  type NapHandler, type NapDispatch,
-  NAP_DOMAINS, SHELL_BRIDGE_URI, PROTOCOL_VERSION,
-  createDispatch, registerNap, dispatch, getRegisteredDomains,
-  ALL_CAPABILITIES, TOPICS,
+  type NappletMessage,
+  type NapDomain,
+  type NappletGlobal,
+  type NapHandler,
+  type NapDispatch,
+  NAP_DOMAINS,
+  SHELL_BRIDGE_URI,
+  PROTOCOL_VERSION,
+  createDispatch,
+  registerNap,
+  dispatch,
+  getRegisteredDomains,
+  ALL_CAPABILITIES,
+  TOPICS,
 } from '@napplet/core';
 ```
 
@@ -90,8 +99,8 @@ registerNap('outbox', (msg) => {
 });
 
 dispatch({ type: 'outbox.query', id: 'abc', filters: [{ kinds: [1] }] }); // true
-dispatch({ type: 'unknown.action' });                                     // false
-dispatch({ type: 'malformed' });                                           // false (no dot)
+dispatch({ type: 'unknown.action' }); // false
+dispatch({ type: 'malformed' }); // false (no dot)
 ```
 
 ---
@@ -123,7 +132,10 @@ const activatePrelude = renderNappletRuntimePreludeCall({
   domains: ['identity', 'storage', 'outbox'],
 });
 
-const srcdoc = html.replace('<head>', `<head><script>${preludeSource}\n${activatePrelude}</script>`);
+const srcdoc = html.replace(
+  '<head>',
+  `<head><script>${preludeSource}\n${activatePrelude}</script>`,
+);
 ```
 
 The IIFE artifact exposes `globalThis.NappletShimPrelude.install({ domains })` and installs only the requested known NAP domains. `prelude.global` artifact is npm-only.
@@ -132,22 +144,22 @@ The IIFE artifact exposes `globalThis.NappletShimPrelude.install({ domains })` a
 
 After runtime injection, the global may contain:
 
-| Namespace | What it does |
-|-----------|--------------|
-| `outbox` | Outbox-aware `getEvent`, `query`, `subscribe`, `publish`, `resolveRelays`; default for normal event reads and publishes |
-| `common` | Profile lookup, follow/unfollow, reactions, reports, NIP-19 helpers |
-| `lists` | NIP-51 list read and mutation helpers |
-| `count` | Count queries through the shell |
-| `dm` | Shell-mediated encrypted direct-message helpers |
-| `relay` | Low-level explicit relay proxy for relay-local escape hatches |
-| `inc` | Inter-napplet communication: `emit`, `on` |
-| `storage` | Scoped key-value storage: `getItem`, `setItem`, `removeItem`, `keys` (512 KB quota), plus `storage.instance.*` |
-| `keys` | Keyboard forwarding + action keybindings: `registerAction`, `unregisterAction`, `onAction` |
-| `media` | Ownership-aware media sessions: `createSession`, `reportState`, `onCommand`, ... |
-| `notify` | Shell-rendered notifications: `send`, `badge`, `onAction`, ... |
-| `identity` | Read-only user queries: `getPublicKey`, `onChanged`, `getProfile`, ... |
-| `config` | Per-napplet declarative config: `get`, `subscribe`, `openSettings`, `registerSchema`, `schema` |
-| `resource` | Sandboxed byte fetching: `info`, `bytes`, `bytesMany`, `bytesAsObjectURL` |
+| Namespace  | What it does                                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `outbox`   | Outbox-aware `getEvent`, `query`, `subscribe`, `publish`, `resolveRelays`; default for normal event reads and publishes |
+| `common`   | Profile lookup, follow/unfollow, reactions, reports, NIP-19 helpers                                                     |
+| `lists`    | NIP-51 list read and mutation helpers                                                                                   |
+| `count`    | Count queries through the shell                                                                                         |
+| `dm`       | Shell-mediated encrypted direct-message helpers                                                                         |
+| `relay`    | Low-level explicit relay proxy for relay-local escape hatches                                                           |
+| `inc`      | Inter-napplet communication: `emit`, `on`                                                                               |
+| `storage`  | Scoped key-value storage: `getItem`, `setItem`, `removeItem`, `keys` (512 KB quota), plus `storage.instance.*`          |
+| `keys`     | Keyboard forwarding + action keybindings: `registerAction`, `unregisterAction`, `onAction`                              |
+| `media`    | Ownership-aware media sessions: `createSession`, `reportState`, `onCommand`, ...                                        |
+| `notify`   | Shell-rendered notifications: `send`, `badge`, `onAction`, ...                                                          |
+| `identity` | Read-only user queries: `getPublicKey`, `onChanged`, `getProfile`, ...                                                  |
+| `config`   | Per-napplet declarative config: `get`, `subscribe`, `openSettings`, `registerSchema`, `schema`                          |
+| `resource` | Sandboxed byte fetching: `info`, `bytes`, `bytesMany`, `bytesAsObjectURL`                                               |
 
 **Domain absence:** If a property is absent, that NAP is unavailable to the napplet.
 
@@ -203,11 +215,13 @@ Top-level namespaced objects mirroring `window.napplet`:
 - **`resource`** — `info`, `bytes`, `bytesMany`, `bytesAsObjectURL`
 
 `identity` is exported as a top-level object and through bare-name helpers:
+
 - `identityGetPublicKey`, `identityOnChanged`
 
 There is **no top-level `shell` object**. Detect capability availability from runtime-injected domain presence (`window.napplet?.outbox`, etc.).
 
 The SDK also re-exports:
+
 - The `*_DOMAIN` constants and `install*Shim` installers
 - `resourceInfo`, `resourceBytes`, `resourceBytesMany`, `resourceBytesAsObjectURL`
 - Protocol types from `@napplet/core` and per-domain message-type unions (`RelayNapMessage`, `IdentityNapMessage`, ...)
@@ -222,7 +236,10 @@ const sub = outbox.subscribe([{ kinds: [1], limit: 20 }], { timeoutMs: 3000 });
 sub.on('event', (result) => console.log('New note:', result.event.content));
 
 const published = await outbox.publish({
-  kind: 1, content: 'Hello from my napplet!', tags: [], created_at: Math.floor(Date.now() / 1000),
+  kind: 1,
+  content: 'Hello from my napplet!',
+  tags: [],
+  created_at: Math.floor(Date.now() / 1000),
 });
 if (!published.ok || !published.event) throw new Error(published.error ?? 'publish failed');
 
@@ -277,12 +294,12 @@ pnpm add @napplet/nap
 
 Each domain exposes up to four entry-point shapes:
 
-| Pattern | Subpath | Contents |
-|---------|---------|----------|
-| **Barrel** | `@napplet/nap/<domain>` | types + shim installer + SDK helpers |
-| **Types-only** | `@napplet/nap/<domain>/types` | pure TypeScript types, zero runtime |
-| **Shim** | `@napplet/nap/<domain>/shim` | installer + message handlers (for shells) |
-| **SDK** | `@napplet/nap/<domain>/sdk` | named helper functions (for napplet code) |
+| Pattern        | Subpath                       | Contents                                  |
+| -------------- | ----------------------------- | ----------------------------------------- |
+| **Barrel**     | `@napplet/nap/<domain>`       | types + shim installer + SDK helpers      |
+| **Types-only** | `@napplet/nap/<domain>/types` | pure TypeScript types, zero runtime       |
+| **Shim**       | `@napplet/nap/<domain>/shim`  | installer + message handlers (for shells) |
+| **SDK**        | `@napplet/nap/<domain>/sdk`   | named helper functions (for napplet code) |
 
 ```typescript
 import { installRelayShim, relaySubscribe, RelaySubscribeMessage } from '@napplet/nap/relay';
@@ -339,24 +356,26 @@ export default defineConfig({
 
 ### Options
 
-| Option | Type | Purpose |
-|--------|------|---------|
-| `nappletType` *(required)* | `string` | The napp type / `d` tag; injected as `<meta name="napplet-napp-type">` and used as manifest `d` tag. |
-| `requires` | `string[]` | Bare NAP domain names this napplet needs. Injects `napplet-requires` meta tag and `["requires", ...]` manifest tags. |
-| `title` | `string` | Human-readable title. Sets/overrides HTML `<title>`. CLI reads it back and emits NIP-5A `["title", ...]` tag. |
-| `description` | `string` | Human-readable description. Sets/overrides `<meta name="description">`. CLI emits NIP-5A `["description", ...]` tag. |
-| `configSchema` | `NappletConfigSchema \| string` | JSON Schema for NAP-CONFIG surface. Inline object or path; falls through to `config.schema.json` then `napplet.config.*`. |
-| `artifactMode` | `'external-assets' \| 'single-file'` | Default `'external-assets'`. `'single-file'` inlines local JS/CSS into `index.html` before hashing. |
+| Option                     | Type                                 | Purpose                                                                                                                   |
+| -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `nappletType` _(required)_ | `string`                             | The napp type / `d` tag; injected as `<meta name="napplet-napp-type">` and used as manifest `d` tag.                      |
+| `requires`                 | `string[]`                           | Bare NAP domain names this napplet needs. Injects `napplet-requires` meta tag and `["requires", ...]` manifest tags.      |
+| `title`                    | `string`                             | Human-readable title. Sets/overrides HTML `<title>`. CLI reads it back and emits NIP-5A `["title", ...]` tag.             |
+| `description`              | `string`                             | Human-readable description. Sets/overrides `<meta name="description">`. CLI emits NIP-5A `["description", ...]` tag.      |
+| `configSchema`             | `NappletConfigSchema \| string`      | JSON Schema for NAP-CONFIG surface. Inline object or path; falls through to `config.schema.json` then `napplet.config.*`. |
+| `artifactMode`             | `'external-assets' \| 'single-file'` | Default `'external-assets'`. `'single-file'` inlines local JS/CSS into `index.html` before hashing.                       |
 
 ### What gets injected
 
 **Dev mode** — two meta tags:
+
 ```html
-<meta name="napplet-aggregate-hash" content="">
-<meta name="napplet-napp-type" content="my-napp">
+<meta name="napplet-aggregate-hash" content="" />
+<meta name="napplet-napp-type" content="my-napp" />
 ```
 
 **Build time** (with `VITE_DEV_PRIVKEY_HEX` set) — walks `dist/`, computes hashes, signs kind 35129 event, writes `.nip5a-manifest.json`:
+
 ```json
 {
   "kind": 35129,
@@ -396,6 +415,7 @@ irm https://napplet.run/install.ps1 | iex
 ```
 
 JSR/Deno alternative:
+
 ```bash
 deno install --global \
   --allow-read --allow-write --allow-run --allow-env --allow-net \
@@ -489,8 +509,8 @@ npx napplet-conformance --url https://my.napplet.example/
 {
   "scripts": {
     "test:conformance": "napplet-conformance ./dist",
-    "test:conformance:ui": "napplet-conformance --ui . --exec \"vite build --watch\""
-  }
+    "test:conformance:ui": "napplet-conformance --ui . --exec \"vite build --watch\"",
+  },
 }
 ```
 
@@ -534,12 +554,12 @@ npx @napplet/boilerplate ./my-napplet --yes
 
 ### Options
 
-| Option | Purpose |
-|--------|---------|
-| `--variant <name>` | Template variant. Currently `basic`. |
-| `--template <path-or-url>` | Override the template source. |
-| `--yes`, `-y` | Use `./my-napplet` when destination is omitted. |
-| `--force` | Allow generation into a non-empty directory. |
+| Option                     | Purpose                                         |
+| -------------------------- | ----------------------------------------------- |
+| `--variant <name>`         | Template variant. Currently `basic`.            |
+| `--template <path-or-url>` | Override the template source.                   |
+| `--yes`, `-y`              | Use `./my-napplet` when destination is omitted. |
+| `--force`                  | Allow generation into a non-empty directory.    |
 
 ---
 
@@ -549,13 +569,13 @@ npx @napplet/boilerplate ./my-napplet --yes
 
 ### The skills
 
-| Skill | When | Covers |
-|-------|------|--------|
-| `make-napplet` | One-prompt end-to-end builds | Orchestrates project-state triage, port/design/build/test, NAP-THEME, OUTBOX-first, evidence checklist. |
-| `design-napplet` | First — plan before code | Sandbox/loading constraints, OUTBOX-first NAP selection, hard-vs-optional shell domains, responsive layout, build spec. |
-| `build-napplet` | Implementation | Correct project state, preserves starter substrate, applies NAP-THEME, uses `@napplet/sdk`, previews through Paja. |
+| Skill            | When                            | Covers                                                                                                                      |
+| ---------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `make-napplet`   | One-prompt end-to-end builds    | Orchestrates project-state triage, port/design/build/test, NAP-THEME, OUTBOX-first, evidence checklist.                     |
+| `design-napplet` | First — plan before code        | Sandbox/loading constraints, OUTBOX-first NAP selection, hard-vs-optional shell domains, responsive layout, build spec.     |
+| `build-napplet`  | Implementation                  | Correct project state, preserves starter substrate, applies NAP-THEME, uses `@napplet/sdk`, previews through Paja.          |
 | `port-nostr-app` | Migrating an existing Nostr app | Replace direct relay pools, `window.nostr`, local storage, direct fetch, app-owned signing with shell-owned NAP boundaries. |
-| `test-napplet` | Before publishing | Protocol conformance via `napplet-conformance`, interpreting failures, runtime guard, CI wiring. |
+| `test-napplet`   | Before publishing               | Protocol conformance via `napplet-conformance`, interpreting failures, runtime guard, CI wiring.                            |
 
 ### Install routes
 
@@ -576,7 +596,7 @@ napplet skills install --to copilot      # .github/copilot-instructions.md
 ```typescript
 import { listSkills, readSkill, install } from '@napplet/skills';
 
-listSkills();                      // [{ name, description, path }, ...]
-readSkill('build-napplet');        // full SKILL.md source
-install({ to: 'claude' });         // → InstallResult[]
+listSkills(); // [{ name, description, path }, ...]
+readSkill('build-napplet'); // full SKILL.md source
+install({ to: 'claude' }); // → InstallResult[]
 ```

@@ -9,9 +9,11 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'create-object',
-      requires: ['upload', 'outbox'],
+      requires: ['upload', 'outbox', 'identity', 'storage', 'intent'],
       artifactMode: 'single-file',
-      archetypes: [{ slug: 'create-object', naps: ['upload', 'outbox'] }],
+      archetypes: [
+        { slug: 'create-object', naps: ['upload', 'outbox', 'identity', 'storage', 'intent'] },
+      ],
     }),
   ],
   build: {
