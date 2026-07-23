@@ -30,8 +30,9 @@ function release(): void {
 
 /** True when the shell provides NAP-RESOURCE; optional domains must be feature-detected. */
 export function hasResource(): boolean {
-  return typeof (window as Window & { napplet?: Record<string, unknown> }).napplet?.resource ===
-    'object';
+  return (
+    typeof (window as Window & { napplet?: Record<string, unknown> }).napplet?.resource === 'object'
+  );
 }
 
 /**

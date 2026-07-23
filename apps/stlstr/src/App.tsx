@@ -824,12 +824,16 @@ function NappletFrame({
   }, [napplet, routeId, identity]);
 
   // NAP-IDENTITY is request/response, so a napplet that asked "who is signed in?" at mount
-  // would hold a stale answer forever. Pushing the canonical `identity:changed` topic is
-  // what lets an owner-gated action (object-detail's "Edit this object") appear the moment
-  // the owner signs in, instead of after a reload.
+  // would hold a stale answer forever. Pushing on every account change is what lets an
+  // owner-gated action (object-detail's "Edit this object") appear the moment the owner
+  // signs in, instead of after a reload.
+  //
+  // `publishIdentityChanged`, NOT `injectEvent`: the former posts the `identity.changed`
+  // envelope the SDK's `identity.onChanged` listens for, while the latter would deliver an
+  // inc.event on a topic nothing is subscribed to.
   useEffect(() => {
     const subscription = accountManager.active$.subscribe((account) => {
-      bridgeRef.current?.injectEvent('identity:changed', { pubkey: account?.pubkey ?? '' });
+      bridgeRef.current?.publishIdentityChanged(account?.pubkey ?? '');
     });
     return () => subscription.unsubscribe();
   }, []);

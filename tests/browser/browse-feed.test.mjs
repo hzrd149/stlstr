@@ -64,10 +64,11 @@ test('the feed lists recently published objects, newest first', async () => {
     );
 
     const titles = await textsOf(frame, '[data-testid="object-title"]');
-    const fixtureOrder = titles.filter((title) =>
-      OBJECTS.some((object) => object.title === title),
+    const fixtureOrder = titles.filter((title) => OBJECTS.some((object) => object.title === title));
+    assert.deepEqual(
+      fixtureOrder,
+      [...OBJECTS].reverse().map((object) => object.title),
     );
-    assert.deepEqual(fixtureOrder, [...OBJECTS].reverse().map((object) => object.title));
   } finally {
     await page.close();
   }

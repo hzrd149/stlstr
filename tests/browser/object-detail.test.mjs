@@ -46,6 +46,18 @@ async function withExtension(page, pubkey) {
   }, pubkey);
 }
 
+/**
+ * A page in its own browser context. Accounts persist to localStorage, so tests that sign
+ * in must not share an origin — otherwise one test's account leaks into the next and the
+ * shell never offers a Login button again.
+ */
+async function freshPage() {
+  const context = await browser.createBrowserContext();
+  const page = await context.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  return { page, close: () => context.close() };
+}
+
 async function openObject(page) {
   await page.goto(`${baseUrl}${objectPath}`, { waitUntil: 'networkidle0' });
   const handle = await page.waitForSelector('iframe[title="Object details napplet"]');
@@ -55,22 +67,38 @@ async function openObject(page) {
   return frame;
 }
 
-async function signIn(page) {
-  await page.click('button.btn-primary.btn-sm');
-  const buttons = await page.$$('dialog.modal button');
-  for (const button of buttons) {
-    const label = await button.evaluate((node) => node.textContent?.trim());
-    if (label === 'Browser extension') {
+/** Clicks the one button whose visible label is exactly `label`. */
+async function clickLabelled(page, selector, label) {
+  for (const button of await page.$$(selector)) {
+    if ((await button.evaluate((node) => node.textContent?.trim())) === label) {
       await button.click();
-      return;
+      return true;
     }
   }
-  assert.fail('the login dialog should offer browser-extension login');
+  return false;
+}
+
+/**
+ * Signs in through the shell's real login flow, backed by the fake NIP-07 provider.
+ *
+ * Completion is detected by the "Login" button being replaced with the account button —
+ * not by any class, because `.btn-primary.btn-sm` still matches the "Use" button inside the
+ * accounts dialog once an account exists.
+ */
+async function signIn(page) {
+  assert.ok(await clickLabelled(page, 'button', 'Login'), 'the shell should offer a Login button');
+  assert.ok(
+    await clickLabelled(page, 'dialog.modal button', 'Browser extension'),
+    'the login dialog should offer browser-extension login',
+  );
+
+  await page.waitForFunction(
+    () => ![...document.querySelectorAll('button')].some((n) => n.textContent?.trim() === 'Login'),
+  );
 }
 
 test('the object page renders its title and gallery image', async () => {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 900 });
+  const { page, close } = await freshPage();
 
   try {
     const frame = await openObject(page);
@@ -85,13 +113,12 @@ test('the object page renders its title and gallery image', async () => {
     assert.match(await image.evaluate((node) => node.src), /^blob:/);
     assert.ok(await image.evaluate((node) => node.naturalWidth > 0), 'the cover should decode');
   } finally {
-    await page.close();
+    await close();
   }
 });
 
 test('the edit action stays hidden when nobody is signed in', async () => {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 900 });
+  const { page, close } = await freshPage();
 
   try {
     const frame = await openObject(page);
@@ -101,33 +128,29 @@ test('the edit action stays hidden when nobody is signed in', async () => {
     await frame.waitForSelector('section[aria-label="Object gallery"] img');
     assert.equal(await frame.$('[data-testid="edit-object"]'), null);
   } finally {
-    await page.close();
+    await close();
   }
 });
 
 test('the edit action stays hidden for a signed-in non-owner', async () => {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 900 });
+  const { page, close } = await freshPage();
   await withExtension(page, STRANGER.pubkey);
 
   try {
     const frame = await openObject(page);
     await signIn(page);
 
-    // Wait for the shell to actually reflect the login before asserting on absence.
-    await page.waitForFunction(() => !document.querySelector('button.btn-primary.btn-sm'));
+    // The gallery having loaded means the page is settled, so an absent button is a
+    // decision rather than a race.
     await frame.waitForSelector('section[aria-label="Object gallery"] img');
-
     assert.equal(await frame.$('[data-testid="edit-object"]'), null);
   } finally {
-    await page.evaluate(() => localStorage.clear()).catch(() => {});
-    await page.close();
+    await close();
   }
 });
 
 test('the owner sees the edit action and it opens the editor', async () => {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 900 });
+  const { page, close } = await freshPage();
   await withExtension(page, OWNER.pubkey);
 
   try {
@@ -144,7 +167,6 @@ test('the owner sees the edit action and it opens the editor', async () => {
     );
     await page.waitForSelector('iframe[title="Edit object napplet"]');
   } finally {
-    await page.evaluate(() => localStorage.clear()).catch(() => {});
-    await page.close();
+    await close();
   }
 });

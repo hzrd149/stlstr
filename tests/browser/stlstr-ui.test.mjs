@@ -88,8 +88,12 @@ test('stlstr routes object details to a dedicated napplet', async () => {
     const frame = await nappletFrame(page, 'Object details');
     // This address names no fixture object, so the napplet reports that rather than
     // rendering one — which is still the napplet owning the page, not the shell.
-    await frame.waitForSelector('[data-testid="object-status"]');
-    assert.match(await frame.$eval('main', (node) => node.textContent ?? ''), /not been published/);
+    // Wait for the settled message: `object-status` also carries "Loading object...".
+    await frame.waitForFunction(() =>
+      document
+        .querySelector('[data-testid="object-status"]')
+        ?.textContent?.includes('not been published'),
+    );
     assert.equal(await frame.$('h1'), null);
     assert.equal(await frame.$('.card'), null);
   } finally {

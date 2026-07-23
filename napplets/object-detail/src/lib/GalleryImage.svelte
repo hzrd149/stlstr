@@ -60,7 +60,9 @@
     class="h-full w-full {fit === 'cover' ? 'object-cover' : 'object-contain'}"
   />
 {:else if settled}
-  <div class="flex h-full w-full items-center justify-center p-2 text-center text-sm text-base-content/50">
+  <div
+    class="flex h-full w-full items-center justify-center p-2 text-center text-sm text-base-content/50"
+  >
     {image?.alt || 'No preview available'}
   </div>
 {:else}
