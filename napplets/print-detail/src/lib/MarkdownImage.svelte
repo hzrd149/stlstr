@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { loadImageUrl } from './images';
+  import { loadImageUrl } from '@stlstr/napplet-kit/images';
 
   /**
    * An image embedded in a Markdown description.

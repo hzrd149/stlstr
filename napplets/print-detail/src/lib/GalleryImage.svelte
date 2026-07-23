@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { loadImageUrl } from './images';
+  import { loadImageUrl } from '@stlstr/napplet-kit/images';
   import type { ObjectImage } from './object';
 
   /**

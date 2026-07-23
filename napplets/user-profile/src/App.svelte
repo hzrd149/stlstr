@@ -2,7 +2,7 @@
   import { inc, intent, outbox } from '@napplet/sdk';
   import { onMount } from 'svelte';
   import CoverImage from './lib/CoverImage.svelte';
-  import { loadImageUrl } from './lib/images';
+  import { loadImageUrl } from '@stlstr/napplet-kit/images';
   import {
     collectObject,
     OBJECT_KIND,
