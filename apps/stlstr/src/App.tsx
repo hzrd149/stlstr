@@ -1135,6 +1135,10 @@ function ShellNavLink({
   );
 }
 
+function BrandLogo({ className = 'size-8' }: { className?: string }) {
+  return <img src="/logo.svg" alt="" className={className} aria-hidden="true" />;
+}
+
 function ShellLayout() {
   const [accountsReady, setAccountsReady] = useState(false);
 
@@ -1171,7 +1175,8 @@ function ShellLayout() {
             </label>
           </div>
           <div className="flex-1">
-            <Link className="btn btn-ghost text-xl" to="/" onClick={closeDrawer}>
+            <Link className="btn btn-ghost gap-2 text-xl" to="/" onClick={closeDrawer}>
+              <BrandLogo />
               STLstr
             </Link>
           </div>
@@ -1203,7 +1208,10 @@ function ShellLayout() {
           className="drawer-overlay"
         ></label>
         <div className="min-h-full w-72 bg-base-100 p-4">
-          <div className="mb-1 text-2xl font-bold">STLstr</div>
+          <div className="mb-1 flex items-center gap-2 text-2xl font-bold">
+            <BrandLogo className="size-9" />
+            STLstr
+          </div>
           <p className="mb-4 text-xs text-base-content/60">
             The worst named nostr app for 3d printing
           </p>
