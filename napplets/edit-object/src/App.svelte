@@ -77,6 +77,8 @@
   let viewer = $state('');
   let status = $state('Waiting for an object to open...');
   let busy = $state(false);
+  /** A publish succeeded and the shell is navigating away; the form must stay locked. */
+  let leaving = $state(false);
   let loaded = $state(false);
   let publishedAddress = $state('');
   let originalEvent = $state.raw<NostrEvent | null>(null);
@@ -402,10 +404,18 @@
     void loadObject(requested);
   }
 
-  /** Sends someone who cannot edit back to the page they can use. */
-  async function viewObject(): Promise<void> {
-    if (!address || !hasIntent()) return;
-    await intent.open('object-detail', { address });
+  /**
+   * Opens the object's detail page. Used both to send someone who cannot edit to the
+   * page they can use, and to leave here once an edit is published.
+   *
+   * Reports whether the shell actually took the navigation, so callers can stay put
+   * and keep offering the manual route instead of assuming they are gone.
+   */
+  async function viewObject(): Promise<boolean> {
+    if (!address || !hasIntent()) return false;
+    const result = await intent.open('object-detail', { address });
+    if (!result.ok) status = result.error ?? 'Could not open that object.';
+    return result.ok;
   }
 
   function buildReplacementTags(): NostrTag[] {
@@ -542,6 +552,13 @@
       address = publishedAddress;
       status = `Updated ${nextTitle}.`;
       if (hasStorage()) await storage.removeItem(draftKey());
+
+      // The edit is complete: images uploaded, the replacement is on the relays, and
+      // the draft is cleared. Hand the user to the object rather than leaving them on
+      // a form they are finished with. This unmounts the frame, so it goes last, and
+      // a shell that cannot route the intent falls back to the button below.
+      leaving = true;
+      if (!(await viewObject())) leaving = false;
     } catch (error) {
       status = error instanceof Error ? error.message : 'Publishing failed.';
     } finally {
@@ -795,9 +812,11 @@
         </div>
 
         {#if publishedAddress}
+          <!-- Normally the shell has already navigated by the time this renders; it
+               stays for shells that cannot route the intent, or where it failed. -->
           <div class="alert alert-success">
             <span>Published the replacement event.</span>
-            {#if hasIntent()}
+            {#if hasIntent() && !leaving}
               <button type="button" class="btn btn-outline btn-sm" onclick={viewObject}>
                 Open object
               </button>
@@ -810,16 +829,21 @@
             This keeps the same object address: 33500:&lt;maker&gt;:{identifier}
           </p>
           <div class="flex flex-wrap gap-2">
-            <button type="button" class="btn btn-outline" onclick={saveDraft} disabled={busy}>
+            <button
+              type="button"
+              class="btn btn-outline"
+              onclick={saveDraft}
+              disabled={busy || leaving}
+            >
               Save draft
             </button>
             <button
               type="button"
               class="btn btn-primary"
               onclick={publishReplacement}
-              disabled={busy}
+              disabled={busy || leaving}
             >
-              {busy ? 'Publishing...' : 'Publish update'}
+              {busy ? 'Publishing...' : leaving ? 'Opening object...' : 'Publish update'}
             </button>
           </div>
         </footer>
