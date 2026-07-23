@@ -16,11 +16,12 @@ import {
   type IntentPayload,
   type StlstrIntent,
 } from './intent-map';
+import { resolveConfiguredNapplet } from './napplets';
 
 /**
  * NAP-INTENT lets a napplet hand a job to another napplet without knowing which one handles
  * it. In stlstr the shell owns routing, so an archetype resolves to a shell route rather
- * than a separate window: `intent.open('object-detail', { address })` navigates the shell,
+ * than a separate window: `intent.open('printable-detail', { address })` navigates the shell,
  * which mounts the handling napplet and delivers the payload (see `intent-delivery.ts`).
  *
  * This is a hand-written resolver rather than `createCatalogIntentResolver` because there is
@@ -44,17 +45,18 @@ function asPayload(value: unknown): IntentPayload {
  * normalize so everything downstream — href, delivery, napplet — sees one shape.
  */
 function normalizePayload(archetype: string, payload: IntentPayload): IntentPayload | null {
-  if (archetype !== 'object-detail' && archetype !== 'edit-object') return payload;
+  if (archetype !== 'printable-detail' && archetype !== 'printable-edit') return payload;
   return normalizeObjectPayload(payload);
 }
 
 function candidateFor(archetype: string): IntentCandidate {
   const entry = ARCHETYPES[archetype];
+  const napplet = resolveConfiguredNapplet(archetype);
   return {
-    dTag: entry.dTag,
-    title: entry.title,
+    dTag: napplet?.dTag ?? entry.dTag,
+    title: napplet?.title ?? entry.title,
     actions: [...entry.actions],
-    protocols: conventionsFor(archetype),
+    protocols: napplet?.protocols.length ? napplet.protocols : conventionsFor(archetype),
     isDefault: true,
   };
 }
@@ -75,8 +77,8 @@ function availabilityFor(archetype: string): IntentAvailability {
  * The href an intent navigates to.
  *
  * Most archetypes are pages, and `intentToHref` is a pure function of the payload. The
- * preview archetype is an *overlay*: it modifies whatever page the user is already on, so
- * its href is only definable relative to the current location. Reading `window.location`
+ * STL preview archetype is an *overlay*: it modifies whatever page the user is already on,
+ * so its href is only definable relative to the current location. Reading `window.location`
  * here is deliberate — the router's browser history keeps it authoritative, and the
  * alternative is threading a router location through the adapter for a value we can read
  * directly.
@@ -84,9 +86,7 @@ function availabilityFor(archetype: string): IntentAvailability {
 function hrefFor(intent: StlstrIntent): string | null {
   if (intent.archetype !== PREVIEW_ARCHETYPE) return intentToHref(intent);
 
-  const fileId = intent.payload.fileId?.trim();
-  if (!fileId) return null;
-  return previewHref(`${window.location.pathname}${window.location.search}`, fileId);
+  return previewHref(`${window.location.pathname}${window.location.search}`, intent.payload);
 }
 
 function failed(archetype: string, action: string, error: string): IntentResult {
@@ -113,10 +113,12 @@ export function createStlstrIntentService({ navigate }: IntentServiceOptions): S
         const { archetype } = request;
         const action = request.action ?? 'open';
         const entry = ARCHETYPES[archetype];
+        const napplet = resolveConfiguredNapplet(archetype);
+        const handlerDTag = napplet?.dTag ?? entry?.dTag;
 
         if (!entry) return failed(archetype, action, `no handler for ${archetype}`);
         if (!entry.actions.includes(action)) {
-          return failed(archetype, action, `${entry.dTag} does not support "${action}"`);
+          return failed(archetype, action, `${handlerDTag} does not support "${action}"`);
         }
 
         // The catalog is a fixed set of built-in napplets, so a caller-supplied handler dTag
@@ -127,12 +129,12 @@ export function createStlstrIntentService({ navigate }: IntentServiceOptions): S
           typeof preference === 'string' &&
           preference !== 'default' &&
           preference !== 'choose' &&
-          preference !== entry.dTag
+          preference !== handlerDTag
         ) {
           return failed(archetype, action, `${preference} does not handle ${archetype}`);
         }
 
-        const protocols = conventionsFor(archetype);
+        const protocols = napplet?.protocols.length ? napplet.protocols : conventionsFor(archetype);
         if (request.protocol && !protocols.includes(request.protocol)) {
           return failed(archetype, action, `unsupported protocol ${request.protocol}`);
         }
@@ -147,7 +149,7 @@ export function createStlstrIntentService({ navigate }: IntentServiceOptions): S
             archetype,
             action,
             archetype === PREVIEW_ARCHETYPE
-              ? 'payload does not name a file to preview'
+              ? 'payload does not name an STL URL to preview'
               : 'payload does not address a page',
           );
         }
@@ -163,8 +165,8 @@ export function createStlstrIntentService({ navigate }: IntentServiceOptions): S
           archetype,
           action,
           handled: true,
-          handler: entry.dTag,
-          windowId: `route-${entry.routeId}-${entry.dTag}`,
+          handler: handlerDTag,
+          windowId: `route-${entry.routeId}-${handlerDTag}`,
           protocol: request.protocol ?? protocols[0],
         };
       },

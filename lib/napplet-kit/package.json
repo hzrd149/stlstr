@@ -5,6 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./files": "./src/files.ts",
     "./profiles": "./src/profiles.ts",
     "./components/MakerLink.svelte": "./src/components/MakerLink.svelte"
   },

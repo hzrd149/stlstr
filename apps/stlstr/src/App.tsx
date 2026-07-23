@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+  type RefObject,
+} from 'react';
 import {
   createShellBridge,
   injectNappletNamespacePrelude,
@@ -45,9 +53,19 @@ import {
   type StlstrIntent,
 } from './services/intent-map';
 import { STLSTR_DEV_MODE, getUser, relayPool } from './services/nostr';
+import {
+  loadNappletArtifact,
+  resolveConfiguredNapplet,
+  type ResolvedNapplet,
+} from './services/napplets';
 import { createOutboxService } from './services/outbox';
 import { createStlstrResourceService } from './services/resource';
-import { getAppRelays, getLookupRelays, getSettings } from './services/settings';
+import {
+  getAppRelays,
+  getLookupRelays,
+  getSettings,
+  subscribeToSettings,
+} from './services/settings';
 import { createUploadService } from './services/upload';
 import SettingsView from './SettingsView';
 
@@ -56,15 +74,6 @@ declare global {
     nostr?: unknown;
   }
 }
-
-type DevNapplet = {
-  name: string;
-  url: string;
-};
-
-type DevRegistry = {
-  napplets?: DevNapplet[];
-};
 
 type AdapterOptions = {
   /** Pushes a shell route. NAP-INTENT resolves archetypes by navigating the shell. */
@@ -158,43 +167,6 @@ function createStlstrAdapter({ navigate, resolveIdentity }: AdapterOptions): She
       console.warn('[stlstr] dropped napplet message', info);
     },
   };
-}
-
-async function resolveNappletUrl(name: string, fallbackUrl: string): Promise<string> {
-  try {
-    const response = await fetch('/napplets.dev.json', { cache: 'no-store' });
-    if (!response.ok) return fallbackUrl;
-
-    const registry = (await response.json()) as DevRegistry;
-    return registry.napplets?.find((napplet) => napplet.name === name)?.url ?? fallbackUrl;
-  } catch {
-    return fallbackUrl;
-  }
-}
-
-/**
- * Read the NAP domains a napplet declares in its NIP-5A manifest meta tag.
- *
- * Each napplet's `nip5aManifest({ requires })` is the single source of truth for
- * what it needs; the shell grants exactly that instead of duplicating a list per
- * route. Domains a napplet treats as optional still appear here — optionality is
- * a runtime guard (`if (window.napplet?.count)`) inside the napplet, not an
- * absence from the manifest.
- *
- * `DOMParser` does not execute scripts, so parsing the artifact is inert.
- */
-function readNappletDomains(html: string): string[] {
-  const content = new DOMParser()
-    .parseFromString(html, 'text/html')
-    .querySelector('meta[name="napplet-requires"]')
-    ?.getAttribute('content');
-
-  if (!content) return [];
-
-  return content
-    .split(',')
-    .map((domain) => domain.trim())
-    .filter(Boolean);
 }
 
 /** Collapses the mobile drawer. Navigating with it still open would hide the new page. */
@@ -666,7 +638,7 @@ function AccountNav() {
  *
  * `routeId` names the shell route mounting the napplet; it distinguishes windows
  * when several routes share one napplet (browse/search/tag all mount
- * `browse`). The iframe is keyed by pathname, so navigating between two
+ * `print-browse`). The iframe is keyed by pathname, so navigating between two
  * objects tears the napplet down and rebuilds it against the new address.
  */
 function NappletFrame({
@@ -676,7 +648,7 @@ function NappletFrame({
   intent,
   frameKey,
 }: {
-  napplet: string;
+  napplet: ResolvedNapplet;
   routeId: string;
   title: string;
   /**
@@ -698,6 +670,11 @@ function NappletFrame({
   const { pathname } = useLocation();
   const navigate = useShellNavigate();
   const identity = frameKey ?? pathname;
+  const nappletMountKey = `${napplet.source}:${napplet.dTag}:${napplet.aggregateHash}:${napplet.artifactUrl}`;
+  const nappletRef = useRef(napplet);
+  useEffect(() => {
+    nappletRef.current = napplet;
+  }, [napplet]);
 
   // Serializing keeps the effect dep stable across the fresh object each render builds.
   const intentKey = intent ? JSON.stringify(intent) : '';
@@ -742,8 +719,8 @@ function NappletFrame({
     const shell = createShellBridge(adapter);
     bridge = shell;
     bridgeRef.current = shell;
-    const windowId = `route-${routeId}-${napplet}`;
-    const aggregateHash = `dev-${napplet}-build`;
+    const mountedNapplet = nappletRef.current;
+    const windowId = `route-${routeId}-${mountedNapplet.dTag}`;
 
     const delivery = createIntentDelivery({
       getTarget: () => iframeRef.current?.contentWindow ?? null,
@@ -769,31 +746,27 @@ function NappletFrame({
       const iframe = iframeRef.current;
       if (!iframe?.contentWindow) return;
 
-      const fallbackUrl = `/napplets.dev/${napplet}/index.html`;
-      const url = await resolveNappletUrl(napplet, fallbackUrl);
-      const response = await fetch(url, { cache: 'no-store' });
-      if (!response.ok) {
-        throw new Error(`Build ${napplet} first: ${response.status} ${response.statusText}`);
-      }
-
-      const html = await response.text();
+      const loaded = await loadNappletArtifact(mountedNapplet);
       if (cancelled) return;
 
-      const domains = readNappletDomains(html);
+      const domains = loaded.domains;
       if (domains.length === 0) {
         console.warn(
-          `[stlstr] ${napplet} declares no NAP domains; add them to its vite.config nip5aManifest({ requires }).`,
+          `[stlstr] ${mountedNapplet.dTag} declares no NAP domains; add them to its vite.config nip5aManifest({ requires }).`,
         );
       }
 
-      originRegistry.register(iframe.contentWindow, windowId, { dTag: napplet, aggregateHash });
+      originRegistry.register(iframe.contentWindow, windowId, {
+        dTag: loaded.dTag,
+        aggregateHash: loaded.aggregateHash,
+      });
       shell.runtime.sessionRegistry.register(windowId, {
         pubkey: '',
         windowId,
         origin: window.location.origin,
-        type: napplet,
-        dTag: napplet,
-        aggregateHash,
+        type: loaded.dTag,
+        dTag: loaded.dTag,
+        aggregateHash: loaded.aggregateHash,
         registeredAt: Date.now(),
         instanceId: windowId,
         provenance: 'nip-5d',
@@ -809,12 +782,12 @@ function NappletFrame({
       }
 
       // Sealed last so the guard sits ahead of the NAP prelude and the napplet's own code.
-      iframe.srcdoc = sealNappletFrame(injectNappletNamespacePrelude(html, { domains }));
-      setStatus(`Loaded ${napplet}`);
+      iframe.srcdoc = sealNappletFrame(injectNappletNamespacePrelude(loaded.html, { domains }));
+      setStatus(`Loaded ${loaded.title}`);
     }
 
     loadNapplet().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : `Failed to load ${napplet}.`);
+      setStatus(error instanceof Error ? error.message : `Failed to load ${mountedNapplet.title}.`);
     });
 
     return () => {
@@ -829,11 +802,11 @@ function NappletFrame({
       bridge = null;
       bridgeRef.current = null;
     };
-  }, [napplet, routeId, identity]);
+  }, [nappletMountKey, routeId, identity]);
 
   // NAP-IDENTITY is request/response, so a napplet that asked "who is signed in?" at mount
   // would hold a stale answer forever. Pushing on every account change is what lets an
-  // owner-gated action (object-detail's "Edit this object") appear the moment the owner
+  // owner-gated action (printable-detail's "Edit this print") appear the moment the owner
   // signs in, instead of after a reload.
   //
   // `publishIdentityChanged`, NOT `injectEvent`: the former posts the `identity.changed`
@@ -877,13 +850,50 @@ function NappletFrame({
   );
 }
 
+function NappletRouteFrame({
+  archetype,
+  routeId,
+  title,
+  intent,
+  frameKey,
+}: {
+  archetype: string;
+  routeId: string;
+  title: string;
+  intent: StlstrIntent;
+  frameKey?: string;
+}) {
+  useSyncExternalStore(subscribeToSettings, getSettings, getSettings);
+  const napplet = resolveConfiguredNapplet(archetype);
+
+  if (!napplet) {
+    return (
+      <section className="grid h-full place-items-center bg-base-100 p-4">
+        <div className="alert alert-error max-w-xl">
+          <span>No napplet is configured for {archetype}.</span>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <NappletFrame
+      napplet={napplet}
+      routeId={routeId}
+      title={title}
+      intent={intent}
+      frameKey={frameKey}
+    />
+  );
+}
+
 /**
  * The centered dialog that hosts an overlay napplet over the current page.
  *
- * The open preview lives in the URL (`?preview=<fileId>`), not in React state, so a
+ * The open preview lives in the URL (`?stl=<payload>`), not in React state, so a
  * preview is deep-linkable and Back closes it. That makes the URL the single source of
  * truth, and dismissal must therefore go through history — calling `dialog.close()` alone
- * would leave a closed dialog with `?preview=` still in the address bar, which Back would
+ * would leave a closed dialog with `?stl=` still in the address bar, which Back would
  * then re-open.
  */
 function PreviewDialog() {
@@ -927,7 +937,7 @@ function PreviewDialog() {
     <dialog
       ref={dialogRef}
       className="modal modal-bottom sm:modal-middle"
-      aria-label="Part preview"
+      aria-label="STL preview"
       onCancel={(event) => {
         // ESC would close the dialog without touching the URL. Route it through dismiss.
         event.preventDefault();
@@ -936,7 +946,7 @@ function PreviewDialog() {
     >
       <div className="modal-box flex h-[85vh] max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden p-0">
         <div className="flex items-center justify-between border-b border-base-300 px-4 py-2">
-          <h2 className="font-semibold">Part preview</h2>
+          <h2 className="font-semibold">STL preview</h2>
           <button
             className="btn btn-circle btn-ghost btn-sm"
             aria-label="Close preview"
@@ -947,10 +957,10 @@ function PreviewDialog() {
           </button>
         </div>
         <div className="min-h-0 flex-1">
-          <NappletFrame
-            napplet="part-preview"
+          <NappletRouteFrame
+            archetype="stl-preview"
             routeId="overlay-preview"
-            title="Part preview"
+            title="STL preview"
             intent={overlay}
             // Constant: the dialog outlives base-route changes underneath it, and a new
             // file is redelivered to the live napplet rather than rebuilding the viewer.
@@ -993,11 +1003,11 @@ function useShellNavigate() {
 
 function BrowseRoute() {
   return (
-    <NappletFrame
-      napplet="browse"
+    <NappletRouteFrame
+      archetype="printable-browse"
       routeId="browse"
-      title="Browse objects"
-      intent={{ archetype: 'browse', action: 'open', payload: {} }}
+      title="Browse prints"
+      intent={{ archetype: 'printable-browse', action: 'open', payload: {} }}
     />
   );
 }
@@ -1007,11 +1017,11 @@ function SearchRoute() {
   const query = searchParams.get('q')?.trim() ?? '';
 
   return (
-    <NappletFrame
-      napplet="browse"
+    <NappletRouteFrame
+      archetype="printable-browse"
       routeId="search"
-      title={query ? `Search: ${query}` : 'Search objects'}
-      intent={{ archetype: 'browse', action: 'open', payload: query ? { query } : {} }}
+      title={query ? `Search: ${query}` : 'Search prints'}
+      intent={{ archetype: 'printable-browse', action: 'open', payload: query ? { query } : {} }}
     />
   );
 }
@@ -1020,11 +1030,11 @@ function TagRoute() {
   const { tag = '' } = useParams();
 
   return (
-    <NappletFrame
-      napplet="browse"
+    <NappletRouteFrame
+      archetype="printable-browse"
       routeId="tag"
       title={`#${tag}`}
-      intent={{ archetype: 'browse', action: 'open', payload: { tag } }}
+      intent={{ archetype: 'printable-browse', action: 'open', payload: { tag } }}
     />
   );
 }
@@ -1034,22 +1044,38 @@ function CreateRoute() {
   const remixOf = searchParams.get('remix')?.trim() ?? '';
 
   return (
-    <NappletFrame
-      napplet="create-object"
+    <NappletRouteFrame
+      archetype="printable-create"
       routeId="create"
-      title="Create object"
-      intent={{ archetype: 'create-object', action: 'open', payload: remixOf ? { remixOf } : {} }}
+      title="Create print"
+      intent={{
+        archetype: 'printable-create',
+        action: 'open',
+        payload: remixOf ? { remixOf } : {},
+      }}
     />
   );
 }
 
-/** The maker behind an object: profile metadata, their objects, their collections. */
+/** The signed-in user's own published part files. */
+function PartLibraryRoute() {
+  return (
+    <NappletRouteFrame
+      archetype="part-library"
+      routeId="part-library"
+      title="Your parts"
+      intent={{ archetype: 'part-library', action: 'open', payload: {} }}
+    />
+  );
+}
+
+/** The maker behind a print: profile metadata, their prints, their collections. */
 function UserProfileRoute() {
   const { pubkey = '' } = useParams();
 
   return (
-    <NappletFrame
-      napplet="user-profile"
+    <NappletRouteFrame
+      archetype="profile"
       routeId="user-profile"
       title="Maker profile"
       intent={{ archetype: 'profile', action: 'open', payload: { pubkey } }}
@@ -1061,14 +1087,31 @@ function ObjectDetailRoute() {
   const { pubkey = '', identifier = '' } = useParams();
 
   return (
-    <NappletFrame
-      napplet="object-detail"
-      routeId="object-detail"
-      title="Object details"
+    <NappletRouteFrame
+      archetype="printable-detail"
+      routeId="printable-detail"
+      title="Print details"
       intent={{
-        archetype: 'object-detail',
+        archetype: 'printable-detail',
         action: 'open',
         payload: { address: `33500:${pubkey}:${identifier}` },
+      }}
+    />
+  );
+}
+
+function PartDetailRoute() {
+  const { fileId = '' } = useParams();
+
+  return (
+    <NappletRouteFrame
+      archetype="part-detail"
+      routeId="part-detail"
+      title="Part details"
+      intent={{
+        archetype: 'part-detail',
+        action: 'open',
+        payload: { fileId },
       }}
     />
   );
@@ -1078,12 +1121,12 @@ function ObjectEditRoute() {
   const { pubkey = '', identifier = '' } = useParams();
 
   return (
-    <NappletFrame
-      napplet="edit-object"
-      routeId="object-edit"
-      title="Edit object"
+    <NappletRouteFrame
+      archetype="printable-edit"
+      routeId="printable-edit"
+      title="Edit print"
       intent={{
-        archetype: 'edit-object',
+        archetype: 'printable-edit',
         action: 'edit',
         payload: { address: `33500:${pubkey}:${identifier}` },
       }}
@@ -1098,7 +1141,7 @@ function NotFoundRoute() {
         <span>This STLstr route does not exist yet.</span>
       </div>
       <Link className="btn btn-primary w-fit" to="/">
-        Browse objects
+        Browse prints
       </Link>
     </section>
   );
@@ -1156,6 +1199,7 @@ function ShellLayout() {
     <>
       <ShellNavLink to="/" label="Browse" alsoActiveOn={/^\/(search|tags)(\/|$)/} />
       <ShellNavLink to="/create" label="Create" />
+      <ShellNavLink to="/parts" label="Parts" alsoActiveOn={/^\/parts(\/|$)/} />
       <ShellNavLink to="/settings" label="Settings" />
     </>
   );
@@ -1238,10 +1282,12 @@ function App() {
         <Route path="search" element={<SearchRoute />} />
         <Route path="tags/:tag" element={<TagRoute />} />
         <Route path="create" element={<CreateRoute />} />
+        <Route path="parts" element={<PartLibraryRoute />} />
         <Route path="settings" element={<SettingsView />} />
         <Route path="profiles/:pubkey" element={<UserProfileRoute />} />
         <Route path="objects/:pubkey/:identifier" element={<ObjectDetailRoute />} />
         <Route path="objects/:pubkey/:identifier/edit" element={<ObjectEditRoute />} />
+        <Route path="part/:fileId" element={<PartDetailRoute />} />
         <Route path="*" element={<NotFoundRoute />} />
       </Route>
     </Routes>

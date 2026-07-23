@@ -1,0 +1,308 @@
+import type { Filter } from 'applesauce-core/helpers/filter';
+import { mergeRelaySets } from 'applesauce-core/helpers/relays';
+import type { NostrEvent } from 'nostr-tools';
+import { nip19 } from 'nostr-tools';
+import { ARCHETYPES, conventionsFor } from './intent-map';
+import { STLSTR_DEV_MODE, eventStore, relayPool } from './nostr';
+import { getLookupRelays, getSettings, type NappletOverride } from './settings';
+
+const NIP5A_KIND = 35129;
+const MANIFEST_TIMEOUT_MS = 5_000;
+
+type DevNapplet = {
+  name: string;
+  url: string;
+};
+
+type DevRegistry = {
+  napplets?: DevNapplet[];
+};
+
+export type ResolvedNapplet = {
+  archetype: string;
+  dTag: string;
+  title: string;
+  description?: string;
+  aggregateHash: string;
+  artifactUrl: string;
+  protocols: string[];
+  source: 'default' | 'override';
+  naddr?: string;
+  pubkey?: string;
+  identifier?: string;
+  relays?: string[];
+  compatibleWithArchetype?: boolean;
+};
+
+export type LoadedNapplet = ResolvedNapplet & {
+  html: string;
+  domains: string[];
+};
+
+function tagValue(event: NostrEvent, name: string): string | undefined {
+  return event.tags.find((tag) => tag[0] === name && tag[1])?.[1]?.trim() || undefined;
+}
+
+function hasCompatibleArchetype(event: NostrEvent, archetype: string): boolean {
+  const protocols = conventionsFor(archetype);
+  return event.tags.some(
+    (tag) => tag[0] === 'archetype' && tag[1] === archetype && protocols.some((p) => tag.includes(p)),
+  );
+}
+
+function artifactUrlFrom(event: NostrEvent): string | undefined {
+  const direct = tagValue(event, 'url') || tagValue(event, 'artifact') || tagValue(event, 'html');
+  if (direct) return allowedArtifactUrl(direct);
+
+  const indexHash = event.tags.find(
+    (tag) => tag[0] === 'path' && tag[1] === '/index.html' && tag[2],
+  )?.[2];
+  if (!indexHash) return undefined;
+
+  for (const server of event.tags
+    .filter((tag) => tag[0] === 'server' && tag[1])
+    .map((tag) => tag[1])) {
+    const url = allowedArtifactUrl(server);
+    if (!url) continue;
+    const base = new URL(url);
+    base.pathname = `${base.pathname.replace(/\/$/, '')}/${indexHash}`;
+    return base.toString();
+  }
+
+  return undefined;
+}
+
+function allowedArtifactUrl(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:' || (STLSTR_DEV_MODE && url.protocol === 'http:')) {
+      return url.toString();
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolvedFromManifest(
+  manifest: NostrEvent,
+  archetype: string,
+  naddr: string,
+  relays: string[],
+): ResolvedNapplet {
+  const dTag = tagValue(manifest, 'd');
+  const aggregateHash =
+    manifest.tags.find((tag) => tag[0] === 'x' && tag[2] === 'aggregate')?.[1] ?? tagValue(manifest, 'x');
+  const artifactUrl = artifactUrlFrom(manifest);
+  if (!dTag) throw new Error('That napplet manifest does not include a d tag.');
+  if (!aggregateHash) throw new Error('That napplet manifest does not include an aggregate hash.');
+  if (!artifactUrl) throw new Error('That napplet manifest does not include a loadable artifact URL.');
+
+  return {
+    archetype,
+    dTag,
+    title: tagValue(manifest, 'title') ?? dTag,
+    description: tagValue(manifest, 'description'),
+    aggregateHash,
+    artifactUrl,
+    protocols: conventionsFor(archetype),
+    source: 'override',
+    naddr,
+    pubkey: manifest.pubkey,
+    identifier: dTag,
+    relays,
+    compatibleWithArchetype: hasCompatibleArchetype(manifest, archetype),
+  };
+}
+
+async function resolveDevNappletUrl(name: string, fallbackUrl: string): Promise<string> {
+  try {
+    const response = await fetch('/napplets.dev.json', { cache: 'no-store' });
+    if (!response.ok) return fallbackUrl;
+
+    const registry = (await response.json()) as DevRegistry;
+    return registry.napplets?.find((napplet) => napplet.name === name)?.url ?? fallbackUrl;
+  } catch {
+    return fallbackUrl;
+  }
+}
+
+function readNappletDomains(html: string): string[] {
+  const content = new DOMParser()
+    .parseFromString(html, 'text/html')
+    .querySelector('meta[name="napplet-requires"]')
+    ?.getAttribute('content');
+
+  if (!content) return [];
+
+  return content
+    .split(',')
+    .map((domain) => domain.trim())
+    .filter(Boolean);
+}
+
+async function fetchManifest(
+  pubkey: string,
+  identifier: string,
+  relays: string[],
+): Promise<NostrEvent | null> {
+  const filters: Filter[] = [{ kinds: [NIP5A_KIND], authors: [pubkey], '#d': [identifier], limit: 1 }];
+  const candidates: NostrEvent[] = [];
+
+  await new Promise<void>((resolve, reject) => {
+    const subscription = relayPool
+      .request(relays, filters, { timeout: MANIFEST_TIMEOUT_MS, eventStore })
+      .subscribe({
+        next: (event) => {
+          eventStore.add(event);
+          candidates.push(event as NostrEvent);
+        },
+        error: reject,
+        complete: resolve,
+      });
+
+    window.setTimeout(() => {
+      subscription.unsubscribe();
+      resolve();
+    }, MANIFEST_TIMEOUT_MS + 250);
+  });
+
+  return candidates.sort((a, b) => b.created_at - a.created_at)[0] ?? null;
+}
+
+export function defaultNappletForArchetype(archetype: string): ResolvedNapplet | null {
+  const entry = ARCHETYPES[archetype];
+  if (!entry) return null;
+
+  return {
+    archetype,
+    dTag: entry.dTag,
+    title: entry.title,
+    description: entry.description,
+    aggregateHash: `dev-${entry.dTag}-build`,
+    artifactUrl: `/napplets.dev/${entry.dTag}/index.html`,
+    protocols: conventionsFor(archetype),
+    source: 'default',
+  };
+}
+
+export function overrideFromResolved(napplet: ResolvedNapplet): NappletOverride | null {
+  if (napplet.source !== 'override' || !napplet.naddr || !napplet.pubkey || !napplet.identifier) {
+    return null;
+  }
+  return {
+    naddr: napplet.naddr,
+    pubkey: napplet.pubkey,
+    identifier: napplet.identifier,
+    dTag: napplet.dTag,
+    title: napplet.title,
+    description: napplet.description,
+    aggregateHash: napplet.aggregateHash,
+    artifactUrl: napplet.artifactUrl,
+    relays: napplet.relays,
+  };
+}
+
+export async function resolveNappletNaddr(
+  naddr: string,
+  archetype: string,
+): Promise<ResolvedNapplet> {
+  const decoded = nip19.decode(naddr.trim());
+  if (decoded.type !== 'naddr') throw new Error('Paste a Nostr naddr for a napplet manifest.');
+
+  const pointer = decoded.data;
+  if (pointer.kind !== NIP5A_KIND) throw new Error('That naddr does not point to a NIP-5A napplet.');
+
+  const relays = mergeRelaySets([...(pointer.relays ?? []), ...getLookupRelays()]);
+  const manifest = await fetchManifest(pointer.pubkey, pointer.identifier, relays);
+  if (!manifest) throw new Error('Could not find that napplet manifest on your lookup relays.');
+  return resolvedFromManifest(manifest, archetype, naddr.trim(), relays);
+}
+
+export async function discoverCompatibleNapplets(archetype: string): Promise<ResolvedNapplet[]> {
+  const relays = getLookupRelays();
+  const filters: Filter[] = [{ kinds: [NIP5A_KIND], limit: 80 }];
+  const events: NostrEvent[] = [];
+
+  await new Promise<void>((resolve, reject) => {
+    const subscription = relayPool
+      .request(relays, filters, { timeout: MANIFEST_TIMEOUT_MS, eventStore })
+      .subscribe({
+        next: (event) => {
+          eventStore.add(event);
+          events.push(event as NostrEvent);
+        },
+        error: reject,
+        complete: resolve,
+      });
+
+    window.setTimeout(() => {
+      subscription.unsubscribe();
+      resolve();
+    }, MANIFEST_TIMEOUT_MS + 250);
+  });
+
+  const seen = new Set<string>();
+  const resolved: ResolvedNapplet[] = [];
+  for (const event of events.sort((a, b) => b.created_at - a.created_at)) {
+    const dTag = tagValue(event, 'd');
+    if (!dTag) continue;
+    const key = `${event.pubkey}:${dTag}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    try {
+      const naddr = nip19.naddrEncode({ identifier: dTag, pubkey: event.pubkey, kind: NIP5A_KIND, relays });
+      resolved.push(resolvedFromManifest(event, archetype, naddr, relays));
+    } catch {
+      // Skip incomplete or not-yet-loadable manifests in discovery results.
+    }
+  }
+
+  return resolved;
+}
+
+function resolvedFromOverride(archetype: string, override: NappletOverride): ResolvedNapplet {
+  const fallback = defaultNappletForArchetype(archetype);
+  return {
+    archetype,
+    dTag: override.dTag,
+    title: override.title ?? fallback?.title ?? override.dTag,
+    description: override.description ?? fallback?.description,
+    aggregateHash: override.aggregateHash ?? `override-${override.dTag}`,
+    artifactUrl: override.artifactUrl ?? '',
+    protocols: conventionsFor(archetype),
+    source: 'override',
+    naddr: override.naddr,
+    pubkey: override.pubkey,
+    identifier: override.identifier,
+    relays: override.relays,
+  };
+}
+
+export function resolveConfiguredNapplet(archetype: string): ResolvedNapplet | null {
+  const override = getSettings().nappletOverrides[archetype];
+  if (override) return resolvedFromOverride(archetype, override);
+  return defaultNappletForArchetype(archetype);
+}
+
+export async function loadNappletArtifact(napplet: ResolvedNapplet): Promise<LoadedNapplet> {
+  const fallbackUrl = `/napplets.dev/${napplet.dTag}/index.html`;
+  const url =
+    napplet.source === 'default'
+      ? await resolveDevNappletUrl(napplet.dTag, fallbackUrl)
+      : napplet.artifactUrl;
+  if (!url) throw new Error(`${napplet.title} does not have a loadable artifact URL.`);
+
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(
+      napplet.source === 'default'
+        ? `Build ${napplet.dTag} first: ${response.status} ${response.statusText}`
+        : `Could not load ${napplet.title}: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const html = await response.text();
+  return { ...napplet, artifactUrl: url, html, domains: readNappletDomains(html) };
+}

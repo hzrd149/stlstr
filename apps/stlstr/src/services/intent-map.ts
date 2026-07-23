@@ -24,7 +24,7 @@ export type ArchetypeEntry = {
   /** Shell route id, used for the window id and for React keys. */
   routeId: string;
   /** Navigation group this archetype belongs to, when it is a top-level destination. */
-  nav?: 'browse' | 'create' | 'settings';
+  nav?: 'browse' | 'create' | 'parts' | 'settings';
   title: string;
   description: string;
   /** Verbs this archetype accepts. */
@@ -70,14 +70,37 @@ const OBJECT_KIND = '33500';
  * the archetype. It is hardcoded to this one archetype deliberately — see
  * `.planning/preview-dialog.md` §9 for the trigger to generalize.
  */
-export const PREVIEW_ARCHETYPE = 'part-preview';
+export const PREVIEW_ARCHETYPE = 'stl-preview';
 
 /** Query param carrying the open overlay. Orthogonal to a route's own params. */
-const PREVIEW_PARAM = 'preview';
+const PREVIEW_PARAM = 'stl';
 
 /** A kind-1063 file event id. */
 function isFileId(value: string): boolean {
   return /^[0-9a-f]{64}$/i.test(value);
+}
+
+function isPreviewPayload(payload: IntentPayload): boolean {
+  return Boolean(payload.url?.trim());
+}
+
+function encodePreviewPayload(payload: IntentPayload): string {
+  return encodeURIComponent(JSON.stringify(payload));
+}
+
+function decodePreviewPayload(value: string): IntentPayload | null {
+  try {
+    const decoded = JSON.parse(decodeURIComponent(value)) as unknown;
+    if (!decoded || typeof decoded !== 'object') return null;
+
+    const payload: IntentPayload = {};
+    for (const [key, item] of Object.entries(decoded as Record<string, unknown>)) {
+      if (typeof item === 'string') payload[key] = item;
+    }
+    return isPreviewPayload(payload) ? payload : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseUrl(currentUrl: string): URL {
@@ -97,9 +120,11 @@ function serializeUrl(url: URL): string {
  * without either needing to know about the other.
  */
 export function overlayFromLocation(location: { search: string }): StlstrIntent | null {
-  const fileId = new URLSearchParams(location.search).get(PREVIEW_PARAM)?.trim() ?? '';
-  if (!isFileId(fileId)) return null;
-  return { archetype: PREVIEW_ARCHETYPE, action: 'open', payload: { fileId } };
+  const raw = new URLSearchParams(location.search).get(PREVIEW_PARAM)?.trim() ?? '';
+  if (!raw) return null;
+
+  const payload = decodePreviewPayload(raw);
+  return payload ? { archetype: PREVIEW_ARCHETYPE, action: 'open', payload } : null;
 }
 
 /** True when this href or query string carries an open preview. */
@@ -108,11 +133,11 @@ export function hasPreview(currentUrl: string): boolean {
 }
 
 /** Opens the preview over the current page, preserving the path and its other params. */
-export function previewHref(currentUrl: string, fileId: string): string | null {
-  if (!isFileId(fileId)) return null;
+export function previewHref(currentUrl: string, payload: IntentPayload): string | null {
+  if (!isPreviewPayload(payload)) return null;
 
   const url = parseUrl(currentUrl);
-  url.searchParams.set(PREVIEW_PARAM, fileId);
+  url.searchParams.set(PREVIEW_PARAM, encodePreviewPayload(payload));
   return serializeUrl(url);
 }
 
@@ -148,12 +173,12 @@ export function normalizeObjectPayload(payload: IntentPayload): IntentPayload | 
 }
 
 export const ARCHETYPES: Record<string, ArchetypeEntry> = {
-  browse: {
-    dTag: 'browse',
+  'printable-browse': {
+    dTag: 'print-browse',
     routeId: 'browse',
     nav: 'browse',
-    title: 'Browse objects',
-    description: 'Find printable objects published as Nostr events.',
+    title: 'Browse prints',
+    description: 'Find printable models published as Nostr events.',
     actions: ['open'],
     toHref: (payload) => {
       const tag = payload.tag?.trim();
@@ -165,7 +190,7 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     titleFor: (intent) => {
       if (intent.payload.tag) return `#${intent.payload.tag}`;
       if (intent.payload.query) return `Search: ${intent.payload.query}`;
-      return 'Browse objects';
+      return 'Browse prints';
     },
   },
 
@@ -173,7 +198,7 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     dTag: 'user-profile',
     routeId: 'user-profile',
     title: 'Maker profile',
-    description: 'View a maker, their published objects, and their collections.',
+    description: 'View a maker, their published prints, and their collections.',
     actions: ['open'],
     toHref: (payload) => {
       const pubkey = payload.pubkey?.trim();
@@ -181,11 +206,11 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     },
   },
 
-  'object-detail': {
-    dTag: 'object-detail',
-    routeId: 'object-detail',
-    title: 'Object details',
-    description: 'View images, files, metadata, maker attribution, and object actions.',
+  'printable-detail': {
+    dTag: 'print-detail',
+    routeId: 'printable-detail',
+    title: 'Print details',
+    description: 'View images, files, metadata, maker attribution, and print actions.',
     actions: ['open'],
     toHref: (payload) => {
       const normalized = normalizeObjectPayload(payload);
@@ -193,12 +218,12 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     },
   },
 
-  'create-object': {
-    dTag: 'create-object',
+  'printable-create': {
+    dTag: 'print-create',
     routeId: 'create',
     nav: 'create',
-    title: 'Create object',
-    description: 'Publish a new 3D printable object with images and files.',
+    title: 'Create print',
+    description: 'Publish a new 3D printable model with images and files.',
     actions: ['open', 'create'],
     toHref: (payload) => {
       const remixOf = payload.remixOf?.trim();
@@ -207,22 +232,44 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     },
   },
 
-  'part-preview': {
-    dTag: 'part-preview',
+  'stl-preview': {
+    dTag: 'stl-preview',
     routeId: 'overlay-preview',
-    title: 'Part preview',
-    description: 'Inspect a printable part in 3D without leaving the page.',
+    title: 'STL preview',
+    description: 'Inspect an STL file in 3D without leaving the page.',
     actions: ['open'],
     // An overlay modifies the current page rather than naming one of its own, so it has no
     // standalone href. `services/intent.ts` builds the URL from the ambient location.
     toHref: () => null,
   },
 
-  'edit-object': {
-    dTag: 'edit-object',
-    routeId: 'object-edit',
-    title: 'Edit object',
-    description: 'Load an owned printable object and publish a replacement event.',
+  'part-detail': {
+    dTag: 'part-detail',
+    routeId: 'part-detail',
+    title: 'Part details',
+    description: 'View metadata for a published printable part file.',
+    actions: ['open'],
+    toHref: (payload) => {
+      const fileId = payload.fileId?.trim();
+      return fileId && isFileId(fileId) ? `/part/${encodeURIComponent(fileId)}` : null;
+    },
+  },
+
+  'part-library': {
+    dTag: 'part-library',
+    routeId: 'part-library',
+    nav: 'parts',
+    title: 'Your parts',
+    description: 'Manage published part files and see which prints use them.',
+    actions: ['open'],
+    toHref: () => '/parts',
+  },
+
+  'printable-edit': {
+    dTag: 'print-edit',
+    routeId: 'printable-edit',
+    title: 'Edit print',
+    description: 'Load an owned print and publish a replacement event.',
     actions: ['open', 'edit'],
     toHref: (payload) => {
       const normalized = normalizeObjectPayload(payload);
@@ -279,21 +326,23 @@ export function intentFromLocation(location: {
   const parts = path.split('/').filter(Boolean);
   const search = new URLSearchParams(location.search);
 
-  if (path === '/') return intent('browse', 'open');
+  if (path === '/') return intent('printable-browse', 'open');
 
   if (path === '/search') {
     const query = search.get('q')?.trim() ?? '';
-    return intent('browse', 'open', query ? { query } : {});
+    return intent('printable-browse', 'open', query ? { query } : {});
   }
 
   if (parts[0] === 'tags' && parts[1]) {
-    return intent('browse', 'open', { tag: decodePart(parts[1]) });
+    return intent('printable-browse', 'open', { tag: decodePart(parts[1]) });
   }
 
   if (path === '/create') {
     const remixOf = search.get('remix')?.trim() ?? '';
-    return intent('create-object', 'open', remixOf ? { remixOf } : {});
+    return intent('printable-create', 'open', remixOf ? { remixOf } : {});
   }
+
+  if (path === '/parts') return intent('part-library', 'open');
 
   if (parts[0] === 'profiles' && parts[1]) {
     return intent('profile', 'open', { pubkey: decodePart(parts[1]) });
@@ -301,8 +350,12 @@ export function intentFromLocation(location: {
 
   if (parts[0] === 'objects' && parts[1] && parts[2]) {
     const address = `${OBJECT_KIND}:${decodePart(parts[1])}:${decodePart(parts[2])}`;
-    if (parts[3] === 'edit') return intent('edit-object', 'edit', { address });
-    if (parts.length === 3) return intent('object-detail', 'open', { address });
+    if (parts[3] === 'edit') return intent('printable-edit', 'edit', { address });
+    if (parts.length === 3) return intent('printable-detail', 'open', { address });
+  }
+
+  if (parts[0] === 'part' && parts[1] && isFileId(decodePart(parts[1]))) {
+    return intent('part-detail', 'open', { fileId: decodePart(parts[1]) });
   }
 
   return null;

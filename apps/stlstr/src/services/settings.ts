@@ -21,6 +21,18 @@ export const NETWORK_SETTINGS_LOCKED = STLSTR_DEV_MODE;
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type NappletUpdateBehavior = 'banner' | 'auto-grant' | 'silent-reprompt';
 
+export type NappletOverride = {
+  naddr: string;
+  pubkey: string;
+  identifier: string;
+  dTag: string;
+  title?: string;
+  description?: string;
+  aggregateHash?: string;
+  artifactUrl?: string;
+  relays?: string[];
+};
+
 export type StlstrSettings = {
   /** Which daisyUI theme to render the shell with. */
   theme: ThemePreference;
@@ -32,6 +44,8 @@ export type StlstrSettings = {
   blossomServers: string[];
   /** What the shell does when a napplet asks for new permissions. */
   nappletUpdateBehavior: NappletUpdateBehavior;
+  /** User-selected NIP-5A manifest overrides keyed by archetype. */
+  nappletOverrides: Record<string, NappletOverride>;
 };
 
 export const DEFAULT_SETTINGS: StlstrSettings = {
@@ -40,6 +54,7 @@ export const DEFAULT_SETTINGS: StlstrSettings = {
   lookupRelays: [...PRODUCTION_LOOKUP_RELAYS],
   blossomServers: [...PRODUCTION_BLOSSOM_SERVERS],
   nappletUpdateBehavior: 'banner',
+  nappletOverrides: {},
 };
 
 /** Parses user input into a relay URL, or null when it is not usable. */
@@ -68,6 +83,43 @@ function isUpdateBehavior(value: unknown): value is NappletUpdateBehavior {
   return value === 'banner' || value === 'auto-grant' || value === 'silent-reprompt';
 }
 
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function readNappletOverrides(value: unknown): Record<string, NappletOverride> {
+  if (!value || typeof value !== 'object') return {};
+
+  const overrides: Record<string, NappletOverride> = {};
+  for (const [archetype, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!archetype || !raw || typeof raw !== 'object') continue;
+    const item = raw as Record<string, unknown>;
+    const naddr = text(item.naddr);
+    const pubkey = text(item.pubkey);
+    const identifier = text(item.identifier);
+    const dTag = text(item.dTag);
+    if (!naddr || !pubkey || !identifier || !dTag) continue;
+
+    const relays = Array.isArray(item.relays)
+      ? mergeRelaySets(item.relays.filter((relay): relay is string => typeof relay === 'string'))
+      : undefined;
+
+    overrides[archetype] = {
+      naddr,
+      pubkey,
+      identifier,
+      dTag,
+      title: text(item.title),
+      description: text(item.description),
+      aggregateHash: text(item.aggregateHash),
+      artifactUrl: text(item.artifactUrl),
+      relays,
+    };
+  }
+
+  return overrides;
+}
+
 function readStoredSettings(): StlstrSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
@@ -89,6 +141,7 @@ function readStoredSettings(): StlstrSettings {
       nappletUpdateBehavior: isUpdateBehavior(stored.nappletUpdateBehavior)
         ? stored.nappletUpdateBehavior
         : DEFAULT_SETTINGS.nappletUpdateBehavior,
+      nappletOverrides: readNappletOverrides(stored.nappletOverrides),
     };
   } catch (cause) {
     console.warn('[stlstr] failed to read saved settings', cause);
@@ -152,6 +205,22 @@ export function removeBlossomServer(value: string): void {
   updateSettings({
     blossomServers: settings.blossomServers.filter((server) => server !== value),
   });
+}
+
+export function setNappletOverride(archetype: string, override: NappletOverride): void {
+  updateSettings({
+    nappletOverrides: { ...settings.nappletOverrides, [archetype]: override },
+  });
+}
+
+export function removeNappletOverride(archetype: string): void {
+  const next = { ...settings.nappletOverrides };
+  delete next[archetype];
+  updateSettings({ nappletOverrides: next });
+}
+
+export function resetNappletOverrides(): void {
+  updateSettings({ nappletOverrides: {} });
 }
 
 /**
