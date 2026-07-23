@@ -148,7 +148,7 @@ export function normalizeObjectPayload(payload: IntentPayload): IntentPayload | 
 }
 
 export const ARCHETYPES: Record<string, ArchetypeEntry> = {
-  'browse': {
+  browse: {
     dTag: 'browse',
     routeId: 'browse',
     nav: 'browse',

@@ -10,27 +10,27 @@ dialog is a second delivery surface for the same intent machinery, not a paralle
 
 ## 1. Decisions
 
-| Question                    | Decision                                                                                                                     |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Is an open dialog in the URL? | **Yes, as an overlay query param.** `…?preview=<fileId>` layers on whatever route is beneath. Deep-linkable, back dismisses. |
-| What does the payload address? | **A kind-1063 file event id.** `{ fileId }`; the napplet resolves url/mime/hash/name itself over outbox.                    |
-| How general is the modal?     | **Hardcoded to `part-preview`.** One `PreviewDialog`, no `presentation` field on `ArchetypeEntry` yet. See §9.              |
+| Question                       | Decision                                                                                                                     |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Is an open dialog in the URL?  | **Yes, as an overlay query param.** `…?preview=<fileId>` layers on whatever route is beneath. Deep-linkable, back dismisses. |
+| What does the payload address? | **A kind-1063 file event id.** `{ fileId }`; the napplet resolves url/mime/hash/name itself over outbox.                     |
+| How general is the modal?      | **Hardcoded to `part-preview`.** One `PreviewDialog`, no `presentation` field on `ArchetypeEntry` yet. See §9.               |
 
 The third decision is the one to revisit first: everything below is written so that generalizing to
 `presentation: 'route' | 'modal'` later is a field addition and a branch, not a rewrite.
 
 ## 2. Constraints verified in the installed packages and in our own code
 
-| Fact                                                                                                                                                                                                                    | Evidence                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **`IntentBehavior` carries no presentation hint** — only `focus`, `newWindow`, `reuse`. Modal-vs-route is not something a caller can request on the wire; the shell decides from the archetype.                        | `IntentBehavior` in `@kehto/services` and `@napplet/nap/intent`   |
-| A query-param change does **not** remount `NappletFrame`. The mount effect keys on `[napplet, routeId, pathname, intentKey]` and the iframe on `key={pathname}`. Adding `?preview=` touches none of them.              | `App.tsx:776`, `App.tsx:781`                                      |
-| …**except** on `/search` and `/create`, whose route components derive `intentKey` from `useSearchParams`. Those read only `q` / `remix`, so `preview` still does not disturb them.                                     | `SearchRoute`, `CreateRoute` in `App.tsx`                          |
-| Each `NappletFrame` installs its **own** `window` message listener and its **own** `ShellBridge`, while `originRegistry` is a module-global singleton. Two mounted frames means every message hits both bridges.        | `App.tsx:688-776`; `originRegistry` import                        |
-| `createIntentDelivery` already supports handing a new payload to a live napplet (`redeliver`), but `NappletFrame` never calls it — `intentKey` is a mount dep, so a payload change remounts instead.                    | `intent-delivery.ts:88`, `App.tsx:756`                            |
-| NAP-RESOURCE caps responses at **10 MiB** (`MAX_BYTES`) and there is no MIME allowlist — unrecognized bytes sniff to `application/octet-stream` and pass through. Only `image/svg+xml` is rejected outright.            | `resource.ts:13`, `resource.ts:264`                               |
-| Binary STL has no magic number (80-byte free-form header); ASCII STL starts `solid `; 3MF is a ZIP, so it currently sniffs as `application/zip`.                                                                        | `sniffMimeType` in `resource.ts`                                  |
-| The object-detail napplet already role-marks part files as `e` tags (`part`/`instructions`/`video`/`preview`/`aux`) resolving to kind 1063 — so a file event id is a reference it holds already.                        | `.planning/object-detail-napplet.md` data-flow table              |
+| Fact                                                                                                                                                                                                             | Evidence                                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| **`IntentBehavior` carries no presentation hint** — only `focus`, `newWindow`, `reuse`. Modal-vs-route is not something a caller can request on the wire; the shell decides from the archetype.                  | `IntentBehavior` in `@kehto/services` and `@napplet/nap/intent` |
+| A query-param change does **not** remount `NappletFrame`. The mount effect keys on `[napplet, routeId, pathname, intentKey]` and the iframe on `key={pathname}`. Adding `?preview=` touches none of them.        | `App.tsx:776`, `App.tsx:781`                                    |
+| …**except** on `/search` and `/create`, whose route components derive `intentKey` from `useSearchParams`. Those read only `q` / `remix`, so `preview` still does not disturb them.                               | `SearchRoute`, `CreateRoute` in `App.tsx`                       |
+| Each `NappletFrame` installs its **own** `window` message listener and its **own** `ShellBridge`, while `originRegistry` is a module-global singleton. Two mounted frames means every message hits both bridges. | `App.tsx:688-776`; `originRegistry` import                      |
+| `createIntentDelivery` already supports handing a new payload to a live napplet (`redeliver`), but `NappletFrame` never calls it — `intentKey` is a mount dep, so a payload change remounts instead.             | `intent-delivery.ts:88`, `App.tsx:756`                          |
+| NAP-RESOURCE caps responses at **10 MiB** (`MAX_BYTES`) and there is no MIME allowlist — unrecognized bytes sniff to `application/octet-stream` and pass through. Only `image/svg+xml` is rejected outright.     | `resource.ts:13`, `resource.ts:264`                             |
+| Binary STL has no magic number (80-byte free-form header); ASCII STL starts `solid `; 3MF is a ZIP, so it currently sniffs as `application/zip`.                                                                 | `sniffMimeType` in `resource.ts`                                |
+| The object-detail napplet already role-marks part files as `e` tags (`part`/`instructions`/`video`/`preview`/`aux`) resolving to kind 1063 — so a file event id is a reference it holds already.                 | `.planning/object-detail-napplet.md` data-flow table            |
 
 Two consequences worth stating plainly before the phases:
 
@@ -133,7 +133,7 @@ const overlay = overlayFromLocation(useLocation());
 
 Today exactly one `NappletFrame` is mounted, so its `window.addEventListener('message')` handler is
 free to forward everything to its bridge. With the dialog open there are two, and every napplet
-message reaches both. Bridge B receives frame A's message, resolves the sender through the *global*
+message reaches both. Bridge B receives frame A's message, resolves the sender through the _global_
 `originRegistry` to a windowId that is absent from B's own `sessionRegistry`, and lands in
 `onUnroutedMessage` at best — at worst a request is serviced twice, once per bridge.
 
@@ -162,7 +162,7 @@ nothing delivers, because `NappletFrame` seeds only inside its mount effect. Res
 
 - Mount effect drops `intentKey` from its deps and seeds from a ref (`intentRef.current`), so a
   payload change no longer tears down the frame.
-- A second effect calls `delivery.redeliver(intent)` when `intentKey` changes *after* the first
+- A second effect calls `delivery.redeliver(intent)` when `intentKey` changes _after_ the first
   seed. `redeliver` already exists for exactly this and re-arms the exactly-once flush.
 
 This keeps three.js and the WebGL context alive across part switches. It also changes base-route
@@ -194,7 +194,7 @@ acceptable in a single-file artifact. Sniff from the bytes, not from the 1063 `m
 publisher-controlled.
 
 **Size.** The 10 MiB `MAX_BYTES` cap is the governing constraint and it will be hit routinely.
-Design the too-large path as a first-class state, not an error: read the 1063 `size` tag *before*
+Design the too-large path as a first-class state, not an error: read the 1063 `size` tag _before_
 fetching, and if it exceeds the cap render the file's metadata plus a `link.open(url)` download
 button with an explicit "too large to preview in-app" message. Never start a fetch that is destined
 to be rejected mid-stream. (Raising `MAX_BYTES` for model MIME types is a separate decision — it
@@ -262,7 +262,7 @@ formats are now real work rather than an import (§6 listed them as "behind the 
 
 **`intent-delivery` had a latent bug that only redelivery exposed.** `redeliver` forced
 `ready = true` on the grounds that a mounted napplet is listening — but a mounted napplet has not
-necessarily *subscribed* yet, and forcing it posts into a void and sets `delivered`, so nothing
+necessarily _subscribed_ yet, and forcing it posts into a void and sets `delivered`, so nothing
 retries. Worse, `observeReady` read the archetype off `pending`, which flush had already cleared —
 so the ready signal was missed after the first delivery and every later redelivery waited on a
 signal that never comes twice. Both fixed: `seed` and `redeliver` are now one `arm()`, and the
@@ -276,7 +276,7 @@ all, so there was nothing to invoke the preview from. It now resolves its object
 `e` tag part files, and offers a Preview button gated on `intent.available('part-preview')` — the
 narrow slice of `.planning/object-detail-napplet.md` needed to reach the dialog, and no more.
 
-**Test environment note.** `--use-gl=swiftshader` yields *no* WebGL context in headless Chromium;
+**Test environment note.** `--use-gl=swiftshader` yields _no_ WebGL context in headless Chromium;
 `--enable-unsafe-swiftshader` is the flag that gives the software fallback. Getting this backwards
 reads exactly like a broken viewer.
 
