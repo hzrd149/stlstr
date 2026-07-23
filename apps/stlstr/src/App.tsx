@@ -32,6 +32,7 @@ import {
   loginWithExtension,
   type StlstrAccount,
 } from './services/accounts';
+import { createCountService } from './services/count';
 import { createStlstrIdentityService } from './services/identity';
 import { createIntentDelivery, type IntentDelivery } from './services/intent-delivery';
 import { createStlstrIntentService } from './services/intent';
@@ -151,6 +152,7 @@ function createStlstrAdapter({ navigate, resolveIdentity }: AdapterOptions): She
         getSigner: () => accountManager.active?.signer ?? null,
       }),
       link: createStlstrLinkService(),
+      count: createCountService(),
     },
     onUnroutedMessage: (info) => {
       console.warn('[stlstr] dropped napplet message', info);
