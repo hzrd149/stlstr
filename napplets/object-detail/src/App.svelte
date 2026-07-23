@@ -39,8 +39,12 @@
   /**
    * The object event itself. The comment thread needs the whole event, not its address:
    * applesauce builds a comment's NIP-22 tags from the parent event it is given.
+   *
+   * `$state.raw` is required, not a preference. Applesauce's event helpers memoize onto the
+   * event with symbol properties, and writing to a deep `$state` proxy from inside a
+   * `$derived` throws `state_unsafe_mutation` — which killed the whole comment thread.
    */
-  let object = $state<NostrEvent | null>(null);
+  let object = $state.raw<NostrEvent | null>(null);
   /** Who is signed in, per NAP-IDENTITY. Empty when nobody is, which is the safe default. */
   let viewer = $state('');
 

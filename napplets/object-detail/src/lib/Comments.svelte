@@ -47,7 +47,9 @@
   let status = $state('');
 
   let draft = $state('');
-  let replyTo = $state<Comment | null>(null);
+  // Raw for the same reason as the object event: applesauce memoizes onto `.event` with
+  // symbol properties, which a deep `$state` proxy turns into reactive writes.
+  let replyTo = $state.raw<Comment | null>(null);
   let publishing = $state(false);
 
   const thread = $derived(buildThread(comments.values()));
