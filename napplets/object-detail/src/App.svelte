@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { identity, inc, intent, outbox } from '@napplet/sdk';
+  import { identity, inc, intent, outbox, type NostrEvent } from '@napplet/sdk';
   import { onMount } from 'svelte';
+  import Comments from './lib/Comments.svelte';
   import GalleryImage from './lib/GalleryImage.svelte';
   import { parseImages, type ObjectImage } from './lib/object';
 
   /**
    * The object detail page.
    *
-   * Only the part-file slice of `.planning/object-detail-napplet.md` is built here — enough
-   * to reach the preview dialog. The gallery, comments, makes, remixes, and owner actions
-   * described in that plan are still skeletons below.
+   * The gallery, part files, owner actions, and the NIP-22 comment thread are built here.
+   * Makes and remixes from `.planning/object-detail-napplet.md` are still to come.
    *
    * The address arrives over the NAP-INTENT delivery seam as a targeted `inc.event` on
    * `object-detail:open`. Subscribe FIRST, then emit `object-detail:ready`.
@@ -36,6 +36,11 @@
   /** Address and author of the object on screen, set once it loads. */
   let address = $state('');
   let owner = $state('');
+  /**
+   * The object event itself. The comment thread needs the whole event, not its address:
+   * applesauce builds a comment's NIP-22 tags from the parent event it is given.
+   */
+  let object = $state<NostrEvent | null>(null);
   /** Who is signed in, per NAP-IDENTITY. Empty when nobody is, which is the safe default. */
   let viewer = $state('');
 
@@ -90,8 +95,10 @@
     });
   }
 
-  async function loadObject(address: string): Promise<void> {
-    const [kind, pubkey, ...rest] = address.split(':');
+  // The parameter is deliberately not named `address`: that would shadow the state below,
+  // and the assignments at the end would land on the local instead of the owner gate.
+  async function loadObject(requested: string): Promise<void> {
+    const [kind, pubkey, ...rest] = requested.split(':');
     const identifier = rest.join(':');
 
     if (kind !== '33500' || !pubkey || !identifier) {
@@ -110,6 +117,7 @@
     activeImage = 0;
     owner = '';
     address = '';
+    object = null;
 
     try {
       const { events } = await outbox.query(
@@ -132,6 +140,7 @@
       // The author of the event is the owner — not whoever the address claimed.
       owner = newest.pubkey;
       address = `33500:${newest.pubkey}:${identifier}`;
+      object = newest;
       status = '';
       await loadParts(partIds(newest.tags));
     } catch (error) {
@@ -272,7 +281,9 @@
         <div class="divider my-0">Files</div>
         <ul class="grid gap-2" data-testid="object-parts">
           {#each parts as part (part.id)}
-            <li class="flex items-center justify-between gap-2 rounded-box border border-base-300 p-2">
+            <li
+              class="flex items-center justify-between gap-2 rounded-box border border-base-300 p-2"
+            >
               <span class="min-w-0">
                 <span class="block truncate text-sm font-medium">{part.name}</span>
                 <span class="text-xs text-base-content/60">{formatBytes(part.sizeBytes)}</span>
@@ -301,4 +312,11 @@
       {/if}
     </section>
   </div>
+
+  {#if object}
+    <!-- Mounted only once the object resolved: the thread is scoped to it. -->
+    <div class="mt-6">
+      <Comments {object} {viewer} />
+    </div>
+  {/if}
 </main>
