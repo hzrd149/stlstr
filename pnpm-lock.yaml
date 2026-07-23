@@ -252,6 +252,9 @@ importers:
       applesauce-accounts:
         specifier: ^6.2.0
         version: 6.2.0(@capacitor/core@7.6.8)(typescript@6.0.3)
+      applesauce-actions:
+        specifier: ^6.2.0
+        version: 6.2.0(typescript@6.0.3)
       applesauce-common:
         specifier: ^6.2.0
         version: 6.2.0(typescript@6.0.3)
@@ -270,6 +273,9 @@ importers:
       applesauce-signers:
         specifier: ^6.2.2
         version: 6.2.2(@capacitor/core@7.6.8)(typescript@6.0.3)
+      blossom-client-sdk:
+        specifier: ^5.0.0
+        version: 5.0.0
       nostr-tools:
         specifier: ^2.24.1
         version: 2.24.1(typescript@6.0.3)
@@ -1352,6 +1358,18 @@ packages:
   basic-ftp@5.3.1:
     resolution: {integrity: sha512-bopVNp6ugyA150DDuZfPFdt1KZ5a94ZDiwX4hMgZDzF+GttD80lEy8kj98kbyhLXnPvhtIo93mdnLIjpCAeeOw==}
     engines: {node: '>=10.0.0'}
+
+  blossom-client-sdk@5.0.0:
+    resolution: {integrity: sha512-xz7w6eBQv6uiNK9ogh5AymnzCAohiU029XySpKxJyG7RsDHkoru+xoZhY55tiIOyWFX/5s8pip4hVh5hO1PN/Q==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@cashu/cashu-ts': ^2.4.3
+      hls.js: ^1.6.16
+    peerDependenciesMeta:
+      '@cashu/cashu-ts':
+        optional: true
+      hls.js:
+        optional: true
 
   brace-expansion@5.0.7:
     resolution: {integrity: sha512-7oFy703dxfY3/NLxC1fh2SUCQ0H9rmAY+5EpDVfXjUTTs+HEwR2nYaqLv+GWcTsumwxPfiz6CzCNkwXwBUwqCA==}
@@ -3304,7 +3322,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
       - typescript
-    optional: true
 
   applesauce-common@6.2.0(typescript@6.0.3):
     dependencies:
@@ -3486,6 +3503,10 @@ snapshots:
   baseline-browser-mapping@2.11.0: {}
 
   basic-ftp@5.3.1: {}
+
+  blossom-client-sdk@5.0.0:
+    dependencies:
+      '@noble/hashes': 1.8.0
 
   brace-expansion@5.0.7:
     dependencies:

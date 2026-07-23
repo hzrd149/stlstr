@@ -6,8 +6,15 @@ import { createEventLoaderForStore } from 'applesauce-loaders/loaders';
 import { RelayPool } from 'applesauce-relay';
 import type { NostrEvent } from 'nostr-tools';
 
-export const NOSTR_LOOKUP_RELAYS = ['wss://purplepag.es', 'wss://index.hzrd149.com'];
-export const NOSTR_EXTRA_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
+export const STLSTR_DEV_MODE = import.meta.env.DEV;
+export const STLSTR_DEV_RELAY = 'ws://localhost:4869';
+export const STLSTR_DEV_BLOSSOM_SERVER = 'http://localhost:24242';
+
+const PRODUCTION_LOOKUP_RELAYS = ['wss://purplepag.es', 'wss://index.hzrd149.com'];
+const PRODUCTION_EXTRA_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
+
+export const NOSTR_LOOKUP_RELAYS = STLSTR_DEV_MODE ? [STLSTR_DEV_RELAY] : PRODUCTION_LOOKUP_RELAYS;
+export const NOSTR_EXTRA_RELAYS = STLSTR_DEV_MODE ? [STLSTR_DEV_RELAY] : PRODUCTION_EXTRA_RELAYS;
 
 export const eventStore = new EventStore();
 export const relayPool = new RelayPool();

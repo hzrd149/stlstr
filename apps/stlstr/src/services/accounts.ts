@@ -6,12 +6,12 @@ import {
 } from 'applesauce-accounts/accounts';
 import type { ISigner } from 'applesauce-signers';
 import { NostrConnectSigner } from 'applesauce-signers/signers';
-import { relayPool } from './nostr';
+import { NOSTR_EXTRA_RELAYS, relayPool } from './nostr';
 
 const ACCOUNTS_STORAGE_KEY = 'stlstr.accounts.v1';
 const ACTIVE_ACCOUNT_STORAGE_KEY = 'stlstr.activeAccount.v1';
 
-export const NOSTR_CONNECT_RELAYS = ['wss://bucket.coracle.social'];
+export const NOSTR_CONNECT_RELAYS = NOSTR_EXTRA_RELAYS;
 export const NOSTR_CONNECT_PERMISSIONS = [
   'get_public_key',
   ...NostrConnectSigner.buildSigningPermissions([0, 1, 3, 10002]),

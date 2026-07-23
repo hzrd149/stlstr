@@ -10,6 +10,7 @@ import { NostrConnectAccount } from 'applesauce-accounts/accounts';
 import { getDisplayName, getProfilePicture } from 'applesauce-core/helpers';
 import { use$ } from 'applesauce-react/hooks';
 import { NostrConnectSigner } from 'applesauce-signers/signers';
+import { verifyEvent } from 'nostr-tools';
 import { toDataURL } from 'qrcode';
 import {
   accountManager,
@@ -20,7 +21,15 @@ import {
   loginWithExtension,
   type StlstrAccount,
 } from './services/accounts';
-import { getUser } from './services/nostr';
+import {
+  NOSTR_EXTRA_RELAYS,
+  NOSTR_LOOKUP_RELAYS,
+  STLSTR_DEV_MODE,
+  getUser,
+  relayPool,
+} from './services/nostr';
+import { createOutboxService } from './services/outbox';
+import { createUploadService } from './services/upload';
 
 declare global {
   interface Window {
@@ -68,21 +77,43 @@ const CREATE_ROUTE: AppRoute = {
   domains: ['storage', 'identity', 'upload', 'outbox', 'intent'],
 };
 
-function createNoopAdapter(): ShellAdapter {
+function createStlstrAdapter(): ShellAdapter {
+  const subscriptions = new Map<string, () => void>();
+
+  const getActiveUser = () => {
+    const pubkey = accountManager.active?.pubkey;
+    return pubkey ? getUser(pubkey) : null;
+  };
+  const routeRelayUrls = (relayUrls: string[]) =>
+    STLSTR_DEV_MODE ? NOSTR_EXTRA_RELAYS : relayUrls;
+
   return {
     relayPool: {
-      getRelayPool: () => null,
-      trackSubscription: () => {},
-      untrackSubscription: () => {},
+      getRelayPool: () => ({
+        subscription: (relayUrls, filters) => relayPool.subscription(routeRelayUrls(relayUrls), filters),
+        publish: (relayUrls, event) => {
+          void relayPool.publish(routeRelayUrls(relayUrls), event);
+        },
+        request: (relayUrls, filters) => relayPool.request(routeRelayUrls(relayUrls), filters),
+      }),
+      trackSubscription: (key, cleanup) => subscriptions.set(key, cleanup),
+      untrackSubscription: (key) => {
+        subscriptions.get(key)?.();
+        subscriptions.delete(key);
+      },
       openScopedRelay: () => {},
       closeScopedRelay: () => {},
       publishToScopedRelay: () => false,
-      selectRelayTier: () => [],
+      selectRelayTier: () => NOSTR_EXTRA_RELAYS,
     },
     relayConfig: {
       addRelay: () => {},
       removeRelay: () => {},
-      getRelayConfig: () => ({ discovery: [], super: [], outbox: [] }),
+      getRelayConfig: () => ({
+        discovery: NOSTR_LOOKUP_RELAYS,
+        super: NOSTR_EXTRA_RELAYS,
+        outbox: NOSTR_EXTRA_RELAYS,
+      }),
       getNip66Suggestions: () => [],
     },
     windowManager: {
@@ -102,10 +133,20 @@ function createNoopAdapter(): ShellAdapter {
       getWorkerRelay: () => null,
     },
     crypto: {
-      verifyEvent: async () => false,
+      verifyEvent: async (event) => verifyEvent(event),
     },
-    capabilities: {
-      disabledDomains: ['relay'],
+    upload: {
+      getUploader: () => ({ rails: ['blossom'] }),
+    },
+    services: {
+      outbox: createOutboxService({
+        getActiveUser,
+        getSigner: () => accountManager.active?.signer ?? null,
+      }),
+      upload: createUploadService({
+        getActiveUser,
+        getSigner: () => accountManager.active?.signer ?? null,
+      }),
     },
     onUnroutedMessage: (info) => {
       console.warn('[stlstr] dropped napplet message', info);
@@ -653,7 +694,7 @@ function NappletFrame({ route }: { route: AppRoute }) {
     if (!route.nappletName) return;
 
     let cancelled = false;
-    const bridge = createShellBridge(createNoopAdapter());
+    const bridge = createShellBridge(createStlstrAdapter());
     bridgeRef.current = bridge;
     const windowId = `route-${route.id}-${route.nappletName}`;
     const aggregateHash = `dev-${route.nappletName}-build`;
