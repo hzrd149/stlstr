@@ -4,6 +4,7 @@
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { eventThreadFilter } from '@stlstr/napplet-kit/comments';
   import { tagValue } from '@stlstr/napplet-kit/tags';
+  import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import {
     FILE_KIND,
     OBJECT_KIND,
@@ -80,42 +81,13 @@
 
   const canPreviewFile = $derived(Boolean(file && canPreview && isPreviewable(file.meta)));
 
-  function napplets(): Record<string, unknown> {
-    return ((window as Window & { napplet?: Record<string, unknown> }).napplet ?? {}) as Record<
-      string,
-      unknown
-    >;
-  }
-
-  const hasOutbox = () => {
-    const domain = napplets().outbox as { query?: unknown } | undefined;
-    return typeof domain?.query === 'function';
-  };
-  const hasInc = () => {
-    const domain = napplets().inc as { on?: unknown; emit?: unknown } | undefined;
-    return typeof domain?.on === 'function' && typeof domain.emit === 'function';
-  };
-  const hasIntentOpen = () => {
-    const domain = napplets().intent as { open?: unknown } | undefined;
-    return typeof domain?.open === 'function';
-  };
-  const hasIntentAvailable = () => {
-    const domain = napplets().intent as { available?: unknown } | undefined;
-    return typeof domain?.available === 'function';
-  };
-  const hasIdentity = () => {
-    const domain = napplets().identity as
-      { getPublicKey?: unknown; onChanged?: unknown } | undefined;
-    return typeof domain?.getPublicKey === 'function' && typeof domain.onChanged === 'function';
-  };
-  const hasCount = () => {
-    const domain = napplets().count as { query?: unknown } | undefined;
-    return typeof domain?.query === 'function';
-  };
-  const hasResource = () => {
-    const domain = napplets().resource as { bytes?: unknown } | undefined;
-    return typeof domain?.bytes === 'function';
-  };
+  const hasOutbox = () => hasMethods('outbox', 'query');
+  const hasInc = () => hasMethods('inc', 'on', 'emit');
+  const hasIntentOpen = () => hasMethods('intent', 'open');
+  const hasIntentAvailable = () => hasMethods('intent', 'available');
+  const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
+  const hasCount = () => hasMethods('count', 'query');
+  const hasResource = () => hasMethods('resource', 'bytes');
 
   function roleFor(event: NostrEvent, id: string): string {
     return event.tags.find((tag) => tag[0] === 'e' && tag[1] === id)?.[3]?.trim() ?? '';

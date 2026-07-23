@@ -13,6 +13,7 @@
  */
 
 import { resource } from '@napplet/sdk';
+import { hasDomain } from './capabilities';
 
 const MAX_IN_FLIGHT = 4;
 
@@ -34,9 +35,7 @@ function release(): void {
 }
 
 export function hasResource(): boolean {
-  return (
-    typeof (window as Window & { napplet?: Record<string, unknown> }).napplet?.resource === 'object'
-  );
+  return hasDomain('resource');
 }
 
 /**

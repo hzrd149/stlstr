@@ -11,6 +11,7 @@
     type NostrTag,
   } from '@napplet/sdk';
   import { tagValue } from '@stlstr/napplet-kit/tags';
+  import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import { onMount } from 'svelte';
 
   type UploadResult = Awaited<ReturnType<typeof upload.upload>>;
@@ -90,45 +91,13 @@
   /** An empty viewer means nobody is signed in, so the editor stays closed. */
   const isOwner = $derived(Boolean(viewer && owner && viewer === owner));
 
-  function napplets(): Record<string, unknown> {
-    return ((window as Window & { napplet?: Record<string, unknown> }).napplet ?? {}) as Record<
-      string,
-      unknown
-    >;
-  }
-
-  const hasOutbox = () => {
-    const domain = napplets().outbox as Partial<typeof outbox> | undefined;
-    return typeof domain?.query === 'function' && typeof domain?.publish === 'function';
-  };
-  const hasInc = () => {
-    const domain = napplets().inc as Partial<typeof inc> | undefined;
-    return typeof domain?.on === 'function' && typeof domain?.emit === 'function';
-  };
-  const hasIntent = () => {
-    const domain = napplets().intent as Partial<typeof intent> | undefined;
-    return typeof domain?.open === 'function';
-  };
-  const hasIdentity = () => {
-    const domain = napplets().identity as Partial<typeof identity> | undefined;
-    return typeof domain?.getPublicKey === 'function' && typeof domain?.onChanged === 'function';
-  };
-  const hasStorage = () => {
-    const domain = napplets().storage as Partial<typeof storage> | undefined;
-    return (
-      typeof domain?.getItem === 'function' &&
-      typeof domain?.setItem === 'function' &&
-      typeof domain?.removeItem === 'function'
-    );
-  };
-  const hasUpload = () => {
-    const domain = napplets().upload as Partial<typeof upload> | undefined;
-    return typeof domain?.upload === 'function';
-  };
-  const hasResource = () => {
-    const domain = napplets().resource as Partial<typeof resource> | undefined;
-    return typeof domain?.bytes === 'function';
-  };
+  const hasOutbox = () => hasMethods('outbox', 'query', 'publish');
+  const hasInc = () => hasMethods('inc', 'on', 'emit');
+  const hasIntent = () => hasMethods('intent', 'open');
+  const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
+  const hasStorage = () => hasMethods('storage', 'getItem', 'setItem', 'removeItem');
+  const hasUpload = () => hasMethods('upload', 'upload');
+  const hasResource = () => hasMethods('resource', 'bytes');
 
   function tagValues(tags: string[][], name: string): string[] {
     return tags

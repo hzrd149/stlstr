@@ -1,6 +1,7 @@
 <script lang="ts">
   import { inc, link, resource } from '@napplet/sdk';
   import { looksLikeStl, parseStl } from '@stlstr/napplet-kit/stl';
+  import { hasDomain } from '@stlstr/napplet-kit/capabilities';
   import { onMount, tick } from 'svelte';
   import { createViewer, type Viewer } from './viewer';
 
@@ -36,16 +37,9 @@
   /** Guards against a stale fetch resolving after a newer STL has been delivered. */
   let loadToken = 0;
 
-  function napplets(): Record<string, unknown> {
-    return ((window as Window & { napplet?: Record<string, unknown> }).napplet ?? {}) as Record<
-      string,
-      unknown
-    >;
-  }
-
-  const hasResource = () => typeof napplets().resource === 'object';
-  const hasInc = () => typeof napplets().inc === 'object';
-  const hasLink = () => typeof napplets().link === 'object';
+  const hasResource = () => hasDomain('resource');
+  const hasInc = () => hasDomain('inc');
+  const hasLink = () => hasDomain('link');
 
   function formatBytes(bytes: number): string {
     if (!bytes) return 'unknown size';

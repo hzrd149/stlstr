@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import CoverImage from './lib/CoverImage.svelte';
   import { loadImageUrl } from '@stlstr/napplet-kit/images';
+  import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import {
     collectObject,
     OBJECT_KIND,
@@ -55,29 +56,10 @@
   );
   const initial = $derived(displayName.slice(0, 1).toUpperCase());
 
-  function napplets(): Record<string, unknown> {
-    return ((window as Window & { napplet?: Record<string, unknown> }).napplet ?? {}) as Record<
-      string,
-      unknown
-    >;
-  }
-
-  const hasOutboxQuery = () => {
-    const domain = napplets().outbox as { query?: unknown } | undefined;
-    return typeof domain?.query === 'function';
-  };
-  const hasOutboxSubscribe = () => {
-    const domain = napplets().outbox as { subscribe?: unknown } | undefined;
-    return typeof domain?.subscribe === 'function';
-  };
-  const hasIntent = () => {
-    const domain = napplets().intent as { open?: unknown } | undefined;
-    return typeof domain?.open === 'function';
-  };
-  const hasInc = () => {
-    const domain = napplets().inc as { emit?: unknown; on?: unknown } | undefined;
-    return typeof domain?.emit === 'function' && typeof domain?.on === 'function';
-  };
+  const hasOutboxQuery = () => hasMethods('outbox', 'query');
+  const hasOutboxSubscribe = () => hasMethods('outbox', 'subscribe');
+  const hasIntent = () => hasMethods('intent', 'open');
+  const hasInc = () => hasMethods('inc', 'emit', 'on');
 
   function revokePicture(): void {
     if (!pictureUrl) return;

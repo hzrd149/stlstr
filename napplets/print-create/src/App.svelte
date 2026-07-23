@@ -20,6 +20,7 @@
   import { looksLikeStl } from '@stlstr/napplet-kit/stl';
   import { renderStlThumbnail } from '@stlstr/napplet-kit/stl-thumbnail';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
+  import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import { onDestroy, onMount } from 'svelte';
 
   type StepId = 'basics' | 'images' | 'files' | 'review';
@@ -106,29 +107,10 @@
     }),
   );
 
-  const hasStorage = () => {
-    const domain = getNappletNamespace().storage as Partial<typeof storage> | undefined;
-    return typeof domain?.getItem === 'function' && typeof domain?.setItem === 'function';
-  };
-  const hasIdentity = () => {
-    const domain = getNappletNamespace().identity as Partial<typeof identity> | undefined;
-    return typeof domain?.getPublicKey === 'function';
-  };
-  const hasIntent = () => {
-    const domain = getNappletNamespace().intent as Partial<typeof intent> | undefined;
-    return typeof domain?.open === 'function';
-  };
-  const hasOutbox = () => {
-    const domain = getNappletNamespace().outbox as Partial<typeof outbox> | undefined;
-    return typeof domain?.query === 'function' && typeof domain?.publish === 'function';
-  };
-
-  function getNappletNamespace(): Record<string, unknown> {
-    return ((window as Window & { napplet?: Record<string, unknown> }).napplet ?? {}) as Record<
-      string,
-      unknown
-    >;
-  }
+  const hasStorage = () => hasMethods('storage', 'getItem', 'setItem');
+  const hasIdentity = () => hasMethods('identity', 'getPublicKey');
+  const hasIntent = () => hasMethods('intent', 'open');
+  const hasOutbox = () => hasMethods('outbox', 'query', 'publish');
 
   function slugify(value: string): string {
     return value

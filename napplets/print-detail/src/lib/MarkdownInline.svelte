@@ -1,5 +1,6 @@
 <script lang="ts">
   import { link } from '@napplet/sdk';
+  import { hasDomain } from '@stlstr/napplet-kit/capabilities';
   import MarkdownImage from './MarkdownImage.svelte';
   import Self from './MarkdownInline.svelte';
   import { decodeEntities, safeUrl, type Token } from './markdown';
@@ -13,8 +14,7 @@
 
   const { tokens }: { tokens: Token[] } = $props();
 
-  const hasLink = () =>
-    typeof (window as Window & { napplet?: Record<string, unknown> }).napplet?.link === 'object';
+  const hasLink = () => hasDomain('link');
 
   /**
    * Leaving the napplet is the shell's call, not ours. The frame is sandboxed without

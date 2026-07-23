@@ -12,6 +12,7 @@
   } from '@stlstr/napplet-kit/files';
   import { fetchMakers, makerDisplayName, type MakerProfile } from '@stlstr/napplet-kit/profiles';
   import { tagValue } from '@stlstr/napplet-kit/tags';
+  import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { onMount } from 'svelte';
 
@@ -97,38 +98,12 @@
     return counts;
   });
 
-  function napplets(): Record<string, unknown> {
-    return ((window as Window & { napplet?: Record<string, unknown> }).napplet ?? {}) as Record<
-      string,
-      unknown
-    >;
-  }
-
-  const hasInc = () => {
-    const domain = napplets().inc as { emit?: unknown; on?: unknown } | undefined;
-    return typeof domain?.emit === 'function' && typeof domain?.on === 'function';
-  };
-  const hasOutbox = () => {
-    const domain = napplets().outbox as { query?: unknown } | undefined;
-    return typeof domain?.query === 'function';
-  };
-  const hasIdentity = () => {
-    const domain = napplets().identity as
-      { getPublicKey?: unknown; onChanged?: unknown } | undefined;
-    return typeof domain?.getPublicKey === 'function' && typeof domain?.onChanged === 'function';
-  };
-  const hasIntentOpen = () => {
-    const domain = napplets().intent as { open?: unknown } | undefined;
-    return typeof domain?.open === 'function';
-  };
-  const hasIntentAvailable = () => {
-    const domain = napplets().intent as { available?: unknown } | undefined;
-    return typeof domain?.available === 'function';
-  };
-  const hasLink = () => {
-    const domain = napplets().link as { open?: unknown } | undefined;
-    return typeof domain?.open === 'function';
-  };
+  const hasInc = () => hasMethods('inc', 'emit', 'on');
+  const hasOutbox = () => hasMethods('outbox', 'query');
+  const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
+  const hasIntentOpen = () => hasMethods('intent', 'open');
+  const hasIntentAvailable = () => hasMethods('intent', 'available');
+  const hasLink = () => hasMethods('link', 'open');
 
   function toLibraryFile(event: NostrEvent): LibraryFile | null {
     const meta = readFileMeta(event.tags);

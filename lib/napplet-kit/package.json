@@ -8,6 +8,7 @@
     "./comments": "./src/comments.ts",
     "./files": "./src/files.ts",
     "./tags": "./src/tags.ts",
+    "./capabilities": "./src/capabilities.ts",
     "./images": "./src/images.ts",
     "./stl": "./src/stl.ts",
     "./stl-thumbnail": "./src/stl-thumbnail.ts",
