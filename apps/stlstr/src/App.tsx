@@ -36,6 +36,7 @@ import { createStlstrIdentityService } from './services/identity';
 import { createIntentDelivery, type IntentDelivery } from './services/intent-delivery';
 import { createStlstrIntentService } from './services/intent';
 import { createStlstrLinkService } from './services/links';
+import { sealNappletFrame } from './services/sandbox';
 import {
   baseHref,
   hasPreview,
@@ -705,8 +706,15 @@ function NappletFrame({
   // The payload is NOT a mount dep: a new payload for the same frame is redelivered to the
   // live napplet rather than remounting it, so an open 3D preview keeps its WebGL context
   // when the user picks another part. The mount path reads the latest value through the ref.
+  //
+  // Synced in an effect rather than assigned during render: writing a ref while rendering
+  // is what `react-hooks/refs` forbids. `useRef(intent)` already seeds the first render,
+  // and effects run in declaration order, so this lands before the mount effect below
+  // reads it — the same idiom `navigateRef` uses.
   const intentRef = useRef(intent);
-  intentRef.current = intent;
+  useEffect(() => {
+    intentRef.current = intent;
+  }, [intent]);
   const deliveryRef = useRef<IntentDelivery | null>(null);
   const deliveredKeyRef = useRef('');
 
@@ -801,7 +809,8 @@ function NappletFrame({
         deliveredKeyRef.current = JSON.stringify(seeded);
       }
 
-      iframe.srcdoc = injectNappletNamespacePrelude(html, { domains });
+      // Sealed last so the guard sits ahead of the NAP prelude and the napplet's own code.
+      iframe.srcdoc = sealNappletFrame(injectNappletNamespacePrelude(html, { domains }));
       setStatus(`Loaded ${napplet}`);
     }
 

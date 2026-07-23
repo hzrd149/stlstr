@@ -48,6 +48,12 @@
   let imageFiles = $state<File[]>([]);
   let resources = $state<SelectedResource[]>([]);
   let currentPubkey = $state('');
+
+  /**
+   * Publishing needs a signer the shell holds. An empty pubkey means nobody is signed in,
+   * so the action is disabled up front rather than failing at the end of a long form.
+   */
+  const signedIn = $derived(Boolean(currentPubkey));
   let status = $state('Start with the basics. Files are uploaded only when you publish.');
   let busy = $state(false);
   let publishedAddress = $state('');
@@ -332,12 +338,27 @@
   }
 
   onMount(() => {
+    // NAP-IDENTITY is the only source for who the user is, and it has two halves: the
+    // question answered at mount, and the push that keeps it current. Without the
+    // subscription this napplet would still think you were signed out after you logged in.
+    let identitySubscription: { unsubscribe(): void } | null = null;
     if (hasIdentity()) {
-      void identity.getPublicKey().then((pubkey) => {
+      void identity
+        .getPublicKey()
+        .then((pubkey) => {
+          currentPubkey = pubkey;
+        })
+        .catch(() => {
+          currentPubkey = '';
+        });
+      identitySubscription = identity.onChanged((pubkey) => {
         currentPubkey = pubkey;
       });
     }
+
     void loadDraft();
+
+    return () => identitySubscription?.unsubscribe();
   });
 </script>
 
@@ -613,12 +634,23 @@
           >Continue</button
         >
       {:else}
+        {#if !signedIn}
+          <span class="text-sm text-base-content/70" data-testid="publish-needs-account">
+            Sign in to publish this object.
+          </span>
+        {/if}
         {#if publishedAddress && hasIntent()}
           <button type="button" class="btn btn-outline" onclick={openPublishedObject}
             >Open object</button
           >
         {/if}
-        <button type="button" class="btn btn-primary" onclick={publishObject} disabled={busy}>
+        <button
+          type="button"
+          class="btn btn-primary"
+          onclick={publishObject}
+          disabled={busy || !signedIn}
+          data-testid="publish-object"
+        >
           {busy ? 'Publishing...' : 'Publish object'}
         </button>
       {/if}

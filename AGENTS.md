@@ -54,6 +54,7 @@
 - Napplet `vite.config.ts` must declare every used NAP in `nip5aManifest({ requires: [...] })`; the host injects grants from that list.
 - Napplet builds should stay single-file artifacts by using `artifactMode: 'single-file'`; host dev serves `napplets/<name>/dist` at `/napplets.dev/<name>/`.
 - For normal dev, napplets are not run as Vite dev servers; `pnpm dev` serves their built `dist/index.html` from the host origin.
+- **Napplets MUST NEVER touch `window.nostr`, bundle `nostr-tools`, or hold a key.** Identity comes from NAP-IDENTITY, publishing from NAP-OUTBOX; there is no third way. `sandbox="allow-scripts"` does not stop a NIP-07 extension, which injects into every frame including srcdoc ones — a napplet that found a signer there could read the user and request signatures with no grant, no consent prompt, and nothing the shell could see or revoke. Two things enforce this: the shell seals `window.nostr` in every napplet frame (`apps/stlstr/src/services/sandbox.ts`), and `scripts/lib/napplet-source.test.mjs` fails the build if napplet source reaches for a signer.
 - Napplets MUST NOT render their own title bars, card wrappers, or visible borders; they are seamless embedded surfaces in the stlstr shell. Napplets MUST use DaisyUI (on Tailwind) so their visual language matches the host. See the `build-napplet` skill's "Visual Integration" section for the full contract.
 
 ## Host Wiring

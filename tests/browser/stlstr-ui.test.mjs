@@ -109,7 +109,12 @@ test('stlstr routes object edits to a dedicated napplet', async () => {
     assert.equal(await page.$('main h1'), null);
 
     const frame = await nappletFrame(page, 'Edit object');
-    assert.match(await frame.$eval('main', (node) => node.textContent ?? ''), /ownership checks/);
+    // No such object exists, so the napplet says so rather than opening an editor.
+    await frame.waitForFunction(() =>
+      document
+        .querySelector('[data-testid="edit-status"]')
+        ?.textContent?.includes('not been published'),
+    );
     assert.equal(await frame.$('h1'), null);
     assert.equal(await frame.$('.card'), null);
   } finally {

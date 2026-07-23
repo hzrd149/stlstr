@@ -151,3 +151,41 @@ test('identity.onChanged fires when the user signs in', async () => {
     await close();
   }
 });
+
+test('a napplet cannot reach window.nostr even when an extension injects it', async () => {
+  const { page, close } = await freshPage();
+  // The extension injects into every frame, srcdoc frames included — this is exactly the
+  // case the shell's seal exists for.
+  await withExtension(page, USER.pubkey);
+
+  try {
+    const frame = await openNapplet(page);
+    await signIn(page);
+
+    const reached = await frame.evaluate(() => {
+      const seen = window.nostr;
+      let called = 'threw';
+      try {
+        called = typeof seen?.getPublicKey === 'function' ? 'callable' : 'absent';
+      } catch {
+        called = 'threw';
+      }
+      // A napplet must not be able to install its own signer either.
+      window.nostr = { getPublicKey: async () => 'attacker' };
+      return {
+        seen: seen === undefined ? 'undefined' : typeof seen,
+        called,
+        after: typeof window.nostr,
+      };
+    });
+
+    assert.equal(reached.seen, 'undefined', 'window.nostr must not be reachable in a napplet');
+    assert.equal(reached.called, 'absent');
+    assert.equal(reached.after, 'undefined', 'the seal must survive an assignment');
+
+    // The shell itself still uses the extension — the seal is frame-scoped, not global.
+    assert.equal(await page.evaluate(() => typeof window.nostr?.getPublicKey), 'function');
+  } finally {
+    await close();
+  }
+});
