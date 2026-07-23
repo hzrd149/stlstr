@@ -1,9 +1,18 @@
 <script lang="ts">
-  import { inc, outbox, resource } from '@napplet/sdk';
+  import { inc, intent, outbox } from '@napplet/sdk';
   import { onMount } from 'svelte';
+  import CoverImage from './lib/CoverImage.svelte';
+  import { loadImageUrl } from './lib/images';
+  import {
+    collectObject,
+    OBJECT_KIND,
+    sortByNewest,
+    toPrintableObject,
+    type PrintableObject,
+  } from './lib/objects';
 
   /**
-   * Renders one user's profile (kind 0).
+   * Renders one user's profile (kind 0) and the printable objects they have published.
    *
    * The pubkey arrives over the NAP-INTENT delivery seam: NAP-INTENT's SDK surface is
    * outbound only, so the shell hands the payload over as a targeted `inc.event` on
@@ -13,6 +22,12 @@
 
   const OPEN_TOPIC = 'user-profile:open';
   const READY_TOPIC = 'user-profile:ready';
+
+  /** How many of the maker's objects to pull. Pagination is a follow-up. */
+  const OBJECT_LIMIT = 60;
+
+  /** Relays that hold nothing for this maker never close, so the empty state needs a deadline. */
+  const OBJECT_DEADLINE_MS = 6000;
 
   type ProfileMetadata = {
     name?: string;
@@ -29,6 +44,12 @@
   let status = $state('Waiting for a profile to open...');
   let loading = $state(false);
 
+  let objects = $state(new Map<string, PrintableObject>());
+  let objectsLoading = $state(false);
+  let objectsStatus = $state('');
+
+  const published = $derived(sortByNewest(objects.values()));
+
   const displayName = $derived(
     profile?.display_name?.trim() || profile?.name?.trim() || 'Unnamed maker',
   );
@@ -42,7 +63,7 @@
   }
 
   const hasOutbox = () => typeof napplets().outbox === 'object';
-  const hasResource = () => typeof napplets().resource === 'object';
+  const hasIntent = () => typeof napplets().intent === 'object';
   const hasInc = () => typeof napplets().inc === 'object';
 
   function revokePicture(): void {
@@ -60,21 +81,16 @@
     }
   }
 
-  /** Cover art and avatars are fetched through NAP-RESOURCE, never a bare <img src>. */
+  /** Avatars are fetched through NAP-RESOURCE, never a bare <img src>. */
   async function loadPicture(url: string | undefined): Promise<void> {
     revokePicture();
-    if (!url || !hasResource()) return;
+    if (!url) return;
 
-    try {
-      const blob = await resource.bytes(url);
-      pictureUrl = URL.createObjectURL(blob);
-    } catch {
-      // A blocked or broken avatar is not an error worth showing; the initial stands in.
-    }
+    // A blocked or broken avatar is not an error worth showing; the initial stands in.
+    pictureUrl = await loadImageUrl(url);
   }
 
   async function loadProfile(nextPubkey: string): Promise<void> {
-    pubkey = nextPubkey;
     profile = null;
     revokePicture();
 
@@ -110,13 +126,80 @@
     }
   }
 
+  // ---------------------------------------------------------------- published objects
+
+  /** Torn down when a different maker is opened, so two subscriptions never overlap. */
+  let closeObjects: (() => void) | undefined;
+
+  function ingest(event: Parameters<typeof toPrintableObject>[0]): void {
+    const object = toPrintableObject(event);
+    if (!object) return;
+
+    const merged = collectObject(objects, object);
+    if (merged === objects) return;
+
+    objects = merged;
+    objectsLoading = false;
+  }
+
+  function loadObjects(nextPubkey: string): void {
+    closeObjects?.();
+    closeObjects = undefined;
+    objects = new Map();
+    objectsStatus = '';
+
+    if (!hasOutbox()) {
+      objectsLoading = false;
+      objectsStatus = 'This shell does not provide relay access, so objects cannot be listed.';
+      return;
+    }
+
+    objectsLoading = true;
+
+    const subscription = outbox.subscribe([
+      { kinds: [OBJECT_KIND], authors: [nextPubkey], limit: OBJECT_LIMIT },
+    ]);
+    subscription.on('event', (result) => ingest(result.event));
+    subscription.on('closed', (reason) => {
+      objectsLoading = false;
+      if (reason) objectsStatus = 'The connection to the relays dropped. Reload to try again.';
+    });
+
+    const deadline = window.setTimeout(() => {
+      objectsLoading = false;
+    }, OBJECT_DEADLINE_MS);
+
+    closeObjects = () => {
+      window.clearTimeout(deadline);
+      subscription.close();
+    };
+  }
+
+  // ---------------------------------------------------------------- navigation
+
+  /** Hands the object to whichever napplet fulfills the `object-detail` role. */
+  async function openObject(object: PrintableObject): Promise<void> {
+    if (!hasIntent()) {
+      objectsStatus = 'This shell cannot open objects.';
+      return;
+    }
+
+    const result = await intent.open('object-detail', { address: object.address });
+    if (!result.ok) objectsStatus = result.error ?? 'Could not open that object.';
+  }
+
+  // ---------------------------------------------------------------- lifecycle
+
   function applyIntent(payload: unknown): void {
     const next = (payload as { pubkey?: unknown } | undefined)?.pubkey;
     if (typeof next !== 'string' || next.length === 0) {
       status = 'The shell opened this page without a maker to show.';
       return;
     }
+
+    pubkey = next;
     void loadProfile(next);
+    loadObjects(next);
   }
 
   onMount(() => {
@@ -131,6 +214,7 @@
 
     return () => {
       subscription.unsubscribe();
+      closeObjects?.();
       revokePicture();
     };
   });
@@ -173,12 +257,59 @@
         {status}
       </p>
     {/if}
-
-    {#if pubkey}
-      <!-- Renders only once a maker has been delivered over the intent seam. -->
-      <p class="text-sm text-base-content/60" data-testid="profile-scope">
-        Objects published by this maker will be listed here.
-      </p>
-    {/if}
   </section>
+
+  {#if pubkey}
+    <!-- Renders only once a maker has been delivered over the intent seam. -->
+    <section class="mt-8 grid gap-4" aria-label="Objects by this maker" data-testid="profile-scope">
+      <h2 class="text-lg font-semibold">
+        Objects by {profile ? displayName : 'this maker'}
+      </h2>
+
+      {#if objectsLoading && published.length === 0}
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Loading objects">
+          {#each [0, 1, 2] as placeholder (placeholder)}
+            <div class="grid gap-2">
+              <div class="skeleton aspect-video w-full"></div>
+              <div class="skeleton h-4 w-2/3"></div>
+            </div>
+          {/each}
+        </div>
+      {:else if published.length === 0}
+        <p class="text-base-content/70" data-testid="profile-objects-empty">
+          This maker has not published any objects yet.
+        </p>
+      {:else}
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="profile-objects">
+          {#each published as object (object.address)}
+            <article class="grid content-start gap-2" data-testid="object-result">
+              <button
+                type="button"
+                class="grid gap-2 text-left"
+                data-testid="open-object"
+                data-address={object.address}
+                onclick={() => openObject(object)}
+              >
+                <CoverImage cover={object.cover} title={object.title} />
+                <span class="font-medium" data-testid="object-title">{object.title}</span>
+                {#if object.summary}
+                  <span class="line-clamp-2 text-sm text-base-content/70">{object.summary}</span>
+                {/if}
+              </button>
+            </article>
+          {/each}
+        </div>
+      {/if}
+
+      {#if objectsStatus}
+        <p
+          class="text-sm text-base-content/60"
+          aria-live="polite"
+          data-testid="profile-objects-status"
+        >
+          {objectsStatus}
+        </p>
+      {/if}
+    </section>
+  {/if}
 </main>
