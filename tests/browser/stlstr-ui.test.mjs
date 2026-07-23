@@ -53,7 +53,7 @@ test('stlstr loads browse as the home route', async () => {
       'none',
     );
 
-    const frame = await nappletFrame(page, 'Browse objects');
+    const frame = await nappletFrame(page, 'Browse prints');
     assert.ok(await frame.$('input[placeholder="Search phone stands, minis, brackets..."]'));
     assert.equal(await frame.$('h1'), null);
     assert.equal(await frame.$('.card'), null);
@@ -62,14 +62,14 @@ test('stlstr loads browse as the home route', async () => {
   }
 });
 
-test('stlstr routes create to the create-object napplet', async () => {
+test('stlstr routes create to the printable-create napplet', async () => {
   const page = await openStlstr('/create');
 
   try {
     assert.equal(await page.$('main > .card'), null);
     assert.equal(await page.$('main h1'), null);
 
-    const frame = await nappletFrame(page, 'Create object');
+    const frame = await nappletFrame(page, 'Create print');
     await frame.waitForSelector('#object-title');
     assert.equal(await frame.$('h1'), null);
     assert.equal(await frame.$('.card'), null);
@@ -85,10 +85,10 @@ test('stlstr routes object details to a dedicated napplet', async () => {
     assert.equal(await page.$('main > .card'), null);
     assert.equal(await page.$('main h1'), null);
 
-    const frame = await nappletFrame(page, 'Object details');
+    const frame = await nappletFrame(page, 'Print details');
     // This address names no fixture object, so the napplet reports that rather than
     // rendering one — which is still the napplet owning the page, not the shell.
-    // Wait for the settled message: `object-status` also carries "Loading object...".
+    // Wait for the settled message: `object-status` also carries "Loading print...".
     await frame.waitForFunction(() =>
       document
         .querySelector('[data-testid="object-status"]')
@@ -108,7 +108,7 @@ test('stlstr routes object edits to a dedicated napplet', async () => {
     assert.equal(await page.$('main > .card'), null);
     assert.equal(await page.$('main h1'), null);
 
-    const frame = await nappletFrame(page, 'Edit object');
+    const frame = await nappletFrame(page, 'Edit print');
     // No such object exists, so the napplet says so rather than opening an editor.
     await frame.waitForFunction(() =>
       document
@@ -157,7 +157,7 @@ test('stlstr shell and active napplet fit mobile viewport', async () => {
   const page = await openStlstr('/', { width: 390, height: 844 });
 
   try {
-    const frame = await nappletFrame(page, 'Browse objects');
+    const frame = await nappletFrame(page, 'Browse prints');
     assert.notEqual(
       await page.$eval(
         'label[aria-label="Open navigation"]',

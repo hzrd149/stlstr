@@ -60,9 +60,9 @@ async function freshPage() {
 
 async function openObject(page) {
   await page.goto(`${baseUrl}${objectPath}`, { waitUntil: 'networkidle0' });
-  const handle = await page.waitForSelector('iframe[title="Object details napplet"]');
+  const handle = await page.waitForSelector('iframe[title="Print details napplet"]');
   const frame = await handle.contentFrame();
-  assert.ok(frame, 'object detail iframe should be available');
+  assert.ok(frame, 'print detail iframe should be available');
   await frame.waitForSelector('[data-testid="object-title"]');
   return frame;
 }
@@ -97,7 +97,7 @@ async function signIn(page) {
   );
 }
 
-test('the object page renders its title and gallery image', async () => {
+test('the print page renders its title and gallery image', async () => {
   const { page, close } = await freshPage();
 
   try {
@@ -108,7 +108,7 @@ test('the object page renders its title and gallery image', async () => {
       SUBJECT.title,
     );
 
-    const image = await frame.waitForSelector('section[aria-label="Object gallery"] img');
+    const image = await frame.waitForSelector('section[aria-label="Print gallery"] img');
     // A blob: URL is the proof it came through resource.bytes, not a bare <img src>.
     assert.match(await image.evaluate((node) => node.src), /^blob:/);
     assert.ok(await image.evaluate((node) => node.naturalWidth > 0), 'the cover should decode');
@@ -125,7 +125,7 @@ test('the edit action stays hidden when nobody is signed in', async () => {
 
     // The gallery having loaded means the page is settled, so an absent button is a
     // decision rather than a race.
-    await frame.waitForSelector('section[aria-label="Object gallery"] img');
+    await frame.waitForSelector('section[aria-label="Print gallery"] img');
     assert.equal(await frame.$('[data-testid="edit-object"]'), null);
   } finally {
     await close();
@@ -142,7 +142,7 @@ test('the edit action stays hidden for a signed-in non-owner', async () => {
 
     // The gallery having loaded means the page is settled, so an absent button is a
     // decision rather than a race.
-    await frame.waitForSelector('section[aria-label="Object gallery"] img');
+    await frame.waitForSelector('section[aria-label="Print gallery"] img');
     assert.equal(await frame.$('[data-testid="edit-object"]'), null);
   } finally {
     await close();
@@ -165,7 +165,7 @@ test('the owner sees the edit action and it opens the editor', async () => {
       {},
       `${objectPath}/edit`,
     );
-    await page.waitForSelector('iframe[title="Edit object napplet"]');
+    await page.waitForSelector('iframe[title="Edit print napplet"]');
   } finally {
     await close();
   }

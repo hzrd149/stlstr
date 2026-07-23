@@ -19,12 +19,14 @@ const baseUrl = `http://${host}:${port}`;
 const relayUrl = process.env.STLSTR_TEST_RELAY_URL || 'ws://localhost:4869';
 const registryPath = join(root, 'apps', 'stlstr', 'public', 'napplets.dev.json');
 const testNapplets = [
-  { name: 'browse', title: 'Browse Objects' },
-  { name: 'create-object', title: 'Create Object' },
-  { name: 'object-detail', title: 'Object Detail' },
+  { name: 'print-browse', title: 'Browse Prints' },
+  { name: 'print-create', title: 'Create Print' },
+  { name: 'print-detail', title: 'Print Detail' },
   { name: 'user-profile', title: 'User Profile' },
-  { name: 'edit-object', title: 'Edit Object' },
-  { name: 'part-preview', title: 'Part Preview' },
+  { name: 'print-edit', title: 'Edit Print' },
+  { name: 'part-library', title: 'Part Library' },
+  { name: 'stl-preview', title: 'STL Preview' },
+  { name: 'part-detail', title: 'Part Detail' },
 ];
 
 function run(command, args, options = {}) {

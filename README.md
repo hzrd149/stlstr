@@ -1,0 +1,104 @@
+# stlstr
+
+stlstr is a Thingiverse-style app for publishing, browsing, and discussing 3D printable objects on Nostr. The host app is intentionally small: it owns identity, relays, Blossom uploads, routing, and sandbox policy. Product UI lives in NIP-5D napplets under `napplets/*`.
+
+This repo publishes those napplets as reusable app surfaces. Other napplet runtimes can embed them by granting the NAP domains in their manifests and delivering the intent payloads for the archetypes below.
+
+## Napplet Archetypes
+
+Each napplet declares one protocol-facing archetype. The folder name is the local package/deploy `d` tag; the archetype is the interoperable role that other runtimes should target with NAP-INTENT.
+
+| Napplet        | Archetype          | Intent action      | Payload                   | Purpose                                                                                                                                                                         |
+| -------------- | ------------------ | ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `print-browse` | `printable-browse` | `open`             | Optional `query` or `tag` | Browse printable objects, search, and tag-filter object feeds.                                                                                                                  |
+| `user-profile` | `profile`          | `open`             | `pubkey`                  | Show a maker profile and their published printable objects. This intentionally uses the generic `profile` archetype so profile links work across unrelated napplet collections. |
+| `print-detail` | `printable-detail` | `open`             | `address`                 | Show one printable object, its media/files, maker attribution, comments, reactions, and edit actions.                                                                           |
+| `print-create` | `printable-create` | `open` or `create` | Optional `remixOf`        | Publish a new printable object and upload its media/files.                                                                                                                      |
+| `print-edit`   | `printable-edit`   | `edit`             | `address`                 | Load an owned printable object and publish a replacement event.                                                                                                                 |
+| `part-detail`  | `part-detail`      | `open`             | `fileId`                  | Show metadata for a NIP-94 part file and offer relevant actions.                                                                                                                |
+| `stl-preview`  | `stl-preview`      | `open`             | `url`, optional metadata  | Preview an STL file in 3D from NAP-RESOURCE fetch parameters, usually as an overlay.                                                                                            |
+
+Object addresses use `33500:<pubkey>:<d>`, where kind `33500` is stlstr's printable object event kind. Part details use a Nostr file event id as `fileId`. STL previews use resource metadata such as `{ url, name, mime, size }`; callers resolve any Nostr event before opening the viewer.
+
+## Runtime Contract
+
+The napplets are sandboxed iframe apps built with `@napplet/vite-plugin` in single-file artifact mode. They do not own keys, relay pools, global storage, or direct Blossom credentials. A runtime embedding them should provide capabilities through `window.napplet` according to each manifest's `requires` list.
+
+Common requirements:
+
+- `intent`: open another archetype from inside a napplet.
+- `inc`: deliver inbound intent payloads on `<archetype>:<action>` topics after the napplet emits `<archetype>:ready`.
+- `outbox`: query and publish Nostr events through the runtime's relay/signing policy.
+- `identity`: expose the current user's pubkey/profile/follows when a napplet needs owner-aware UI.
+- `upload`: upload object files and images to runtime-managed Blossom servers.
+- `resource`: fetch external media/file URLs through the runtime's network policy.
+- `storage`: keep drafts and local UI state under runtime control.
+- `link`, `theme`, `common`, and `count`: optional richer shell integrations used by detail, preview, and browse surfaces.
+
+For example, a runtime that wants to use this repo's profile surface should route `intent.open('profile', { pubkey })` to the `user-profile` napplet, grant `inc`, `outbox`, `resource`, `identity`, and `intent`, then deliver the payload on `profile:open` once the frame has emitted `profile:ready`.
+
+## Compatibility Guidelines
+
+To make another napplet compatible with stlstr or any runtime that understands these roles:
+
+- Declare the shared archetype in the napplet manifest, not just a repo-specific name. Use `profile` for person/profile views instead of `user-profile`.
+- Accept the payload shapes above. If a napplet needs extra data, treat it as optional and still render from the common payload.
+- Use NAP-INTENT for cross-napplet navigation. For example, maker links should open `profile` with `{ pubkey }`, and printable links should open `printable-detail` with `{ address }`.
+- Keep Nostr reads and writes behind `outbox`; do not bundle a signer, touch `window.nostr`, or create hidden relay behavior inside the napplet.
+- Treat domains beyond the manifest payload as runtime services. If `count`, `common`, `link`, `storage`, or `theme` are absent, degrade gracefully rather than failing the whole surface.
+- Keep visual chrome out of napplets. The runtime owns windows, title bars, borders, and navigation; napplets render the embedded content surface.
+
+## Forking Or Reusing
+
+You can fork one napplet without forking the whole app. Preserve the archetype and payload if you want it to remain drop-in compatible with existing runtimes, then change the UI, event queries, or publishing flow behind that contract.
+
+Useful starting points:
+
+- Fork `napplets/user-profile` to build a different profile view while keeping archetype `profile`.
+- Fork `napplets/print-detail` to make a custom printable detail page that still accepts `address`.
+- Fork `napplets/print-browse` to change discovery ranking or feed layout while keeping `printable-browse` open payloads.
+- Build a new napplet with `pnpm new <name> "Display Title"`, then add a manifest archetype that matches one of the shared roles if it should be interchangeable.
+
+## Development
+
+Install with pnpm:
+
+```sh
+pnpm install
+```
+
+Run the host, napplet build watchers, and local Kehto Paja:
+
+```sh
+pnpm dev
+```
+
+Build all napplets:
+
+```sh
+pnpm build
+```
+
+Verify napplets and shared libraries:
+
+```sh
+pnpm verify
+```
+
+Build the host app separately:
+
+```sh
+pnpm build:app
+```
+
+Local deploys are guarded and use `.napplet/config.dev.json` only:
+
+```sh
+pnpm deploy
+```
+
+Production deploys are explicit:
+
+```sh
+pnpm deploy:prod
+```

@@ -286,6 +286,7 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
       if (!next) throw new Error('That napplet could not be stored as an override.');
       setNappletOverride(archetype, next);
       setNaddr('');
+      setPickerOpen(false);
       setStatus(`Using ${resolved.title} for ${entry.title}.`);
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : 'Could not use that napplet.');
@@ -310,7 +311,6 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
     try {
       const found = await discoverCompatibleNapplets(archetype);
       setCandidates(found);
-      setPickerOpen(found.length > 0);
       setStatus(found.length ? `Found ${found.length} napplet.` : 'No napplets found.');
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : 'Could not search for napplets.');
@@ -320,7 +320,7 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
   }
 
   return (
-    <div className="grid gap-3 border-b border-base-300 py-4 last:border-b-0 xl:grid-cols-[minmax(12rem,18rem)_minmax(12rem,1fr)_minmax(18rem,1.3fr)_auto] xl:items-center">
+    <div className="grid gap-3 border-b border-base-300 py-4 last:border-b-0 xl:grid-cols-[minmax(12rem,18rem)_minmax(12rem,1fr)_auto] xl:items-center">
       <div className="min-w-0">
         <h3 className="font-semibold">{archetypeLabel(archetype)}</h3>
         <p className="mt-1 line-clamp-2 text-sm text-base-content/65">{entry.description}</p>
@@ -334,29 +334,16 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
         </div>
       </div>
 
-      <form className="grid min-w-0 gap-2" onSubmit={handleUseOverride}>
-        <div className="join">
-          <input
-            className="input join-item w-full font-mono text-sm"
-            aria-label={`Napplet naddr for ${archetypeLabel(archetype)}`}
-            placeholder="naddr1..."
-            value={naddr}
-            disabled={busy}
-            onChange={(event) => {
-              setNaddr(event.target.value);
-              setStatus('');
-            }}
-          />
-          <button className="btn btn-primary join-item" disabled={busy || !naddr.trim()}>
-            {busy ? 'Checking' : 'Use'}
-          </button>
-        </div>
-        {status ? <p className="text-sm text-base-content/65">{status}</p> : null}
-      </form>
-
       <div className="flex flex-wrap gap-2 xl:justify-end">
-        <button className="btn btn-outline btn-sm w-fit" disabled={discovering} onClick={handleDiscover}>
-          {discovering ? 'Searching relays' : 'Find napplets'}
+        <button
+          className="btn btn-outline btn-sm w-fit"
+          disabled={discovering}
+          onClick={() => {
+            setPickerOpen(true);
+            void handleDiscover();
+          }}
+        >
+          {discovering ? 'Searching relays' : 'Choose napplet'}
         </button>
         <button
           className="btn btn-ghost btn-sm"
@@ -369,6 +356,8 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
           Reset
         </button>
       </div>
+
+      {status ? <p className="text-sm text-base-content/65 xl:col-span-3">{status}</p> : null}
 
       {pickerOpen ? (
         <div className="modal modal-open" role="dialog" aria-modal="true">
@@ -386,40 +375,74 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
               </button>
             </div>
 
-            <ul className="mt-4 grid max-h-[60vh] gap-2 overflow-auto pr-1">
-              {candidates.map((candidate) => (
-                <li
-                  key={`${candidate.pubkey}:${candidate.dTag}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-box border border-base-300 p-3 text-sm"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="font-medium">{candidate.title}</div>
-                      <span
-                        className={`badge badge-sm ${candidate.compatibleWithArchetype ? 'badge-success' : 'badge-warning'}`}
+            <form className="mt-4 grid gap-2 rounded-box bg-base-200 p-3" onSubmit={handleUseOverride}>
+              <label className="text-sm font-medium" htmlFor={`napplet-naddr-${archetype}`}>
+                Paste a napplet naddr
+              </label>
+              <div className="join">
+                <input
+                  id={`napplet-naddr-${archetype}`}
+                  className="input join-item w-full font-mono text-sm"
+                  placeholder="naddr1..."
+                  value={naddr}
+                  disabled={busy}
+                  onChange={(event) => {
+                    setNaddr(event.target.value);
+                    setStatus('');
+                  }}
+                />
+                <button className="btn btn-primary join-item" disabled={busy || !naddr.trim()}>
+                  {busy ? 'Checking' : 'Use'}
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h4 className="text-sm font-semibold">Discovered napplets</h4>
+                {discovering ? <span className="loading loading-spinner loading-sm" /> : null}
+              </div>
+              {candidates.length ? (
+                <ul className="grid max-h-[52vh] gap-2 overflow-auto pr-1">
+                  {candidates.map((candidate) => (
+                    <li
+                      key={`${candidate.pubkey}:${candidate.dTag}`}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-box border border-base-300 p-3 text-sm"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-medium">{candidate.title}</div>
+                          <span
+                            className={`badge badge-sm ${candidate.compatibleWithArchetype ? 'badge-success' : 'badge-warning'}`}
+                          >
+                            {candidate.compatibleWithArchetype ? 'advertises this page' : 'not advertised'}
+                          </span>
+                        </div>
+                        {candidate.description ? (
+                          <div className="mt-1 text-base-content/65">{candidate.description}</div>
+                        ) : null}
+                        <div className="mt-1 truncate font-mono text-xs text-base-content/55">
+                          {candidate.dTag}
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => {
+                          applyResolvedOverride(candidate);
+                          setPickerOpen(false);
+                        }}
                       >
-                        {candidate.compatibleWithArchetype ? 'advertises this page' : 'not advertised'}
-                      </span>
-                    </div>
-                    {candidate.description ? (
-                      <div className="mt-1 text-base-content/65">{candidate.description}</div>
-                    ) : null}
-                    <div className="mt-1 truncate font-mono text-xs text-base-content/55">
-                      {candidate.dTag}
-                    </div>
-                  </div>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => {
-                      applyResolvedOverride(candidate);
-                      setPickerOpen(false);
-                    }}
-                  >
-                    Use
-                  </button>
-                </li>
-              ))}
-            </ul>
+                        Use
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="rounded-box border border-dashed border-base-300 p-4 text-sm text-base-content/60">
+                  {discovering ? 'Searching lookup relays...' : 'No napplets found yet.'}
+                </p>
+              )}
+            </div>
           </div>
           <button
             className="modal-backdrop"

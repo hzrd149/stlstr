@@ -13,7 +13,7 @@ const baseUrl = process.env.STLSTR_TEST_BASE_URL || 'http://127.0.0.1:5174';
 
 const SUBJECT = OBJECTS[OBJECTS.length - 1];
 const USER = MAKERS[SUBJECT.maker];
-/** object-detail declares `identity`, so its route is granted the domain. */
+/** printable-detail declares `identity`, so its route is granted the domain. */
 const objectPath = `/objects/${USER.pubkey}/${SUBJECT.identifier}`;
 
 let browser;
@@ -54,9 +54,9 @@ async function withExtension(page, pubkey) {
 
 async function openNapplet(page) {
   await page.goto(`${baseUrl}${objectPath}`, { waitUntil: 'networkidle0' });
-  const handle = await page.waitForSelector('iframe[title="Object details napplet"]');
+  const handle = await page.waitForSelector('iframe[title="Print details napplet"]');
   const frame = await handle.contentFrame();
-  assert.ok(frame, 'object detail iframe should be available');
+  assert.ok(frame, 'print detail iframe should be available');
   await frame.waitForFunction(() => Boolean(window.napplet?.identity));
   return frame;
 }

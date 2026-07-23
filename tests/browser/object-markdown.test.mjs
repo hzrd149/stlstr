@@ -32,9 +32,9 @@ before(async () => {
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(`${baseUrl}${objectPath}`, { waitUntil: 'networkidle0' });
 
-  const handle = await page.waitForSelector('iframe[title="Object details napplet"]');
+  const handle = await page.waitForSelector('iframe[title="Print details napplet"]');
   frame = await handle.contentFrame();
-  assert.ok(frame, 'object detail iframe should be available');
+  assert.ok(frame, 'print detail iframe should be available');
 
   // The description tab is the default panel, but it only exists once the event loads.
   await frame.waitForSelector('[data-testid="object-description"]');

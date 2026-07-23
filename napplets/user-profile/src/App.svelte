@@ -163,7 +163,7 @@
 
     if (!hasOutboxSubscribe()) {
       objectsLoading = false;
-      objectsStatus = 'This shell does not provide relay access, so objects cannot be listed.';
+      objectsStatus = 'This shell does not provide relay access, so prints cannot be listed.';
       return;
     }
 
@@ -190,15 +190,15 @@
 
   // ---------------------------------------------------------------- navigation
 
-  /** Hands the object to whichever napplet fulfills the `object-detail` role. */
+  /** Hands the object to whichever napplet fulfills the `printable-detail` role. */
   async function openObject(object: PrintableObject): Promise<void> {
     if (!hasIntent()) {
-      objectsStatus = 'This shell cannot open objects.';
+      objectsStatus = 'This shell cannot open prints.';
       return;
     }
 
-    const result = await intent.open('object-detail', { address: object.address });
-    if (!result.ok) objectsStatus = result.error ?? 'Could not open that object.';
+    const result = await intent.open('printable-detail', { address: object.address });
+    if (!result.ok) objectsStatus = result.error ?? 'Could not open that print.';
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -274,13 +274,13 @@
 
   {#if pubkey}
     <!-- Renders only once a maker has been delivered over the intent seam. -->
-    <section class="mt-8 grid gap-4" aria-label="Objects by this maker" data-testid="profile-scope">
+    <section class="mt-8 grid gap-4" aria-label="Prints by this maker" data-testid="profile-scope">
       <h2 class="text-lg font-semibold">
-        Objects by {profile ? displayName : 'this maker'}
+        Prints by {profile ? displayName : 'this maker'}
       </h2>
 
       {#if objectsLoading && published.length === 0}
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Loading objects">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Loading prints">
           {#each [0, 1, 2] as placeholder (placeholder)}
             <div class="grid gap-2">
               <div class="skeleton aspect-video w-full"></div>
@@ -290,7 +290,7 @@
         </div>
       {:else if published.length === 0}
         <p class="text-base-content/70" data-testid="profile-objects-empty">
-          This maker has not published any objects yet.
+          This maker has not published any prints yet.
         </p>
       {:else}
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="profile-objects">

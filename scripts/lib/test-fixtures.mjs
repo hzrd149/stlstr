@@ -117,8 +117,9 @@ export function descriptionOf(object, baseUrl) {
  */
 /**
  * The part file every fixture object carries, as a kind-1063 (NIP-94) event. It is a real
- * 684-byte binary STL served by the test's own Vite server, so the preview napplet exercises
- * the whole path — outbox lookup, NAP-RESOURCE fetch, parse, render — rather than a stub.
+ * 684-byte binary STL served by the test's own Vite server, so the detail napplets can
+ * resolve a real NIP-94 event and the STL viewer can exercise NAP-RESOURCE fetch, parse,
+ * render rather than a stub.
  */
 function buildFileEvent(baseUrl, object, index) {
   return finalizeEvent(
@@ -189,7 +190,7 @@ export function fileIdOf(baseUrl, identifier) {
   return buildFileEvent(baseUrl, OBJECTS[index], index).id;
 }
 
-/** The address the object-detail intent should produce for a fixture object. */
+/** The address the printable-detail intent should produce for a fixture object. */
 export function addressOf(object) {
   return `33500:${MAKERS[object.maker].pubkey}:${object.identifier}`;
 }

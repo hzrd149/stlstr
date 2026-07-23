@@ -30,7 +30,7 @@ async function openBrowseNapplet(path = '/') {
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle0' });
 
-  const iframeHandle = await page.waitForSelector('iframe[title="Browse objects napplet"]');
+  const iframeHandle = await page.waitForSelector('iframe[title="Browse prints napplet"]');
   const frame = await iframeHandle.contentFrame();
   assert.ok(frame, 'browse napplet iframe should be available');
 
@@ -128,12 +128,12 @@ test('NAP-INTENT advertises the archetypes the shell can route', async () => {
   const { page, frame } = await openBrowseNapplet();
 
   try {
-    const detail = await frame.evaluate(() => window.napplet.intent.available('object-detail'));
+    const detail = await frame.evaluate(() => window.napplet.intent.available('printable-detail'));
     assert.equal(detail.available, true);
     assert.equal(detail.hasDefault, true);
     assert.deepEqual(
       detail.candidates.map((candidate) => candidate.dTag),
-      ['object-detail'],
+      ['print-detail'],
     );
 
     const unknown = await frame.evaluate(() => window.napplet.intent.available('mastodon-toot'));
@@ -142,36 +142,38 @@ test('NAP-INTENT advertises the archetypes the shell can route', async () => {
 
     const handlers = await frame.evaluate(() => window.napplet.intent.handlers());
     assert.deepEqual(handlers.map((entry) => entry.archetype).sort(), [
-      'browse',
-      'create-object',
-      'edit-object',
-      'object-detail',
-      'part-preview',
+      'part-detail',
+      'part-library',
+      'printable-browse',
+      'printable-create',
+      'printable-detail',
+      'printable-edit',
       'profile',
+      'stl-preview',
     ]);
   } finally {
     await page.close();
   }
 });
 
-test('NAP-INTENT open navigates the shell to the object route', async () => {
+test('NAP-INTENT open navigates the shell to the print route', async () => {
   const { page, frame } = await openBrowseNapplet();
 
   try {
     const result = await frame.evaluate(() =>
-      window.napplet.intent.open('object-detail', {
+      window.napplet.intent.open('printable-detail', {
         address: '33500:deadbeef:adjustable-phone-stand',
       }),
     );
 
     assert.equal(result.ok, true);
     assert.equal(result.handled, true);
-    assert.equal(result.handler, 'object-detail');
+    assert.equal(result.handler, 'printable-detail');
 
     await page.waitForFunction(
       () => window.location.pathname === '/objects/deadbeef/adjustable-phone-stand',
     );
-    await page.waitForSelector('iframe[title="Object details napplet"]');
+    await page.waitForSelector('iframe[title="Print details napplet"]');
   } finally {
     await page.close();
   }
@@ -181,7 +183,9 @@ test('NAP-INTENT rejects a request it cannot route', async () => {
   const { page, frame } = await openBrowseNapplet();
 
   try {
-    const noPayload = await frame.evaluate(() => window.napplet.intent.open('object-detail', {}));
+    const noPayload = await frame.evaluate(() =>
+      window.napplet.intent.open('printable-detail', {}),
+    );
     assert.equal(noPayload.ok, false);
     assert.match(noPayload.error, /address/i);
 

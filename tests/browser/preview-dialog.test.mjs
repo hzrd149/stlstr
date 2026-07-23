@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import puppeteer from 'puppeteer';
-import { MAKERS, OBJECTS, fileIdOf } from '../../scripts/lib/test-fixtures.mjs';
+import { MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
 
 /**
  * The preview dialog: an overlay archetype rendered over the current page instead of as a
@@ -16,7 +16,13 @@ const baseUrl = process.env.STLSTR_TEST_BASE_URL || 'http://127.0.0.1:5174';
 
 const OBJECT = OBJECTS.find((object) => object.identifier === 'adjustable-phone-stand');
 const OBJECT_PATH = `/objects/${MAKERS[OBJECT.maker].pubkey}/${OBJECT.identifier}`;
-const FILE_ID = fileIdOf(baseUrl, OBJECT.identifier);
+const FILE_PAYLOAD = {
+  url: `${baseUrl}/src/assets/cube.stl`,
+  name: `${OBJECT.identifier}.stl`,
+  mime: 'model/stl',
+  size: '684',
+};
+const ENCODED_FILE_PAYLOAD = encodeURIComponent(JSON.stringify(FILE_PAYLOAD));
 
 let browser;
 
@@ -51,14 +57,27 @@ async function nappletFrame(page, title) {
 
 /** Waits for the preview napplet to have actually received and rendered a part. */
 async function renderedPreview(page) {
-  const frame = await nappletFrame(page, 'Part preview');
+  const frame = await nappletFrame(page, 'STL preview');
   await frame.waitForSelector('[data-testid="preview-name"]');
   await frame.waitForFunction(() => !document.querySelector('[data-testid="preview-status"]'));
   return frame;
 }
 
+async function hasStlPayload(page, expected) {
+  return page.evaluate((payload) => {
+    const raw = new URLSearchParams(window.location.search).get('stl');
+    if (!raw) return false;
+    try {
+      const parsed = JSON.parse(decodeURIComponent(raw));
+      return Object.entries(payload).every(([key, value]) => parsed[key] === value);
+    } catch {
+      return false;
+    }
+  }, expected);
+}
+
 async function openPreviewFromDetail(page) {
-  const detail = await nappletFrame(page, 'Object details');
+  const detail = await nappletFrame(page, 'Print details');
   const button = await detail.waitForSelector('[data-testid="preview-part"]');
   await button.click();
   return detail;
@@ -71,9 +90,14 @@ test('a part opens in the dialog and records itself in the URL', async () => {
     await openPreviewFromDetail(page);
 
     await page.waitForFunction(
-      (fileId) => new URLSearchParams(window.location.search).get('preview') === fileId,
+      (payload) => {
+        const raw = new URLSearchParams(window.location.search).get('stl');
+        if (!raw) return false;
+        const parsed = JSON.parse(decodeURIComponent(raw));
+        return Object.entries(payload).every(([key, value]) => parsed[key] === value);
+      },
       {},
-      FILE_ID,
+      FILE_PAYLOAD,
     );
 
     // The base route is untouched: an overlay modifies the current page, never replaces it.
@@ -121,7 +145,7 @@ test('a payload sent to the dialog does not reach the napplet beneath it', async
 
     // The detail napplet has no preview surface at all, so its own status line is the
     // observable: the preview payload must not have disturbed the object it is showing.
-    const detail = await nappletFrame(page, 'Object details');
+    const detail = await nappletFrame(page, 'Print details');
     const leaked = await detail.$('[data-testid="preview-name"]');
     assert.equal(leaked, null, 'the preview payload leaked into the page napplet');
   } finally {
@@ -130,7 +154,7 @@ test('a payload sent to the dialog does not reach the napplet beneath it', async
 });
 
 test('a deep-linked preview renders without any prior intent', async () => {
-  const page = await openStlstr(`${OBJECT_PATH}?preview=${FILE_ID}`);
+  const page = await openStlstr(`${OBJECT_PATH}?stl=${ENCODED_FILE_PAYLOAD}`);
 
   try {
     const preview = await renderedPreview(page);
@@ -138,7 +162,7 @@ test('a deep-linked preview renders without any prior intent', async () => {
     assert.match(name, /adjustable-phone-stand\.stl/);
 
     // And the page underneath still loaded normally.
-    const detail = await nappletFrame(page, 'Object details');
+    const detail = await nappletFrame(page, 'Print details');
     await detail.waitForSelector('[data-testid="object-title"]');
   } finally {
     await page.close();
@@ -155,9 +179,9 @@ test('closing the dialog restores the base URL', async () => {
     const close = await page.waitForSelector('[data-testid="preview-close"]');
     await close.click();
 
-    await page.waitForFunction(() => !window.location.search.includes('preview='));
+    await page.waitForFunction(() => !window.location.search.includes('stl='));
     assert.equal(await page.evaluate(() => window.location.pathname), OBJECT_PATH);
-    assert.equal(await page.$('iframe[title="Part preview napplet"]'), null);
+    assert.equal(await page.$('iframe[title="STL preview napplet"]'), null);
   } finally {
     await page.close();
   }
@@ -171,14 +195,11 @@ test('back closes the dialog and forward reopens it with the payload', async () 
     await renderedPreview(page);
 
     await page.goBack();
-    await page.waitForFunction(() => !window.location.search.includes('preview='));
+    await page.waitForFunction(() => !window.location.search.includes('stl='));
 
     await page.goForward();
-    await page.waitForFunction(
-      (fileId) => new URLSearchParams(window.location.search).get('preview') === fileId,
-      {},
-      FILE_ID,
-    );
+    await page.waitForFunction(() => window.location.search.includes('stl='));
+    assert.equal(await hasStlPayload(page, FILE_PAYLOAD), true);
 
     // Redelivery on the way forward, not just a re-mounted empty dialog.
     await renderedPreview(page);
@@ -188,7 +209,7 @@ test('back closes the dialog and forward reopens it with the payload', async () 
 });
 
 test('a deep-linked preview closes to the page beneath it', async () => {
-  const page = await openStlstr(`${OBJECT_PATH}?preview=${FILE_ID}`);
+  const page = await openStlstr(`${OBJECT_PATH}?stl=${ENCODED_FILE_PAYLOAD}`);
 
   try {
     await renderedPreview(page);
@@ -198,7 +219,7 @@ test('a deep-linked preview closes to the page beneath it', async () => {
 
     // No history entry to go back to, so it collapses to the base page rather than
     // navigating out of the app.
-    await page.waitForFunction(() => !window.location.search.includes('preview='));
+    await page.waitForFunction(() => !window.location.search.includes('stl='));
     assert.equal(await page.evaluate(() => window.location.pathname), OBJECT_PATH);
   } finally {
     await page.close();
@@ -209,7 +230,7 @@ test('the shell advertises the preview archetype it can route', async () => {
   const page = await openStlstr(OBJECT_PATH);
 
   try {
-    const detail = await nappletFrame(page, 'Object details');
+    const detail = await nappletFrame(page, 'Print details');
 
     // The Preview button renders only after `intent.available` confirms a handler, so its
     // presence is the assertion that the archetype is advertised.

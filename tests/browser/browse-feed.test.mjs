@@ -29,7 +29,7 @@ after(async () => {
 });
 
 /** The shell titles the frame after the intent, so each browse route has its own title. */
-async function openBrowse(path = '/', title = 'Browse objects') {
+async function openBrowse(path = '/', title = 'Browse prints') {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle0' });
@@ -123,7 +123,7 @@ test('clicking a card opens the object detail route', async () => {
       {},
       `/objects/${MAKERS[NEWEST.maker].pubkey}/${NEWEST.identifier}`,
     );
-    await page.waitForSelector('iframe[title="Object details napplet"]');
+    await page.waitForSelector('iframe[title="Print details napplet"]');
   } finally {
     await page.close();
   }
@@ -189,7 +189,7 @@ test('searching routes through the shell and filters the feed', async () => {
   const { page, frame } = await openBrowse();
 
   try {
-    await frame.type('input[aria-label="Search objects"]', 'hex bit');
+    await frame.type('input[aria-label="Search prints"]', 'hex bit');
     await frame.click('button.btn-primary');
 
     // The search is a shell route, so it is linkable and survives a refresh.

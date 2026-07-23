@@ -21,6 +21,7 @@ export type PrintableObject = {
   identifier: string;
   title: string;
   summary: string;
+  topics: string[];
   /** The first `imeta` tag, which NIP.md defines as the cover image. */
   cover: ObjectImage | null;
   createdAt: number;
@@ -75,6 +76,14 @@ export function toPrintableObject(event: NostrEvent): PrintableObject | null {
     identifier,
     title,
     summary: tagValue(event, 'summary'),
+    topics: [
+      ...new Set(
+        event.tags
+          .filter((tag) => tag[0] === 't' && typeof tag[1] === 'string')
+          .map((tag) => tag[1].trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ],
     cover: cover ?? null,
     createdAt: event.created_at,
   };
@@ -99,7 +108,29 @@ export function collectObject(
   return merged;
 }
 
-/** Newest first — a maker's page reads as "what they published most recently". */
+/** Newest first — the home page is a "recently published" feed. */
 export function sortByNewest(objects: Iterable<PrintableObject>): PrintableObject[] {
   return [...objects].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * Client-side filtering over what has already streamed in. Relay-side search (NIP-50) is a
+ * follow-up; this keeps the feed responsive while the subscription is still open.
+ */
+export function filterObjects(
+  objects: PrintableObject[],
+  { query = '', topic = '' }: { query?: string; topic?: string },
+): PrintableObject[] {
+  const needle = query.trim().toLowerCase();
+  const wanted = topic.trim().toLowerCase();
+
+  return objects.filter((object) => {
+    if (wanted && !object.topics.includes(wanted)) return false;
+    if (!needle) return true;
+    return (
+      object.title.toLowerCase().includes(needle) ||
+      object.summary.toLowerCase().includes(needle) ||
+      object.topics.some((entry) => entry.includes(needle))
+    );
+  });
 }
