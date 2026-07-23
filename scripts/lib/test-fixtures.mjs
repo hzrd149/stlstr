@@ -26,7 +26,7 @@ export const MAKERS = {
  * already holds a fixture object will keep the copy it has unless the replacement is
  * strictly newer. Without a bump, an edited description silently never reaches the tests.
  */
-const BASE_TIME = 1_760_100_000;
+const BASE_TIME = 1_784_900_000;
 
 /**
  * A description exercising the Markdown rules in NIP.md, including the ones that must be

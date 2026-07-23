@@ -169,7 +169,7 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     },
   },
 
-  'user-profile': {
+  profile: {
     dTag: 'user-profile',
     routeId: 'user-profile',
     title: 'Maker profile',
@@ -296,7 +296,7 @@ export function intentFromLocation(location: {
   }
 
   if (parts[0] === 'profiles' && parts[1]) {
-    return intent('user-profile', 'open', { pubkey: decodePart(parts[1]) });
+    return intent('profile', 'open', { pubkey: decodePart(parts[1]) });
   }
 
   if (parts[0] === 'objects' && parts[1] && parts[2]) {

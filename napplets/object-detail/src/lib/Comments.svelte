@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { intent, outbox, type NostrEvent } from '@napplet/sdk';
+  import { outbox, type NostrEvent } from '@napplet/sdk';
+  import MakerLink from '@stlstr/napplet-kit/components/MakerLink.svelte';
+  import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
   import { getReplaceableAddress } from 'applesauce-core/helpers/event';
   import {
     buildComment,
@@ -9,7 +11,6 @@
     toComment,
     type Comment,
   } from './comments';
-  import { fetchMakers, type MakerProfile } from './profiles';
 
   /**
    * The NIP-22 comment thread for one printable object.
@@ -76,24 +77,8 @@
     const domain = napplets().outbox as { publish?: unknown } | undefined;
     return typeof domain?.publish === 'function';
   };
-  const hasIntentOpen = () => {
-    const domain = napplets().intent as { open?: unknown } | undefined;
-    return typeof domain?.open === 'function';
-  };
-
   function authorName(pubkey: string): string {
     return authors.get(pubkey)?.name || 'Unknown maker';
-  }
-
-  function initial(pubkey: string): string {
-    const name = authors.get(pubkey)?.name;
-    return name ? name.slice(0, 1).toUpperCase() : '?';
-  }
-
-  async function openAuthorProfile(pubkey: string): Promise<void> {
-    if (!pubkey || !hasIntentOpen()) return;
-    const result = await intent.open('user-profile', { pubkey });
-    if (!result.ok) status = result.error ?? 'Could not open this maker profile.';
   }
 
   /** Coarse and relative on purpose — an exact timestamp is protocol detail, not product UX. */
@@ -312,33 +297,12 @@
           data-depth={comment.depth}
         >
           <div class="flex items-baseline gap-2">
-            {#if hasIntentOpen()}
-              <button
-                type="button"
-                class="group flex min-w-0 items-center gap-2 rounded-field text-left hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                data-testid="comment-author"
-                aria-label="Open {authorName(comment.pubkey)} profile"
-                onclick={() => openAuthorProfile(comment.pubkey)}
-              >
-                <span class="avatar placeholder shrink-0">
-                  <span class="h-6 w-6 rounded-full bg-neutral text-neutral-content">
-                    <span class="text-xs">{initial(comment.pubkey)}</span>
-                  </span>
-                </span>
-                <span class="truncate text-sm font-medium group-hover:underline">
-                  {authorName(comment.pubkey)}
-                </span>
-              </button>
-            {:else}
-              <span class="flex min-w-0 items-center gap-2" data-testid="comment-author">
-                <span class="avatar placeholder shrink-0">
-                  <span class="h-6 w-6 rounded-full bg-neutral text-neutral-content">
-                    <span class="text-xs">{initial(comment.pubkey)}</span>
-                  </span>
-                </span>
-                <span class="truncate text-sm font-medium">{authorName(comment.pubkey)}</span>
-              </span>
-            {/if}
+            <MakerLink
+              pubkey={comment.pubkey}
+              profile={authors.get(comment.pubkey)}
+              testId="comment-author"
+              onError={(message) => (status = message)}
+            />
             <span class="text-xs text-base-content/60">{when(comment.createdAt)}</span>
           </div>
 

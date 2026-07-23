@@ -147,7 +147,7 @@ test('NAP-INTENT advertises the archetypes the shell can route', async () => {
       'edit-object',
       'object-detail',
       'part-preview',
-      'user-profile',
+      'profile',
     ]);
   } finally {
     await page.close();

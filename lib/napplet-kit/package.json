@@ -1,0 +1,23 @@
+{
+  "name": "@stlstr/napplet-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./profiles": "./src/profiles.ts",
+    "./components/MakerLink.svelte": "./src/components/MakerLink.svelte"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "verify": "pnpm type-check"
+  },
+  "dependencies": {
+    "@napplet/sdk": "^0.24.4",
+    "svelte": "^5.56.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

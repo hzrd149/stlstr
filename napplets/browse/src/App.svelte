@@ -1,8 +1,9 @@
 <script lang="ts">
   import { inc, intent, outbox } from '@napplet/sdk';
+  import MakerLink from '@stlstr/napplet-kit/components/MakerLink.svelte';
+  import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
   import { onMount } from 'svelte';
   import CoverImage from './lib/CoverImage.svelte';
-  import { fetchMakers, type MakerProfile } from './lib/profiles';
   import {
     collectObject,
     filterObjects,
@@ -46,13 +47,18 @@
     >;
   }
 
-  const hasInc = () => typeof napplets().inc === 'object';
-  const hasIntent = () => typeof napplets().intent === 'object';
-  const hasOutbox = () => typeof napplets().outbox === 'object';
-
-  function makerName(pubkey: string): string {
-    return makers.get(pubkey)?.name || 'Unknown maker';
-  }
+  const hasInc = () => {
+    const domain = napplets().inc as { emit?: unknown; on?: unknown } | undefined;
+    return typeof domain?.emit === 'function' && typeof domain?.on === 'function';
+  };
+  const hasIntent = () => {
+    const domain = napplets().intent as { open?: unknown } | undefined;
+    return typeof domain?.open === 'function';
+  };
+  const hasOutbox = () => {
+    const domain = napplets().outbox as { subscribe?: unknown } | undefined;
+    return typeof domain?.subscribe === 'function';
+  };
 
   // ---------------------------------------------------------------- maker names
 
@@ -126,17 +132,6 @@
 
     const result = await intent.open('object-detail', { address: object.address });
     if (!result.ok) status = result.error ?? 'Could not open that object.';
-  }
-
-  /** Hands the maker to whichever napplet fulfills the `user-profile` role. */
-  async function openMaker(pubkey: string): Promise<void> {
-    if (!hasIntent()) {
-      status = 'This shell cannot open maker profiles.';
-      return;
-    }
-
-    const result = await intent.open('user-profile', { pubkey });
-    if (!result.ok) status = result.error ?? 'Could not open that maker.';
   }
 
   /**
@@ -245,15 +240,15 @@
             {/if}
           </button>
 
-          <button
-            type="button"
-            class="link w-fit text-sm text-base-content/70"
-            data-testid="open-maker"
-            data-pubkey={object.pubkey}
-            onclick={() => openMaker(object.pubkey)}
-          >
-            {makerName(object.pubkey)}
-          </button>
+          <MakerLink
+            pubkey={object.pubkey}
+            profile={makers.get(object.pubkey)}
+            testId="open-maker"
+            buttonClass="link flex w-fit items-center gap-2 text-sm text-base-content/70"
+            fallbackClass="flex w-fit items-center gap-2 text-sm text-base-content/70"
+            labelClass="truncate"
+            onError={(message) => (status = message)}
+          />
 
           {#if object.topics.length > 0}
             <div class="flex flex-wrap gap-1">

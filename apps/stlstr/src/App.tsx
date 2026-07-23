@@ -1052,7 +1052,7 @@ function UserProfileRoute() {
       napplet="user-profile"
       routeId="user-profile"
       title="Maker profile"
-      intent={{ archetype: 'user-profile', action: 'open', payload: { pubkey } }}
+      intent={{ archetype: 'profile', action: 'open', payload: { pubkey } }}
     />
   );
 }

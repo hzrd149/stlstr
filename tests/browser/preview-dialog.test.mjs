@@ -53,6 +53,7 @@ async function nappletFrame(page, title) {
 async function renderedPreview(page) {
   const frame = await nappletFrame(page, 'Part preview');
   await frame.waitForSelector('[data-testid="preview-name"]');
+  await frame.waitForFunction(() => !document.querySelector('[data-testid="preview-status"]'));
   return frame;
 }
 

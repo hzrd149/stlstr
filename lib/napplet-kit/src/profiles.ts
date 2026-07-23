@@ -1,8 +1,9 @@
 /**
- * Maker names for feed cards.
+ * Shared maker profile lookup for napplets.
  *
- * Cards must never show a raw pubkey (AGENTS.md), so an author whose `kind:0` has not
- * resolved yet is rendered as "Unknown maker" rather than hex.
+ * Reads go through NAP-OUTBOX. The shell owns relay selection and fallback behavior.
+ * Missing or unreadable profiles return an empty display name so callers can cache misses
+ * without ever showing raw pubkeys in product UI.
  */
 
 import { outbox } from '@napplet/sdk';
@@ -13,6 +14,14 @@ export type MakerProfile = {
 };
 
 const MAX_AUTHORS_PER_QUERY = 100;
+
+export function makerDisplayName(profile: MakerProfile | undefined): string {
+  return profile?.name || 'Unknown maker';
+}
+
+export function makerInitial(profile: MakerProfile | undefined): string {
+  return profile?.name ? profile.name.slice(0, 1).toUpperCase() : '?';
+}
 
 function parseName(content: string): string {
   try {
@@ -27,12 +36,7 @@ function parseName(content: string): string {
   }
 }
 
-/**
- * Resolves display names for a batch of authors.
- *
- * Authors with no readable profile are returned with an empty name so callers can cache
- * the miss and stop re-requesting them every time a new card streams in.
- */
+/** Resolves display names for a batch of authors. */
 export async function fetchMakers(pubkeys: string[]): Promise<MakerProfile[]> {
   const authors = [...new Set(pubkeys)].slice(0, MAX_AUTHORS_PER_QUERY);
   if (authors.length === 0) return [];

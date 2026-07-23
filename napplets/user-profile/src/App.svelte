@@ -16,12 +16,12 @@
    *
    * The pubkey arrives over the NAP-INTENT delivery seam: NAP-INTENT's SDK surface is
    * outbound only, so the shell hands the payload over as a targeted `inc.event` on
-   * `user-profile:open`. The cold-start guard is ordering — subscribe FIRST, then emit
-   * `user-profile:ready`, or the shell flushes into a napplet that is not listening yet.
+   * `profile:open`. The cold-start guard is ordering — subscribe FIRST, then emit
+   * `profile:ready`, or the shell flushes into a napplet that is not listening yet.
    */
 
-  const OPEN_TOPIC = 'user-profile:open';
-  const READY_TOPIC = 'user-profile:ready';
+  const OPEN_TOPIC = 'profile:open';
+  const READY_TOPIC = 'profile:ready';
 
   /** How many of the maker's objects to pull. Pagination is a follow-up. */
   const OBJECT_LIMIT = 60;
@@ -62,9 +62,22 @@
     >;
   }
 
-  const hasOutbox = () => typeof napplets().outbox === 'object';
-  const hasIntent = () => typeof napplets().intent === 'object';
-  const hasInc = () => typeof napplets().inc === 'object';
+  const hasOutboxQuery = () => {
+    const domain = napplets().outbox as { query?: unknown } | undefined;
+    return typeof domain?.query === 'function';
+  };
+  const hasOutboxSubscribe = () => {
+    const domain = napplets().outbox as { subscribe?: unknown } | undefined;
+    return typeof domain?.subscribe === 'function';
+  };
+  const hasIntent = () => {
+    const domain = napplets().intent as { open?: unknown } | undefined;
+    return typeof domain?.open === 'function';
+  };
+  const hasInc = () => {
+    const domain = napplets().inc as { emit?: unknown; on?: unknown } | undefined;
+    return typeof domain?.emit === 'function' && typeof domain?.on === 'function';
+  };
 
   function revokePicture(): void {
     if (!pictureUrl) return;
@@ -94,7 +107,7 @@
     profile = null;
     revokePicture();
 
-    if (!hasOutbox()) {
+    if (!hasOutboxQuery()) {
       status = 'This shell does not provide relay access.';
       return;
     }
@@ -148,7 +161,7 @@
     objects = new Map();
     objectsStatus = '';
 
-    if (!hasOutbox()) {
+    if (!hasOutboxSubscribe()) {
       objectsLoading = false;
       objectsStatus = 'This shell does not provide relay access, so objects cannot be listed.';
       return;
