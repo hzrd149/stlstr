@@ -9,6 +9,7 @@
  */
 
 import type { NostrEvent, NostrTag } from '@napplet/sdk';
+import { tagValue } from './tags';
 
 /** The `kind:1063` events this module reads and writes. */
 export const FILE_KIND = 1063;
@@ -57,10 +58,6 @@ const MODEL_EXTENSIONS = ['.stl', '.3mf', '.obj', '.step', '.stp', '.gcode', '.p
  * than starting a request destined to be refused mid-stream.
  */
 export const MAX_PREVIEW_BYTES = 10 * 1024 * 1024;
-
-function tagValue(tags: string[][], name: string): string {
-  return tags.find((tag) => tag[0] === name)?.[1]?.trim() ?? '';
-}
 
 /** The filename at the end of a URL, for files whose event carries no `name` tag. */
 export function basename(url: string): string {

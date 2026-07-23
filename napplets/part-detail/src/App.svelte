@@ -3,6 +3,7 @@
   import Comments from '@stlstr/napplet-kit/components/Comments.svelte';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { eventThreadFilter } from '@stlstr/napplet-kit/comments';
+  import { tagValue } from '@stlstr/napplet-kit/tags';
   import {
     FILE_KIND,
     OBJECT_KIND,
@@ -115,10 +116,6 @@
     const domain = napplets().resource as { bytes?: unknown } | undefined;
     return typeof domain?.bytes === 'function';
   };
-
-  function tagValue(tags: string[][], name: string): string {
-    return tags.find((tag) => tag[0] === name)?.[1]?.trim() ?? '';
-  }
 
   function roleFor(event: NostrEvent, id: string): string {
     return event.tags.find((tag) => tag[0] === 'e' && tag[1] === id)?.[3]?.trim() ?? '';

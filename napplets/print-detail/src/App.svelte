@@ -5,6 +5,7 @@
   import GalleryImage from './lib/GalleryImage.svelte';
   import Markdown from './lib/Markdown.svelte';
   import { threadFilter } from '@stlstr/napplet-kit/comments';
+  import { tagValue } from '@stlstr/napplet-kit/tags';
   import { parseImages, type ObjectImage } from './lib/object';
 
   /**
@@ -109,10 +110,6 @@
     const domain = napplets().count as { query?: unknown } | undefined;
     return typeof domain?.query === 'function';
   };
-
-  function tagValue(tags: string[][], name: string): string {
-    return tags.find((tag) => tag[0] === name)?.[1]?.trim() ?? '';
-  }
 
   /** File references this object marks as printable parts, in publication order. */
   function partIds(tags: string[][]): string[] {

@@ -5,6 +5,7 @@
  */
 
 import type { NostrEvent } from '@napplet/sdk';
+import { tagValue } from '@stlstr/napplet-kit/tags';
 
 /** One image from an `imeta` tag. */
 export type ObjectImage = {
@@ -27,10 +28,6 @@ export type PrintableObject = {
 };
 
 export const OBJECT_KIND = 33500;
-
-function tagValue(event: NostrEvent, name: string): string {
-  return event.tags.find((tag) => tag[0] === name)?.[1]?.trim() ?? '';
-}
 
 /**
  * Parses one `imeta` tag. NIP-92 packs fields as space-separated `key value` pairs across
@@ -60,8 +57,8 @@ function parseImeta(tag: string[]): ObjectImage | null {
 export function toPrintableObject(event: NostrEvent): PrintableObject | null {
   if (event.kind !== OBJECT_KIND) return null;
 
-  const identifier = tagValue(event, 'd');
-  const title = tagValue(event, 'title');
+  const identifier = tagValue(event.tags, 'd');
+  const title = tagValue(event.tags, 'title');
   if (!identifier || !title) return null;
 
   const cover = event.tags
@@ -74,7 +71,7 @@ export function toPrintableObject(event: NostrEvent): PrintableObject | null {
     pubkey: event.pubkey,
     identifier,
     title,
-    summary: tagValue(event, 'summary'),
+    summary: tagValue(event.tags, 'summary'),
     cover: cover ?? null,
     createdAt: event.created_at,
   };

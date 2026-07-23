@@ -10,6 +10,7 @@
     type NostrEvent,
     type NostrTag,
   } from '@napplet/sdk';
+  import { tagValue } from '@stlstr/napplet-kit/tags';
   import { onMount } from 'svelte';
 
   type UploadResult = Awaited<ReturnType<typeof upload.upload>>;
@@ -128,10 +129,6 @@
     const domain = napplets().resource as Partial<typeof resource> | undefined;
     return typeof domain?.bytes === 'function';
   };
-
-  function tagValue(tags: string[][], name: string): string {
-    return tags.find((tag) => tag[0] === name)?.[1]?.trim() ?? '';
-  }
 
   function tagValues(tags: string[][], name: string): string[] {
     return tags

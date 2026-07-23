@@ -11,6 +11,7 @@
     type FileMeta,
   } from '@stlstr/napplet-kit/files';
   import { fetchMakers, makerDisplayName, type MakerProfile } from '@stlstr/napplet-kit/profiles';
+  import { tagValue } from '@stlstr/napplet-kit/tags';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { onMount } from 'svelte';
 
@@ -128,10 +129,6 @@
     const domain = napplets().link as { open?: unknown } | undefined;
     return typeof domain?.open === 'function';
   };
-
-  function tagValue(tags: string[][], name: string): string {
-    return tags.find((tag) => tag[0] === name)?.[1]?.trim() ?? '';
-  }
 
   function toLibraryFile(event: NostrEvent): LibraryFile | null {
     const meta = readFileMeta(event.tags);
