@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import Comments from './lib/Comments.svelte';
   import GalleryImage from './lib/GalleryImage.svelte';
+  import Markdown from './lib/Markdown.svelte';
   import { parseImages, type ObjectImage } from './lib/object';
 
   /**
@@ -363,8 +364,7 @@
         data-testid="object-panel-description"
       >
         {#if description}
-          <!-- NIP.md defines this as Markdown; rendering it as such is a follow-up. -->
-          <p class="max-w-prose whitespace-pre-wrap text-base-content/80">{description}</p>
+          <Markdown source={description} />
         {:else}
           <p class="text-sm text-base-content/70">This object has no description yet.</p>
         {/if}

@@ -19,7 +19,60 @@ export const MAKERS = {
   otto: { name: 'Otto Makes', pubkey: getPublicKey(SECRET_KEYS.otto) },
 };
 
-const BASE_TIME = 1_760_000_000;
+/**
+ * Bump this whenever fixture content changes.
+ *
+ * The dev relay is long-lived and shared, and `kind:33500` is addressable: a relay that
+ * already holds a fixture object will keep the copy it has unless the replacement is
+ * strictly newer. Without a bump, an edited description silently never reaches the tests.
+ */
+const BASE_TIME = 1_760_100_000;
+
+/**
+ * A description exercising the Markdown rules in NIP.md, including the ones that must be
+ * refused. `{{baseUrl}}` is substituted with the test server's origin.
+ *
+ * The hostile cases are fixtures, not decoration: a `javascript:` link, a `data:` image and
+ * a raw HTML element are the three things a description must never be able to turn into
+ * markup, so they are seeded here and asserted against in `object-markdown.test.mjs`.
+ */
+const MARKDOWN_DESCRIPTION = `## Print settings
+
+Print **flat on the bed** with _no supports_. Set the wall count to \`3\` and it survives a drop.
+
+| Setting | Value |
+| --- | --- |
+| Layer height | 0.2mm |
+| Infill | 15% |
+
+### Assembly
+
+- Sand the hinge lightly
+- Test fit before gluing
+
+### Progress
+
+- [x] Model the hinge
+- [ ] Add a cable channel
+
+> The first revision snapped at the hinge. This one does not.
+
+\`\`\`gcode
+M104 S205 ; hotend
+\`\`\`
+
+Build log in [my notes](https://notes.example/phone-stand), or ~~the old page~~.
+
+![Hinge detail]({{baseUrl}}/src/assets/hero.png)
+
+Do not link [this](javascript:alert(1)) and do not load ![this](data:text/html,boom).
+
+<b data-testid="raw-html">raw html must not render</b>
+
+---
+
+Ampersands &amp; entities decode.
+`;
 
 /**
  * Objects in publication order, oldest first. The feed renders these newest first, so the
@@ -46,8 +99,15 @@ export const OBJECTS = [
     title: 'Adjustable Phone Stand',
     summary: 'A folding phone stand printable without supports.',
     topics: ['desk', 'phone-stand'],
+    description: MARKDOWN_DESCRIPTION,
   },
 ];
+
+/** The `.content` a fixture object is published with, per NIP.md's Markdown Content rules. */
+export function descriptionOf(object, baseUrl) {
+  const source = object.description ?? `${object.summary}\n\nPrint at 0.2mm layer height.`;
+  return source.replaceAll('{{baseUrl}}', baseUrl);
+}
 
 /**
  * Builds the signed fixture events.
@@ -113,7 +173,7 @@ export function buildFixtureEvents(baseUrl) {
           ['e', files[index].id, '', 'part'],
           ...object.topics.map((topic) => ['t', topic]),
         ],
-        content: `${object.summary}\n\nPrint at 0.2mm layer height.`,
+        content: descriptionOf(object, baseUrl),
       },
       SECRET_KEYS[object.maker],
     ),

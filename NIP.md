@@ -20,11 +20,32 @@ The design reuses existing Nostr primitives where possible:
 | `2351`  | Make                 | regular     |
 | `30050` | Printable Object Set | addressable |
 
+## Markdown Content
+
+The `.content` field of `kind:33500` printable objects and `kind:2351` makes is Markdown, as is the `.content` of the `kind:1063` file metadata events an object references.
+
+Content SHOULD be [CommonMark](https://spec.commonmark.org/). Clients MAY additionally support the [GitHub Flavored Markdown](https://github.github.com/gfm/) extensions for tables, task lists, strikethrough, and autolinks.
+
+Clients that render Markdown SHOULD support at least headings, paragraphs, emphasis, inline code, fenced code blocks, ordered and unordered lists, block quotes, links, images, and thematic breaks.
+
+This content is authored by arbitrary third parties and read by clients that may hold the reader's keys, so rendering it is a security boundary:
+
+- Clients MUST NOT render raw HTML embedded in `.content`. Inline and block HTML SHOULD be shown as literal text or dropped; it MUST NOT be inserted into the document.
+- Clients MUST refuse link and image destinations whose scheme is not `http`, `https`, `mailto`, or `nostr`. In particular, `javascript:` and `data:` destinations MUST NOT be rendered as links or loaded as images.
+- Clients SHOULD treat relative link and image destinations as invalid. An event has no base URL, so a relative destination resolves against the client's own origin rather than anything the author meant.
+- Clients MAY defer, proxy, or refuse remote images referenced from Markdown. Loading them directly discloses the reader's IP address to whatever host the author chose.
+
+Images embedded in `.content` are illustrations within the description. They are not part of the object's gallery: the ordered `imeta` tags defined below are the object's image set, and clients SHOULD NOT promote a Markdown image into it.
+
+Clients MAY render `nostr:` URIs and [NIP-21](https://github.com/nostr-protocol/nips/blob/master/21.md) entities as mentions. Clients that do not MUST render them as plain text.
+
+Clients that do not render Markdown SHOULD display `.content` as plain text.
+
 ## Printable Object
 
 A printable object is an addressable event of kind `33500`.
 
-Its `.content` field is a Markdown description of the object. It MAY include print instructions, assembly notes, attribution, changelogs, or any other human-readable information.
+Its `.content` field is a Markdown description of the object, as defined in [Markdown Content](#markdown-content). It MAY include print instructions, assembly notes, attribution, changelogs, or any other human-readable information.
 
 ```json
 {
@@ -179,7 +200,7 @@ Example NIP-94 part event:
 
 A make is a regular event of kind `2351`. It represents a user's print, build, remix attempt, or physical result for a printable object.
 
-Its `.content` field is Markdown and MAY include print settings, build notes, problems encountered, or a story about the make.
+Its `.content` field is Markdown, as defined in [Markdown Content](#markdown-content), and MAY include print settings, build notes, problems encountered, or a story about the make.
 
 Makes MUST reference the printable object with an `a` tag:
 
@@ -333,6 +354,8 @@ Find a user's printable object sets:
 ```
 
 ## Client Behavior
+
+Clients SHOULD render `.content` as Markdown, subject to the rules in [Markdown Content](#markdown-content).
 
 Clients SHOULD render the first image `imeta` tag on a printable object as the cover image.
 

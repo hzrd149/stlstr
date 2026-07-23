@@ -16,6 +16,7 @@
     "@napplet/sdk": "^0.24.4",
     "applesauce-common": "^6.2.0",
     "applesauce-core": "^6.2.0",
+    "marked": "^18.0.7",
     "svelte": "^5.56.4"
   },
   "devDependencies": {
