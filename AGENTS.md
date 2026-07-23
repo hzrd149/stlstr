@@ -37,6 +37,14 @@
 - Browser smoke tests are separate: `pnpm test:browser` requires a system Chromium or `PUPPETEER_EXECUTABLE_PATH`, writes the dev registry, builds `counter`, and serves the host on `127.0.0.1:5174` by default (`STLSTR_TEST_HOST` / `STLSTR_TEST_PORT` override it).
 - Formatting is Prettier via `pnpm format:check` / `pnpm format`; `pnpm-lock.yaml`, `dist`, `.turbo`, and napplet sidecar manifests are ignored by Prettier.
 
+## Publishing Napplets
+
+- **`pnpm deploy` is local-only, and the public one is `pnpm deploy:prod`.** The defaults are inverted on purpose: deploys sign with the user's real key, relay writes are append-only, and Blossom blobs are content-addressed, so a slip is not revocable. The short command every muscle memory reaches for is the safe one.
+- `pnpm deploy` and `pnpm deploy:dry` run `scripts/check-dev-target.mjs` first, which refuses unless every relay, Blossom server, and bunker relay in `.napplet/config.dev.json` resolves to loopback, and then checks each is actually listening. It fails closed on anything it cannot parse. The check is chained with `&&` rather than a `predeploy` hook because pnpm's `enable-pre-post-scripts` can be off, which would drop the guard silently.
+- `deploy` reaches only what its config names — `napplet deploy` publishes to `config.relays` and uploads to `config.blossomServers` with no NIP-65 or outbox expansion — so the config file is the entire blast radius.
+- `pnpm login` stores the secret in the OS keychain (libsecret `secret-tool` on Linux; needs a D-Bus session) and never writes it to the repo. It points `keys use` at `.napplet/config.dev.json` so logging in cannot quietly rewrite the production config; only the key _reference_ name is stored in config, never the secret.
+- The local targets are the dev relay on `ws://localhost:4869` and Blossom on `http://localhost:24242`. Both are assumed to be already running on this machine — tests and deploys depend on them rather than starting their own.
+
 ## Source Control
 
 - **Commit every finished feature.** As soon as a unit of work builds and its checks pass, commit it. Uncommitted work is the only work that can be lost, and this tree has already lost a day's worth once.
