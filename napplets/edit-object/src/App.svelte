@@ -4,11 +4,24 @@
     inc,
     intent,
     outbox,
+    resource,
     storage,
+    upload,
     type NostrEvent,
     type NostrTag,
   } from '@napplet/sdk';
   import { onMount } from 'svelte';
+
+  type UploadResult = Awaited<ReturnType<typeof upload.upload>>;
+  type ImageDraft = {
+    id: string;
+    url: string;
+    alt: string;
+    mime: string;
+    file: File | null;
+    previewUrl: string;
+    originalFields: string[];
+  };
 
   /**
    * Edit one printable object (`kind:33500`).
@@ -27,7 +40,16 @@
   const READY_TOPIC = 'edit-object:ready';
   const DRAFT_PREFIX = 'edit-object:draft:v1:';
   const CUSTOM_LICENSE = '__custom';
-  const MUTABLE_TAGS = new Set(['d', 'title', 'summary', 'published_at', 'license', 'i', 't']);
+  const MUTABLE_TAGS = new Set([
+    'd',
+    'title',
+    'summary',
+    'published_at',
+    'license',
+    'i',
+    't',
+    'imeta',
+  ]);
   const LICENSE_OPTIONS: Array<{ id: string; label: string }> = [
     { id: 'CC0-1.0', label: 'CC0 1.0 — public domain' },
     { id: 'CC-BY-4.0', label: 'CC BY 4.0 — credit required' },
@@ -48,6 +70,7 @@
   let tagsText = $state('');
   let sourceUrl = $state('');
   let description = $state('');
+  let images = $state<ImageDraft[]>([]);
   let owner = $state('');
   let address = $state('');
   let identifier = $state('');
@@ -59,6 +82,7 @@
   let originalEvent = $state.raw<NostrEvent | null>(null);
   let preservedTags = $state.raw<NostrTag[]>([]);
   let draftLoaded = $state(false);
+  let imageSequence = 0;
 
   /** An empty viewer means nobody is signed in, so the editor stays closed. */
   const isOwner = $derived(Boolean(viewer && owner && viewer === owner));
@@ -94,6 +118,14 @@
       typeof domain?.removeItem === 'function'
     );
   };
+  const hasUpload = () => {
+    const domain = napplets().upload as Partial<typeof upload> | undefined;
+    return typeof domain?.upload === 'function';
+  };
+  const hasResource = () => {
+    const domain = napplets().resource as Partial<typeof resource> | undefined;
+    return typeof domain?.bytes === 'function';
+  };
 
   function tagValue(tags: string[][], name: string): string {
     return tags.find((tag) => tag[0] === name)?.[1]?.trim() ?? '';
@@ -106,6 +138,40 @@
       .filter(Boolean);
   }
 
+  function parseImetaField(entry: string): [string, string] | null {
+    const separator = entry.indexOf(' ');
+    if (separator < 1) return null;
+    return [entry.slice(0, separator), entry.slice(separator + 1).trim()];
+  }
+
+  function imetaValue(fields: string[], name: string): string {
+    for (const entry of fields) {
+      const parsed = parseImetaField(entry);
+      if (parsed?.[0] === name) return parsed[1];
+    }
+    return '';
+  }
+
+  function parseImageTags(tags: string[][]): ImageDraft[] {
+    return tags
+      .filter((tag) => tag[0] === 'imeta')
+      .map((tag, index) => {
+        const fields = tag.slice(1);
+        const url = imetaValue(fields, 'url');
+        if (!url) return null;
+        return {
+          id: `existing:${index}:${url}`,
+          url,
+          alt: imetaValue(fields, 'alt'),
+          mime: imetaValue(fields, 'm'),
+          file: null,
+          previewUrl: '',
+          originalFields: fields,
+        };
+      })
+      .filter((image): image is ImageDraft => image !== null);
+  }
+
   function buildTopicTags(): string[] {
     return tagsText
       .split(/[\n,]/)
@@ -115,6 +181,92 @@
 
   function appendTag(tags: NostrTag[], tag: NostrTag | null): void {
     if (tag) tags.push(tag);
+  }
+
+  function revokePreview(url: string): void {
+    if (url) URL.revokeObjectURL(url);
+  }
+
+  function resetImages(next: ImageDraft[]): void {
+    for (const image of images) revokePreview(image.previewUrl);
+    images = next;
+  }
+
+  async function loadImagePreview(image: ImageDraft): Promise<void> {
+    if (!image.url || image.file || !hasResource()) return;
+
+    try {
+      const blob = await resource.bytes(image.url);
+      if (!blob.type.startsWith('image/')) return;
+      const previewUrl = URL.createObjectURL(blob);
+      const previous = images.find((candidate) => candidate.id === image.id)?.previewUrl ?? '';
+      if (!images.some((candidate) => candidate.id === image.id)) {
+        revokePreview(previewUrl);
+        return;
+      }
+      images = images.map((candidate) =>
+        candidate.id === image.id ? { ...candidate, previewUrl } : candidate,
+      );
+      revokePreview(previous);
+    } catch {
+      // A blocked or unavailable preview should not prevent metadata editing.
+    }
+  }
+
+  function loadImagePreviews(): void {
+    for (const image of images) void loadImagePreview(image);
+  }
+
+  function addImageFiles(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    const selected = Array.from(input.files ?? []).filter((file) => file.type.startsWith('image/'));
+    if (selected.length === 0) {
+      status = 'Choose image files to add to the object.';
+      return;
+    }
+
+    const next = selected.map((file) => ({
+      id: `new:${file.name}:${file.size}:${file.lastModified}:${imageSequence++}`,
+      url: '',
+      alt: file.name,
+      mime: file.type,
+      file,
+      previewUrl: URL.createObjectURL(file),
+      originalFields: [],
+    }));
+    images = [...images, ...next];
+    input.value = '';
+    status = `${selected.length} image${selected.length === 1 ? '' : 's'} added.`;
+  }
+
+  function removeImage(id: string): void {
+    const removed = images.find((image) => image.id === id);
+    revokePreview(removed?.previewUrl ?? '');
+    images = images.filter((image) => image.id !== id);
+  }
+
+  function moveImage(id: string, offset: number): void {
+    const from = images.findIndex((image) => image.id === id);
+    const to = from + offset;
+    if (from < 0 || to < 0 || to >= images.length) return;
+    const next = [...images];
+    const [image] = next.splice(from, 1);
+    next.splice(to, 0, image);
+    images = next;
+  }
+
+  function makeCover(id: string): void {
+    const selected = images.find((image) => image.id === id);
+    if (!selected) return;
+    images = [selected, ...images.filter((image) => image.id !== id)];
+  }
+
+  function setImageAlt(id: string, value: string): void {
+    images = images.map((image) => (image.id === id ? { ...image, alt: value } : image));
+  }
+
+  function imageDraftTags(): string[][] {
+    return images.filter((image) => !image.file).map((image) => buildExistingImeta(image));
   }
 
   function onLicenseChange(event: Event): void {
@@ -136,9 +288,18 @@
 
     await storage.setItem(
       draftKey(),
-      JSON.stringify({ title, summary, description, license, customLicense, tagsText, sourceUrl }),
+      JSON.stringify({
+        title,
+        summary,
+        description,
+        license,
+        customLicense,
+        tagsText,
+        sourceUrl,
+        images: imageDraftTags(),
+      }),
     );
-    status = 'Saved this edit draft.';
+    status = 'Saved this edit draft. New image files must be reselected before publishing.';
   }
 
   async function loadDraft(): Promise<void> {
@@ -155,6 +316,7 @@
         customLicense: boolean;
         tagsText: string;
         sourceUrl: string;
+        images: string[][];
       }>;
       title = draft.title ?? title;
       summary = draft.summary ?? summary;
@@ -164,6 +326,10 @@
         draft.customLicense ?? !LICENSE_OPTIONS.some((option) => option.id === license);
       tagsText = draft.tagsText ?? tagsText;
       sourceUrl = draft.sourceUrl ?? sourceUrl;
+      if (Array.isArray(draft.images)) {
+        resetImages(parseImageTags(draft.images));
+        loadImagePreviews();
+      }
       draftLoaded = true;
       status = 'Loaded a saved edit draft.';
     } catch {
@@ -211,6 +377,7 @@
       tagsText = tagValues(newest.tags, 't').join(', ');
       sourceUrl = tagValue(newest.tags, 'i');
       description = newest.content;
+      resetImages(parseImageTags(newest.tags));
       // The event's author is the owner — never the pubkey the payload asked for.
       owner = newest.pubkey;
       identifier = requestedIdentifier;
@@ -219,6 +386,7 @@
       preservedTags = newest.tags.filter((tag) => !MUTABLE_TAGS.has(tag[0])) as NostrTag[];
       loaded = true;
       status = '';
+      loadImagePreviews();
       await loadDraft();
     } catch (error) {
       status = error instanceof Error ? error.message : 'Could not load this object.';
@@ -259,6 +427,75 @@
     return tags;
   }
 
+  function uploadResultToNip94(result: UploadResult, file: File): NostrTag[] {
+    if (Array.isArray(result.nip94) && result.nip94.length > 0) return result.nip94;
+
+    const tags: NostrTag[] = [];
+    appendTag(tags, result.url ? ['url', result.url] : null);
+    appendTag(tags, ['m', result.mimeType ?? file.type ?? 'application/octet-stream']);
+    appendTag(tags, result.sha256 ? ['x', result.sha256] : null);
+    appendTag(tags, result.originalSha256 ? ['ox', result.originalSha256] : null);
+    appendTag(tags, result.size != null ? ['size', String(result.size)] : null);
+    if (result.dimensions)
+      tags.push(['dim', `${result.dimensions.width}x${result.dimensions.height}`]);
+    for (const fallbackUrl of result.fallbackUrls ?? []) tags.push(['fallback', fallbackUrl]);
+    return tags;
+  }
+
+  function uploadResultToImeta(result: UploadResult, image: ImageDraft): NostrTag {
+    if (!image.file) return buildExistingImeta(image);
+
+    const fields = uploadResultToNip94(result, image.file)
+      .filter(([name]) => name !== 'ox')
+      .map(([name, value]) => `${name} ${value}`);
+
+    if (result.blurhash) fields.push(`blurhash ${result.blurhash}`);
+    fields.push(`alt ${image.alt.trim() || image.file.name}`);
+    return ['imeta', ...fields];
+  }
+
+  function buildExistingImeta(image: ImageDraft): NostrTag {
+    const fields = image.originalFields.filter((entry) => {
+      const parsed = parseImetaField(entry);
+      return parsed?.[0] !== 'alt';
+    });
+
+    if (!fields.some((entry) => parseImetaField(entry)?.[0] === 'url') && image.url) {
+      fields.push(`url ${image.url}`);
+    }
+    if (!fields.some((entry) => parseImetaField(entry)?.[0] === 'm') && image.mime) {
+      fields.push(`m ${image.mime}`);
+    }
+    if (image.alt.trim()) fields.push(`alt ${image.alt.trim()}`);
+    return ['imeta', ...fields];
+  }
+
+  async function uploadImage(image: ImageDraft): Promise<NostrTag> {
+    if (!image.file) return buildExistingImeta(image);
+    if (!hasUpload()) throw new Error('This shell does not provide image uploads.');
+
+    status = `Uploading ${image.file.name}...`;
+    const result = await upload.upload({
+      data: image.file,
+      filename: image.file.name,
+      mimeType: image.file.type || undefined,
+      caption: image.alt.trim() || image.file.name,
+    });
+
+    if (!result.ok || result.status === 'failed' || result.status === 'cancelled') {
+      throw new Error(result.error ?? `Upload failed for ${image.file.name}`);
+    }
+    if (!result.url) throw new Error(`Upload did not return a URL for ${image.file.name}`);
+    return uploadResultToImeta(result, image);
+  }
+
+  async function buildReplacementTagsWithImages(): Promise<NostrTag[]> {
+    const tags = buildReplacementTags();
+    const imageTags: NostrTag[] = [];
+    for (const image of images) imageTags.push(await uploadImage(image));
+    return [...tags.slice(0, 3), ...imageTags, ...tags.slice(3)];
+  }
+
   async function publishReplacement(): Promise<void> {
     if (!loaded || !isOwner || !originalEvent) return;
 
@@ -272,6 +509,10 @@
       status = 'Add a description before publishing.';
       return;
     }
+    if (images.length === 0) {
+      status = 'Add at least one image. The first image is the cover.';
+      return;
+    }
 
     busy = true;
     publishedAddress = '';
@@ -281,7 +522,7 @@
       const published = await outbox.publish({
         kind: 33500,
         content: nextDescription,
-        tags: buildReplacementTags(),
+        tags: await buildReplacementTagsWithImages(),
         created_at: Math.floor(Date.now() / 1000),
       });
 
@@ -294,6 +535,8 @@
       }
 
       originalEvent = published.event;
+      resetImages(parseImageTags(published.event.tags));
+      loadImagePreviews();
       preservedTags = published.event.tags.filter((tag) => !MUTABLE_TAGS.has(tag[0])) as NostrTag[];
       publishedAddress = `33500:${published.event.pubkey}:${identifier}`;
       address = publishedAddress;
@@ -336,6 +579,7 @@
     return () => {
       subscription.unsubscribe();
       identitySubscription?.unsubscribe();
+      for (const image of images) revokePreview(image.previewUrl);
     };
   });
 </script>
@@ -431,9 +675,123 @@
           />
         </label>
 
+        <section class="grid gap-3" aria-label="Object images">
+          <div>
+            <h2 class="text-sm font-medium">Images</h2>
+            <p class="text-sm text-base-content/70">
+              Images publish as ordered imeta tags. The first image is the object cover.
+            </p>
+          </div>
+
+          <label class="fieldset">
+            <span class="fieldset-legend">Add gallery images</span>
+            <input
+              class="file-input w-full"
+              type="file"
+              accept="image/*"
+              multiple
+              onchange={addImageFiles}
+              disabled={busy}
+            />
+            <span class="fieldset-label">
+              New files upload when you publish. Existing images are reused unless removed.
+            </span>
+          </label>
+
+          {#if images.length > 0}
+            <ol class="grid gap-3">
+              {#each images as image, index (image.id)}
+                <li class="grid gap-3 rounded-box bg-base-200 p-3 md:grid-cols-[8rem_1fr_auto]">
+                  <div class="aspect-video overflow-hidden rounded-box bg-base-300">
+                    {#if image.previewUrl}
+                      <img
+                        src={image.previewUrl}
+                        alt={image.alt || title || `Object image ${index + 1}`}
+                        class="h-full w-full object-cover"
+                      />
+                    {:else}
+                      <div
+                        class="grid h-full place-items-center px-3 text-center text-xs text-base-content/60"
+                      >
+                        Preview unavailable
+                      </div>
+                    {/if}
+                  </div>
+
+                  <div class="grid gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="badge" class:badge-primary={index === 0}>
+                        {index === 0 ? 'Cover' : `Image ${index + 1}`}
+                      </span>
+                      <span class="text-xs text-base-content/60">
+                        {image.file
+                          ? `${image.file.name} · ${Math.round(image.file.size / 1024)} KB`
+                          : image.url}
+                      </span>
+                    </div>
+                    <label class="fieldset py-0">
+                      <span class="fieldset-legend">Alt text</span>
+                      <input
+                        class="input input-sm w-full"
+                        value={image.alt}
+                        placeholder="Short image description"
+                        oninput={(event) =>
+                          setImageAlt(image.id, (event.currentTarget as HTMLInputElement).value)}
+                        disabled={busy}
+                      />
+                    </label>
+                  </div>
+
+                  <div class="flex flex-wrap gap-2 md:flex-col">
+                    {#if index !== 0}
+                      <button
+                        type="button"
+                        class="btn btn-outline btn-sm"
+                        onclick={() => makeCover(image.id)}
+                        disabled={busy}
+                      >
+                        Make cover
+                      </button>
+                    {/if}
+                    <button
+                      type="button"
+                      class="btn btn-outline btn-sm"
+                      onclick={() => moveImage(image.id, -1)}
+                      disabled={busy || index === 0}
+                    >
+                      Up
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline btn-sm"
+                      onclick={() => moveImage(image.id, 1)}
+                      disabled={busy || index === images.length - 1}
+                    >
+                      Down
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-error btn-outline btn-sm"
+                      onclick={() => removeImage(image.id)}
+                      disabled={busy}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              {/each}
+            </ol>
+          {:else}
+            <div class="alert">
+              <span
+                >Add at least one image before publishing. The first image becomes the cover.</span
+              >
+            </div>
+          {/if}
+        </section>
+
         <div class="rounded-box bg-base-200 p-3 text-sm text-base-content/70">
-          Existing images, file references, remixes, and other non-edit metadata are preserved in
-          this version. Image and file management is the next build step.
+          File references, remixes, and other non-edit metadata are preserved in this version.
         </div>
 
         {#if publishedAddress}
