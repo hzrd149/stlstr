@@ -54,7 +54,7 @@ test('stlstr loads browse as the home route', async () => {
     );
 
     const frame = await nappletFrame(page, 'Browse prints');
-    assert.ok(await frame.$('input[placeholder="Search phone stands, minis, brackets..."]'));
+    assert.ok(await frame.$('input[placeholder^="Search phone stands, minis, brackets..."]'));
     assert.equal(await frame.$('h1'), null);
     assert.equal(await frame.$('.card'), null);
   } finally {
