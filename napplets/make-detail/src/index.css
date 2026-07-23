@@ -1,4 +1,10 @@
 @import 'tailwindcss';
+
+/* Scan shared @stlstr/napplet-kit components so classes used only inside them (e.g.
+   object-cover/object-contain in GalleryImage) are generated. Resolved through the
+   package dependency, not a path across the workspace. */
+@source "../node_modules/@stlstr/napplet-kit/src";
+
 @plugin "daisyui" {
   themes:
     light --default,

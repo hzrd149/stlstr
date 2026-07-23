@@ -2,8 +2,9 @@
 
 /* Tailwind only scans this napplet's own source by default, so utility classes used
    solely inside shared @stlstr/napplet-kit components (e.g. object-cover/object-contain
-   in GalleryImage) would never be generated. Scan the kit too. */
-@source "../../../lib/napplet-kit/src";
+   in GalleryImage) would never be generated. Scan the kit through its resolved package
+   dependency, not a path across the workspace. */
+@source "../node_modules/@stlstr/napplet-kit/src";
 
 @plugin "daisyui" {
   themes:
