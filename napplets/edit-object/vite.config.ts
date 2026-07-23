@@ -9,7 +9,11 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'edit-object',
-      requires: ['outbox', 'inc', 'identity', 'upload', 'resource'],
+      // `intent` sends the user to the object after a successful save; `storage`
+      // keeps the unsaved draft. Both stay optional at runtime (guarded via
+      // `napplets().intent` / `.storage`), but the shell grants exactly this list,
+      // so leaving them out is what makes the feature dead rather than degraded.
+      requires: ['outbox', 'inc', 'identity', 'upload', 'resource', 'intent', 'storage'],
       artifactMode: 'single-file',
       archetypes: [{ slug: 'edit-object', naps: ['outbox', 'identity', 'upload', 'resource'] }],
     }),
