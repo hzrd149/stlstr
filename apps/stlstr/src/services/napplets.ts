@@ -44,12 +44,6 @@ export const NAPPLET_PUBLISH_RELAYS = [
   'wss://nos.lol',
 ];
 
-/** The `kind:pubkey:dTag` address of a published built-in napplet, or null if unconfigured. */
-export function publishedNappletAddress(dTag: string): string | null {
-  if (!NAPPLET_PUBLISHER_PUBKEY) return null;
-  return `${NIP5A_KIND}:${NAPPLET_PUBLISHER_PUBKEY}:${dTag}`;
-}
-
 /** The shareable `naddr` for a published built-in napplet, or null if unconfigured. */
 export function publishedNappletNaddr(dTag: string): string | null {
   if (!NAPPLET_PUBLISHER_PUBKEY) return null;

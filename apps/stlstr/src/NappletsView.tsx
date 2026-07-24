@@ -21,7 +21,6 @@ import {
 } from './services/intent-map';
 import {
   NAPPLET_PUBLISHER_PUBKEY,
-  publishedNappletAddress,
   publishedNappletNaddr,
 } from './services/napplets';
 
@@ -78,7 +77,7 @@ type ArchetypeRow = {
   intents: Array<[string, IntentDoc]>;
   /** True when a napplet is actually built and deployed for this archetype. */
   published: boolean;
-  address: string | null;
+  naddr: string | null;
 };
 
 /**
@@ -96,7 +95,7 @@ function archetypeRows(): ArchetypeRow[] {
         entry,
         intents: Object.entries(entry.intents),
         published,
-        address: published ? publishedNappletAddress(entry.dTag) : null,
+        naddr: published ? publishedNappletNaddr(entry.dTag) : null,
       };
     })
     .sort((a, b) => {
@@ -205,8 +204,8 @@ function Showcase({ copied, onCopy }: { copied: string | null; onCopy: (value: s
         <p className="max-w-2xl text-base text-base-content/70">
           STLstr is built from small, sandboxed napplets — and it publishes every one of them for
           other Nostr apps to embed. Drop a maker profile, a 3D preview, or the whole printable feed
-          into your own app without rebuilding any of it. Copy a napplet&rsquo;s address, or open it
-          straight away in Paja.
+          into your own app without rebuilding any of it. Copy a napplet&rsquo;s naddr or archetype, or
+          open it straight away in Paja.
         </p>
       </header>
 
@@ -225,9 +224,6 @@ function Showcase({ copied, onCopy }: { copied: string | null; onCopy: (value: s
               >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold">{entry.title}</h3>
-                  <span className="badge badge-ghost badge-sm shrink-0 font-mono">
-                    {entry.dTag}
-                  </span>
                 </div>
                 <p className="text-sm text-base-content/65">{entry.description}</p>
 
@@ -300,7 +296,7 @@ function IntentDetail({ convention, doc }: { convention: string; doc: IntentDoc 
   );
 }
 
-/** One archetype's full definition: what it is, its address, and every intent it accepts. */
+/** One archetype's full definition: what it is, its naddr, and every intent it accepts. */
 function ArchetypeSection({
   row,
   copied,
@@ -310,14 +306,13 @@ function ArchetypeSection({
   copied: string | null;
   onCopy: (value: string) => void;
 }) {
-  const { archetype, entry, intents, published, address } = row;
+  const { archetype, entry, intents, published, naddr } = row;
 
   return (
     <article className="grid gap-4 rounded-box bg-base-100 p-5 ring-1 ring-base-300/70">
       <header className="grid gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-mono text-lg font-semibold">{archetype}</h3>
-          <span className="badge badge-ghost badge-sm font-mono">{entry.dTag}</span>
           {published ? (
             <span className="badge badge-success badge-sm badge-outline">published</span>
           ) : (
@@ -325,13 +320,21 @@ function ArchetypeSection({
           )}
         </div>
         <p className="max-w-2xl text-base text-base-content/70">{entry.description}</p>
-        {address ? (
+        {naddr ? (
           <div className="max-w-xl pt-1">
             <CopyField
-              label="Address"
-              value={address}
-              copied={copied === address}
+              label="naddr"
+              value={naddr}
+              copied={copied === naddr}
               onCopy={onCopy}
+              action={
+                <CopyChip
+                  value={archetype}
+                  copied={copied === archetype}
+                  onCopy={onCopy}
+                  title="Copy archetype"
+                />
+              }
             />
           </div>
         ) : (
@@ -373,16 +376,14 @@ function ArchetypeReference({
         <p className="max-w-2xl text-base text-base-content/65">
           An archetype is the interoperable role another runtime targets with NAP-INTENT — the
           contract, not the implementation. Each defines the intents it accepts and the payload
-          shape each intent reads. Grant a napplet those intents, then open it by its{' '}
-          <code className="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">kind:pubkey:d</code>{' '}
-          address.
+          shape each intent reads. Grant a napplet those intents, then open it by its naddr.
         </p>
       </header>
 
       {!configured && (
         <div className="alert alert-info text-sm">
           <span>
-            This build has no publishing identity configured, so copyable addresses are hidden. The
+            This build has no publishing identity configured, so copyable naddrs are hidden. The
             archetypes and intents below are still accurate.
           </span>
         </div>
