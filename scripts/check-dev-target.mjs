@@ -2,7 +2,7 @@
 /**
  * Preflight for local napplet deploys.
  *
- * `pnpm deploy` signs with the user's real key. The only thing standing between a
+ * `pnpm napplet:deploy` signs with the user's real key. The only thing standing between a
  * local test publish and a permanent public one is which config file the CLI reads,
  * so this asserts the dev config cannot reach off-machine before the key is touched.
  *
@@ -80,7 +80,7 @@ if (offMachine.length > 0) {
   console.error(`[deploy] ${CONFIG_PATH} targets hosts outside this machine:\n`);
   for (const [field, url] of offMachine) console.error(`  ${field}: ${url}`);
   console.error('\nRefusing to deploy. Local deploys must stay on loopback.');
-  console.error('To publish publicly on purpose, use `pnpm deploy:prod`.');
+  console.error('To publish publicly on purpose, use `pnpm napplet:deploy:prod`.');
   process.exit(1);
 }
 

@@ -10,13 +10,29 @@ import { getLookupRelays, getSettings, type NappletOverride } from './settings';
 const NIP5A_KIND = 35129;
 const MANIFEST_TIMEOUT_MS = 5_000;
 
-type DevNapplet = {
+/**
+ * Where the shell finds the built-in napplet artifacts it ships as archetype
+ * defaults. In dev, the Vite server serves each napplet's live `dist/` at
+ * `/napplets.dev/<dTag>/` and generates `/napplets.dev.json`. In a production
+ * build, the napplet bundle plugin (apps/stlstr/vite.config.ts) copies each
+ * artifact to `/napplets/<dTag>/` and emits `/napplets.json`. The two are
+ * symmetric so the same default-resolution code path works in both.
+ */
+const NAPPLET_ASSET_BASE = STLSTR_DEV_MODE ? '/napplets.dev' : '/napplets';
+const NAPPLET_REGISTRY_URL = STLSTR_DEV_MODE ? '/napplets.dev.json' : '/napplets.json';
+
+/** The same-origin URL of a built-in napplet's default artifact for a dTag. */
+function defaultArtifactUrl(dTag: string): string {
+  return `${NAPPLET_ASSET_BASE}/${dTag}/index.html`;
+}
+
+type RegistryNapplet = {
   name: string;
   url: string;
 };
 
-type DevRegistry = {
-  napplets?: DevNapplet[];
+type NappletRegistry = {
+  napplets?: RegistryNapplet[];
 };
 
 export type ResolvedNapplet = {
@@ -47,7 +63,8 @@ function tagValue(event: NostrEvent, name: string): string | undefined {
 function hasCompatibleArchetype(event: NostrEvent, archetype: string): boolean {
   const protocols = conventionsFor(archetype);
   return event.tags.some(
-    (tag) => tag[0] === 'archetype' && tag[1] === archetype && protocols.some((p) => tag.includes(p)),
+    (tag) =>
+      tag[0] === 'archetype' && tag[1] === archetype && protocols.some((p) => tag.includes(p)),
   );
 }
 
@@ -93,11 +110,13 @@ function resolvedFromManifest(
 ): ResolvedNapplet {
   const dTag = tagValue(manifest, 'd');
   const aggregateHash =
-    manifest.tags.find((tag) => tag[0] === 'x' && tag[2] === 'aggregate')?.[1] ?? tagValue(manifest, 'x');
+    manifest.tags.find((tag) => tag[0] === 'x' && tag[2] === 'aggregate')?.[1] ??
+    tagValue(manifest, 'x');
   const artifactUrl = artifactUrlFrom(manifest);
   if (!dTag) throw new Error('That napplet manifest does not include a d tag.');
   if (!aggregateHash) throw new Error('That napplet manifest does not include an aggregate hash.');
-  if (!artifactUrl) throw new Error('That napplet manifest does not include a loadable artifact URL.');
+  if (!artifactUrl)
+    throw new Error('That napplet manifest does not include a loadable artifact URL.');
 
   return {
     archetype,
@@ -116,12 +135,12 @@ function resolvedFromManifest(
   };
 }
 
-async function resolveDevNappletUrl(name: string, fallbackUrl: string): Promise<string> {
+async function resolveRegistryNappletUrl(name: string, fallbackUrl: string): Promise<string> {
   try {
-    const response = await fetch('/napplets.dev.json', { cache: 'no-store' });
+    const response = await fetch(NAPPLET_REGISTRY_URL, { cache: 'no-store' });
     if (!response.ok) return fallbackUrl;
 
-    const registry = (await response.json()) as DevRegistry;
+    const registry = (await response.json()) as NappletRegistry;
     return registry.napplets?.find((napplet) => napplet.name === name)?.url ?? fallbackUrl;
   } catch {
     return fallbackUrl;
@@ -147,7 +166,9 @@ async function fetchManifest(
   identifier: string,
   relays: string[],
 ): Promise<NostrEvent | null> {
-  const filters: Filter[] = [{ kinds: [NIP5A_KIND], authors: [pubkey], '#d': [identifier], limit: 1 }];
+  const filters: Filter[] = [
+    { kinds: [NIP5A_KIND], authors: [pubkey], '#d': [identifier], limit: 1 },
+  ];
   const candidates = await collectRequest(relays, filters, MANIFEST_TIMEOUT_MS);
 
   return candidates.sort((a, b) => b.created_at - a.created_at)[0] ?? null;
@@ -163,7 +184,7 @@ export function defaultNappletForArchetype(archetype: string): ResolvedNapplet |
     title: entry.title,
     description: entry.description,
     aggregateHash: `dev-${entry.dTag}-build`,
-    artifactUrl: `/napplets.dev/${entry.dTag}/index.html`,
+    artifactUrl: defaultArtifactUrl(entry.dTag),
     protocols: conventionsFor(archetype),
     source: 'default',
   };
@@ -194,7 +215,8 @@ export async function resolveNappletNaddr(
   if (decoded.type !== 'naddr') throw new Error('Paste a Nostr naddr for a napplet manifest.');
 
   const pointer = decoded.data;
-  if (pointer.kind !== NIP5A_KIND) throw new Error('That naddr does not point to a NIP-5A napplet.');
+  if (pointer.kind !== NIP5A_KIND)
+    throw new Error('That naddr does not point to a NIP-5A napplet.');
 
   const relays = mergeRelaySets([...(pointer.relays ?? []), ...getLookupRelays()]);
   const manifest = await fetchManifest(pointer.pubkey, pointer.identifier, relays);
@@ -217,7 +239,12 @@ export async function discoverCompatibleNapplets(archetype: string): Promise<Res
     seen.add(key);
 
     try {
-      const naddr = nip19.naddrEncode({ identifier: dTag, pubkey: event.pubkey, kind: NIP5A_KIND, relays });
+      const naddr = nip19.naddrEncode({
+        identifier: dTag,
+        pubkey: event.pubkey,
+        kind: NIP5A_KIND,
+        relays,
+      });
       resolved.push(resolvedFromManifest(event, archetype, naddr, relays));
     } catch {
       // Skip incomplete or not-yet-loadable manifests in discovery results.
@@ -252,10 +279,10 @@ export function resolveConfiguredNapplet(archetype: string): ResolvedNapplet | n
 }
 
 export async function loadNappletArtifact(napplet: ResolvedNapplet): Promise<LoadedNapplet> {
-  const fallbackUrl = `/napplets.dev/${napplet.dTag}/index.html`;
+  const fallbackUrl = defaultArtifactUrl(napplet.dTag);
   const url =
     napplet.source === 'default'
-      ? await resolveDevNappletUrl(napplet.dTag, fallbackUrl)
+      ? await resolveRegistryNappletUrl(napplet.dTag, fallbackUrl)
       : napplet.artifactUrl;
   if (!url) throw new Error(`${napplet.title} does not have a loadable artifact URL.`);
 
@@ -263,7 +290,9 @@ export async function loadNappletArtifact(napplet: ResolvedNapplet): Promise<Loa
   if (!response.ok) {
     throw new Error(
       napplet.source === 'default'
-        ? `Build ${napplet.dTag} first: ${response.status} ${response.statusText}`
+        ? STLSTR_DEV_MODE
+          ? `Build ${napplet.dTag} first: ${response.status} ${response.statusText}`
+          : `Built-in napplet ${napplet.dTag} is missing from this deployment: ${response.status} ${response.statusText}`
         : `Could not load ${napplet.title}: ${response.status} ${response.statusText}`,
     );
   }

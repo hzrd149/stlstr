@@ -199,7 +199,7 @@ console.error(`  app:      ${appUrl}`);
 console.error(`  registry: ${appUrl}/napplets.dev.json`);
 if (runPaja) console.error(`  paja:     ${pajaUrl} -> ${appUrl}`);
 if (napplets.length === 0) {
-  console.error('  napplets: none (scaffold one with `pnpm new <name>`)');
+  console.error('  napplets: none (scaffold one with `pnpm napplet:new <name>`)');
 } else {
   console.error('  napplets (build --watch -> same-origin dist URLs):');
   for (const napplet of napplets) {

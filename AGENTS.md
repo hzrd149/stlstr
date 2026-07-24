@@ -30,7 +30,8 @@
 - Install with `pnpm install`; `pnpm-workspace.yaml` intentionally allows only `esbuild` postinstall builds and disables Puppeteer's browser download.
 - Full local dev is `pnpm dev`: starts `@apps/stlstr` on `127.0.0.1:5173`, builds every napplet with `vite build --watch`, writes `apps/stlstr/public/napplets.dev.json`, and starts Kehto Paja on `127.0.0.1:5197`.
 - Use `pnpm dev --no-paja` for host + napplet build-watch only. Dev ports can be overridden with `--host`, `--app-port`, `--paja-port` or `STLSTR_DEV_HOST`, `STLSTR_APP_PORT`, `STLSTR_PAJA_PORT`, `STLSTR_NO_PAJA=1`.
-- Root `pnpm build` only builds napplets. Build the host with `pnpm build:app` or `pnpm --filter @apps/stlstr build`.
+- Scripts are namespaced `app:*` (host app, deployed as an nsyte static site) and `napplet:*` (napplets, deployed to Nostr/Blossom via the napplet CLI); `dev`, `verify`, `test`, `type-check`, and `format` stay unprefixed.
+- Root `pnpm napplet:build` only builds napplets. `pnpm app:build` builds the napplets first, then the host, and bundles every built-in napplet artifact into `apps/stlstr/dist/napplets/<dTag>/` with a `napplets.json` registry (see the bundle plugin in `apps/stlstr/vite.config.ts`). For host-only iteration use `pnpm --filter @apps/stlstr build` (expects `napplets/*/dist` to already exist).
 - Focused napplet verification: `pnpm --filter stl-preview verify` or `pnpm --filter part-detail verify`; conformance: `pnpm --filter stl-preview test:conformance`.
 - Root verification: `pnpm verify` runs `pnpm test`, then turbo `type-check` and `build` for `napplets/*` and `lib/*`; it does not build/lint the host app.
 - Host lint/build checks are separate: `pnpm --filter @apps/stlstr lint` and `pnpm --filter @apps/stlstr build`.
@@ -39,10 +40,12 @@
 
 ## Publishing Napplets
 
-- **`pnpm deploy` is local-only, and the public one is `pnpm deploy:prod`.** The defaults are inverted on purpose: deploys sign with the user's real key, relay writes are append-only, and Blossom blobs are content-addressed, so a slip is not revocable. The short command every muscle memory reaches for is the safe one.
-- `pnpm deploy` and `pnpm deploy:dry` run `scripts/check-dev-target.mjs` first, which refuses unless every relay, Blossom server, and bunker relay in `.napplet/config.dev.json` resolves to loopback, and then checks each is actually listening. It fails closed on anything it cannot parse. The check is chained with `&&` rather than a `predeploy` hook because pnpm's `enable-pre-post-scripts` can be off, which would drop the guard silently.
-- `deploy` reaches only what its config names — `napplet deploy` publishes to `config.relays` and uploads to `config.blossomServers` with no NIP-65 or outbox expansion — so the config file is the entire blast radius.
-- `pnpm login` stores the secret in the OS keychain (libsecret `secret-tool` on Linux; needs a D-Bus session) and never writes it to the repo. It points `keys use` at `.napplet/config.dev.json` so logging in cannot quietly rewrite the production config; only the key _reference_ name is stored in config, never the secret.
+- This section is about publishing the napplets themselves (`napplet:*`), which is independent of deploying the host app (`pnpm app:deploy`, an nsyte static-site deploy of `apps/stlstr/dist`).
+- **`pnpm napplet:deploy` is local-only, and the public one is `pnpm napplet:deploy:prod`.** The defaults are inverted on purpose: deploys sign with the user's real key, relay writes are append-only, and Blossom blobs are content-addressed, so a slip is not revocable. The short command every muscle memory reaches for is the safe one.
+- `pnpm napplet:deploy` and `pnpm napplet:deploy:dry` run `scripts/check-dev-target.mjs` first, which refuses unless every relay, Blossom server, and bunker relay in `.napplet/config.dev.json` resolves to loopback, and then checks each is actually listening. It fails closed on anything it cannot parse. The check is chained with `&&` rather than a `predeploy` hook because pnpm's `enable-pre-post-scripts` can be off, which would drop the guard silently.
+- `napplet:deploy` reaches only what its config names — `napplet deploy` publishes to `config.relays` and uploads to `config.blossomServers` with no NIP-65 or outbox expansion — so the config file is the entire blast radius.
+- **Signing identity is the config's `signing.keyReference`, resolved at deploy time — `.napplet/config.json` (prod) references `hzrd149`, `.napplet/config.dev.json` (local) references the throwaway `stlstr` key.** `napplet deploy` re-signs the manifest event with the resolved signer; the build-time `.nip5a-manifest.json` (signed with `VITE_DEV_PRIVKEY_HEX`, the deadbeef dev default) is a local artifact for conformance/aggregate-hash only and never determines the published pubkey. So a prod build does not need the real key — only the prod deploy does.
+- `pnpm napplet:login` stores a secret in the OS keychain (libsecret `secret-tool` on Linux; needs a D-Bus session) under the `stlstr` reference and points `keys use` at `.napplet/config.dev.json`; `pnpm napplet:login:prod` does the same under the `hzrd149` reference against `.napplet/config.json`. Both keep the key out of the repo — only the key _reference_ name is stored in config, never the secret — and the split reference names stop a dev login from quietly rewriting the production signer. Sign out with `pnpm napplet:logout` / `pnpm napplet:logout:prod`.
 - The local targets are the dev relay on `ws://localhost:4869` and Blossom on `http://localhost:24242`. Both are assumed to be already running on this machine — tests and deploys depend on them rather than starting their own.
 
 ## Source Control
@@ -56,7 +59,7 @@
 
 ## Napplet Workflow
 
-- Scaffold new napplets with `pnpm new <name> ["Display Title"] [-- <generator flags>]`; this wraps `npx @napplet/boilerplate` and then `scripts/lib/adopt.mjs` normalizes the package for this monorepo.
+- Scaffold new napplets with `pnpm napplet:new <name> ["Display Title"] [-- <generator flags>]`; this wraps `npx @napplet/boilerplate` and then `scripts/lib/adopt.mjs` normalizes the package for this monorepo.
 - Napplet folder names double as deploy `d` tags; `adopt.mjs` warns if names are not lowercase/digit/hyphen and at most 13 chars.
 - Do not add app-owned `@napplet/shim` imports in napplets. Kehto injects `window.napplet`; napplet app code should use `@napplet/sdk`.
 - Napplet `vite.config.ts` must declare every used NAP in `nip5aManifest({ requires: [...] })`; the host injects grants from that list.

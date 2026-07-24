@@ -57,7 +57,7 @@ Useful starting points:
 - Fork `napplets/user-profile` to build a different profile view while keeping archetype `profile`.
 - Fork `napplets/print-detail` to make a custom printable detail page that still accepts `address`.
 - Fork `napplets/print-browse` to change discovery ranking or feed layout while keeping `printable-browse` open payloads.
-- Build a new napplet with `pnpm new <name> "Display Title"`, then add a manifest archetype that matches one of the shared roles if it should be interchangeable.
+- Build a new napplet with `pnpm napplet:new <name> "Display Title"`, then add a manifest archetype that matches one of the shared roles if it should be interchangeable.
 
 ## Development
 
@@ -73,10 +73,15 @@ Run the host, napplet build watchers, and local Kehto Paja:
 pnpm dev
 ```
 
+Scripts are namespaced: `app:*` builds and deploys the stlstr host app (as an
+[nsyte](https://github.com/sandwichfarm/nsyte) static site), and `napplet:*`
+builds and deploys the napplets (to Nostr/Blossom via the napplet CLI). Shared
+scripts (`dev`, `verify`, `test`, `format`) stay unprefixed.
+
 Build all napplets:
 
 ```sh
-pnpm build
+pnpm napplet:build
 ```
 
 Verify napplets and shared libraries:
@@ -85,20 +90,38 @@ Verify napplets and shared libraries:
 pnpm verify
 ```
 
-Build the host app separately:
+### Deploy the host app (nsyte)
+
+`app:build` builds the napplets first, then the host app, bundling every
+built-in napplet artifact into `apps/stlstr/dist/napplets/<dTag>/index.html` and
+emitting `apps/stlstr/dist/napplets.json`. The built-ins are served same-origin,
+so the app is self-contained — no separate napplet deploy is required for the
+shipped defaults.
 
 ```sh
-pnpm build:app
+pnpm app:build            # produce the deployable apps/stlstr/dist
+pnpm app:deploy:dry       # preview the nsyte deploy without publishing
+pnpm app:deploy           # build, then `nsyte deploy apps/stlstr/dist`
 ```
 
+`app:deploy` runs `nsyte deploy` against `apps/stlstr/dist`. Configure the
+target once with `nsyte init` (writes `.nsite/config.json` — relays, Blossom
+servers, and signing); `nsyte` must be on `PATH`.
+
+### Deploy the napplets (napplet CLI)
+
+Publishing napplets to Nostr is separate from the app deploy above, and is only
+needed for cross-runtime discovery of the napplets as standalone NIP-5A apps.
 Local deploys are guarded and use `.napplet/config.dev.json` only:
 
 ```sh
-pnpm deploy
+pnpm napplet:deploy
 ```
 
-Production deploys are explicit:
+Production deploys are explicit and sign with the `hzrd149` key. Store that key
+once in the OS keychain (it is never written to the repo), then deploy:
 
 ```sh
-pnpm deploy:prod
+pnpm napplet:login:prod   # store the hzrd149 nsec under keyReference "hzrd149"
+pnpm napplet:deploy:prod
 ```

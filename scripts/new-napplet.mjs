@@ -2,7 +2,7 @@
 // Thin wrapper around the official @napplet/boilerplate generator that drops a
 // new napplet into this monorepo's napplets/ workspace.
 //
-//   pnpm new <name> ["Display Title"] [-- <extra generator flags>]
+//   pnpm napplet:new <name> ["Display Title"] [-- <extra generator flags>]
 //
 // It is exactly `npx @napplet/boilerplate ./napplets/<name> ...` with the
 // monorepo target path and sane defaults filled in. Anything after `--` is
@@ -24,7 +24,7 @@ const passthrough = passthroughIndex === -1 ? [] : argv.slice(passthroughIndex +
 const [rawName, rawTitle] = ownArgs;
 
 if (!rawName) {
-  console.error('Usage: pnpm new <name> ["Display Title"] [-- <extra generator flags>]');
+  console.error('Usage: pnpm napplet:new <name> ["Display Title"] [-- <extra generator flags>]');
   process.exit(1);
 }
 
