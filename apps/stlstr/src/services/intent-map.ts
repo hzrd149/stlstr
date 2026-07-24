@@ -67,8 +67,8 @@ const OBJECT_KIND = '33500';
  *
  * NAP-INTENT cannot express this: `IntentBehavior` carries `focus` / `newWindow` / `reuse`
  * and nothing about presentation, so modal-versus-route is the shell's decision, taken from
- * the archetype. It is hardcoded to this one archetype deliberately — see
- * `.planning/preview-dialog.md` §9 for the trigger to generalize.
+ * the archetype. It is hardcoded deliberately; generalize it when a second archetype
+ * needs modal presentation.
  */
 export const PREVIEW_ARCHETYPE = 'stl-preview';
 

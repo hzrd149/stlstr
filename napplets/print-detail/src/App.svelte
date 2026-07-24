@@ -18,7 +18,7 @@
    * The object detail page.
    *
    * The gallery, part files, owner actions, and the NIP-22 comment thread are built here.
-   * Makes and remixes from `.planning/object-detail-napplet.md` are still to come.
+   * Makes and remixes are still to come.
    *
    * The address arrives over the NAP-INTENT delivery seam as a targeted `inc.event` on
    * `printable-detail:open`. Subscribe FIRST, then emit `printable-detail:ready`.

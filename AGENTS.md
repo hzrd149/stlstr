@@ -81,7 +81,7 @@
 
 ## Current Gaps
 
-- There is no root `README.md` or CI workflow in the current tree; trust package scripts and config over stale template prose in package READMEs.
+- There is no CI workflow in the current tree; trust package scripts and config over stale generated/template prose.
 - NAP-RESOURCE rejects `image/svg+xml` instead of rasterizing it, as the spec requires; there is no rasterizer yet. It also cannot re-check resolved addresses after DNS the way the policy describes, because browsers do not expose that.
 - Refusals raised inside the host `fetch` reach napplets as `network-error` with no detail — `@kehto/services` only maps pre-fetch grant failures to `blocked-by-policy`. The shell logs the real reason to the console.
 - `@apps/stlstr` still depends on `nostr-tools`; replace shell-side Nostr plumbing with Applesauce packages as NAP service handlers are implemented.
