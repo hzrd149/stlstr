@@ -2,13 +2,41 @@ import type { Filter } from 'applesauce-core/helpers/filter';
 import { mergeRelaySets } from 'applesauce-core/helpers/relays';
 import type { NostrEvent } from 'nostr-tools';
 import { nip19 } from 'nostr-tools';
+import { accountManager } from './accounts';
 import { ARCHETYPES, conventionsFor } from './intent-map';
-import { STLSTR_DEV_MODE } from './nostr';
+import { getUser, STLSTR_DEV_MODE } from './nostr';
+import { firstDefinedValue } from './observable';
 import { collectRequest } from './relay-query';
 import { getLookupRelays, getSettings, type NappletOverride } from './settings';
 
 const NIP5A_KIND = 35129;
 const MANIFEST_TIMEOUT_MS = 5_000;
+/** How long to wait for the active user's relay list before falling back. */
+const OUTBOX_RESOLVE_TIMEOUT_MS = 2_000;
+
+/**
+ * Relays to search for napplet manifests (NIP-5A), outbox-first.
+ *
+ * A napplet manifest is published to its author's write relays, so the active
+ * user's own outboxes are the authoritative place to look for the napplets they
+ * publish and use — following the same OUTBOX-first model the shell uses for all
+ * other reads. Fall back to the configured lookup relays when nobody is signed
+ * in, the user's relay list has not loaded yet, or in dev where discovery stays
+ * on the local relay.
+ */
+async function getDiscoveryRelays(): Promise<string[]> {
+  if (STLSTR_DEV_MODE) return getLookupRelays();
+
+  const pubkey = accountManager.active?.pubkey;
+  if (pubkey) {
+    const outboxes = mergeRelaySets(
+      await firstDefinedValue(getUser(pubkey).outboxes$, OUTBOX_RESOLVE_TIMEOUT_MS),
+    );
+    if (outboxes.length > 0) return outboxes;
+  }
+
+  return getLookupRelays();
+}
 
 /**
  * Where the shell finds the built-in napplet artifacts it ships as archetype
@@ -218,14 +246,14 @@ export async function resolveNappletNaddr(
   if (pointer.kind !== NIP5A_KIND)
     throw new Error('That naddr does not point to a NIP-5A napplet.');
 
-  const relays = mergeRelaySets([...(pointer.relays ?? []), ...getLookupRelays()]);
+  const relays = mergeRelaySets([...(pointer.relays ?? []), ...(await getDiscoveryRelays())]);
   const manifest = await fetchManifest(pointer.pubkey, pointer.identifier, relays);
-  if (!manifest) throw new Error('Could not find that napplet manifest on your lookup relays.');
+  if (!manifest) throw new Error('Could not find that napplet manifest on your relays.');
   return resolvedFromManifest(manifest, archetype, naddr.trim(), relays);
 }
 
 export async function discoverCompatibleNapplets(archetype: string): Promise<ResolvedNapplet[]> {
-  const relays = getLookupRelays();
+  const relays = await getDiscoveryRelays();
   const filters: Filter[] = [{ kinds: [NIP5A_KIND], limit: 80 }];
   const events = await collectRequest(relays, filters, MANIFEST_TIMEOUT_MS);
 

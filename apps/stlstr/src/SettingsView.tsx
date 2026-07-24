@@ -111,10 +111,7 @@ function UrlList({
   return (
     <ul className="divide-y divide-base-300 rounded-box bg-base-100 ring-1 ring-base-300/70">
       {values.map((value) => (
-        <li
-          key={value}
-          className="flex items-center justify-between gap-3 px-3 py-2"
-        >
+        <li key={value} className="flex items-center justify-between gap-3 px-3 py-2">
           <div className="min-w-0">
             <div className="truncate font-medium">{relayHost(value)}</div>
             <div className="truncate font-mono text-xs text-base-content/55">{value}</div>
@@ -307,7 +304,7 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
 
   async function handleDiscover() {
     setDiscovering(true);
-    setStatus('Searching lookup relays...');
+    setStatus('Searching your relays...');
     try {
       const found = await discoverCompatibleNapplets(archetype);
       setCandidates(found);
@@ -327,8 +324,12 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
       </div>
 
       <div className="min-w-0 text-sm">
-        <div className="text-xs font-medium uppercase tracking-wide text-base-content/45">Handler</div>
-        <div className="mt-1 truncate font-medium">{override?.title ?? fallback?.title ?? entry.title}</div>
+        <div className="text-xs font-medium uppercase tracking-wide text-base-content/45">
+          Handler
+        </div>
+        <div className="mt-1 truncate font-medium">
+          {override?.title ?? fallback?.title ?? entry.title}
+        </div>
         <div className="truncate font-mono text-xs text-base-content/55">
           {override ? override.dTag : `default:${fallback?.dTag ?? entry.dTag}`}
         </div>
@@ -364,9 +365,11 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
           <div className="modal-box max-w-3xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-bold">Choose a napplet for {archetypeLabel(archetype)}</h3>
+                <h3 className="text-lg font-bold">
+                  Choose a napplet for {archetypeLabel(archetype)}
+                </h3>
                 <p className="mt-1 text-sm text-base-content/65">
-                  Showing all loadable napplets found on your lookup relays. Compatibility badges
+                  Showing all loadable napplets found on your relays. Compatibility badges
                   are advisory until published napplets advertise archetypes reliably.
                 </p>
               </div>
@@ -375,7 +378,10 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
               </button>
             </div>
 
-            <form className="mt-4 grid gap-2 rounded-box bg-base-200 p-3" onSubmit={handleUseOverride}>
+            <form
+              className="mt-4 grid gap-2 rounded-box bg-base-200 p-3"
+              onSubmit={handleUseOverride}
+            >
               <label className="text-sm font-medium" htmlFor={`napplet-naddr-${archetype}`}>
                 Paste a napplet naddr
               </label>
@@ -415,7 +421,9 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
                           <span
                             className={`badge badge-sm ${candidate.compatibleWithArchetype ? 'badge-success' : 'badge-warning'}`}
                           >
-                            {candidate.compatibleWithArchetype ? 'advertises this page' : 'not advertised'}
+                            {candidate.compatibleWithArchetype
+                              ? 'advertises this page'
+                              : 'not advertised'}
                           </span>
                         </div>
                         {candidate.description ? (
@@ -439,7 +447,7 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
                 </ul>
               ) : (
                 <p className="rounded-box border border-dashed border-base-300 p-4 text-sm text-base-content/60">
-                  {discovering ? 'Searching lookup relays...' : 'No napplets found yet.'}
+                  {discovering ? 'Searching your relays...' : 'No napplets found yet.'}
                 </p>
               )}
             </div>
@@ -472,7 +480,11 @@ function NappletOverrides() {
               : 'Every page is using the built-in default napplet.'}
           </p>
         </div>
-        <button className="btn btn-outline btn-sm" disabled={!overrideCount} onClick={resetNappletOverrides}>
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={!overrideCount}
+          onClick={resetNappletOverrides}
+        >
           Reset all to defaults
         </button>
       </div>
@@ -482,7 +494,7 @@ function NappletOverrides() {
         ))}
       </div>
       <p className="text-sm text-base-content/60">
-        Relay search scans recent NIP-5A manifests on your lookup relays. Until published napplets
+        Relay search scans recent NIP-5A manifests on your relays. Until published napplets
         advertise archetypes reliably, the picker shows every loadable napplet it finds.
       </p>
     </div>
