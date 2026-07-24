@@ -1070,6 +1070,18 @@ function PartLibraryRoute() {
   );
 }
 
+/** Standalone publisher for reusable NIP-94 file events. */
+function PartUploadRoute() {
+  return (
+    <NappletRouteFrame
+      archetype="part-upload"
+      routeId="part-upload"
+      title="Upload parts"
+      intent={{ archetype: 'part-upload', action: 'open', payload: {} }}
+    />
+  );
+}
+
 /** The maker behind a print: profile metadata, their prints, their collections. */
 function UserProfileRoute() {
   const { pubkey = '' } = useParams();
@@ -1359,6 +1371,7 @@ function App() {
         <Route path="tags/:tag" element={<TagRoute />} />
         <Route path="create" element={<CreateRoute />} />
         <Route path="parts" element={<PartLibraryRoute />} />
+        <Route path="parts/upload" element={<PartUploadRoute />} />
         <Route path="settings" element={<SettingsView />} />
         <Route path="profiles/:pubkey" element={<UserProfileRoute />} />
         <Route path="objects/:pubkey/:identifier" element={<ObjectDetailRoute />} />

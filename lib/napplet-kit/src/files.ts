@@ -55,6 +55,24 @@ export type FileMeta = {
 /** Extensions treated as 3D models, for previewability and the library's model filter. */
 const MODEL_EXTENSIONS = ['.stl', '.3mf', '.obj', '.step', '.stp', '.gcode', '.ply'];
 
+/** MIME types that represent printable/manufacturing part files, not docs or aux assets. */
+export const PRINTABLE_PART_MIME_TYPES = [
+  'model/stl',
+  'application/sla',
+  'model/3mf',
+  'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
+  'model/obj',
+  'model/step',
+  'model/step+xml',
+  'application/step',
+  'model/ply',
+  'text/x.gcode',
+  'application/x-gcode',
+  'application/gcode',
+] as const;
+
+const printablePartMimeTypes = new Set<string>(PRINTABLE_PART_MIME_TYPES);
+
 /**
  * Mirrors the shell's NAP-RESOURCE `MAX_BYTES`. A file above it cannot be fetched for
  * preview at all, so callers check the published size before offering the action rather
@@ -96,6 +114,11 @@ export function isModelFile(meta: FileMeta): boolean {
   if (meta.mime.startsWith('model/')) return true;
   const name = meta.name.toLowerCase();
   return MODEL_EXTENSIONS.some((extension) => name.endsWith(extension));
+}
+
+/** True when the file declares a printable part MIME type. */
+export function isPrintablePartFile(meta: FileMeta): boolean {
+  return printablePartMimeTypes.has(meta.mime.toLowerCase());
 }
 
 /** True when the shell's resource service could fetch this file for a 3D preview. */

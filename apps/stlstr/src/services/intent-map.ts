@@ -278,6 +278,15 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     toHref: () => '/parts',
   },
 
+  'part-upload': {
+    dTag: 'part-upload',
+    routeId: 'part-upload',
+    title: 'Upload parts',
+    description: 'Publish reusable file events for printables to reference.',
+    actions: ['open', 'create'],
+    toHref: () => '/parts/upload',
+  },
+
   'printable-edit': {
     dTag: 'print-edit',
     routeId: 'printable-edit',
@@ -380,6 +389,8 @@ export function intentFromLocation(location: {
   }
 
   if (path === '/parts') return intent('part-library', 'open');
+
+  if (path === '/parts/upload') return intent('part-upload', 'open');
 
   if (parts[0] === 'profiles' && parts[1]) {
     return intent('profile', 'open', { pubkey: decodePart(parts[1]) });

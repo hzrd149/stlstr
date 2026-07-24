@@ -3,9 +3,10 @@
   import {
     FILE_KIND,
     OBJECT_KIND,
+    PRINTABLE_PART_MIME_TYPES,
     fileIdsFor,
     formatBytes,
-    isModelFile,
+    isPrintablePartFile,
     isPreviewable,
     readFileMeta,
     type FileMeta,
@@ -36,6 +37,7 @@
   const PREVIEW_ARCHETYPE = 'stl-preview';
   const UPLOAD_ARCHETYPE = 'part-upload';
   const DETAIL_ARCHETYPE = 'printable-detail';
+  const PART_DETAIL_ARCHETYPE = 'part-detail';
 
   /** How many files to pull. Pagination is a follow-up. */
   const LIBRARY_LIMIT = 200;
@@ -71,7 +73,6 @@
   let usageLoaded = $state(false);
   let status = $state('');
   let search = $state('');
-  let modelsOnly = $state(false);
   let canPreview = $state(false);
   let canUpload = $state(false);
 
@@ -79,7 +80,6 @@
 
   const visible = $derived(
     files.filter((file) => {
-      if (modelsOnly && !isModelFile(file.meta)) return false;
       const needle = search.trim().toLowerCase();
       return !needle || file.meta.name.toLowerCase().includes(needle);
     }),
@@ -108,7 +108,7 @@
 
   function toLibraryFile(event: NostrEvent): LibraryFile | null {
     const meta = readFileMeta(event.tags);
-    if (!meta) return null;
+    if (!meta || !isPrintablePartFile(meta)) return null;
     return {
       eventId: event.id,
       createdAt: event.created_at,
@@ -140,7 +140,14 @@
 
     try {
       const { events } = await outbox.query(
-        [{ kinds: [FILE_KIND], authors: [pubkey], limit: LIBRARY_LIMIT }],
+        [
+          {
+            kinds: [FILE_KIND],
+            authors: [pubkey],
+            '#m': [...PRINTABLE_PART_MIME_TYPES],
+            limit: LIBRARY_LIMIT,
+          },
+        ],
         { timeoutMs: 6000 },
       );
 
@@ -280,6 +287,12 @@
     if (!result.ok) status = result.error ?? 'Could not open that object.';
   }
 
+  async function openPart(file: LibraryFile): Promise<void> {
+    if (!hasIntentOpen()) return;
+    const result = await intent.open(PART_DETAIL_ARCHETYPE, { fileId: file.eventId });
+    if (!result.ok) status = result.error ?? 'Could not open that part.';
+  }
+
   async function openUpload(): Promise<void> {
     if (!hasIntentOpen()) return;
     const result = await intent.open(UPLOAD_ARCHETYPE, {});
@@ -372,15 +385,6 @@
         aria-label="Filter parts by file name"
         bind:value={search}
       />
-      <label class="label cursor-pointer gap-2">
-        <input
-          type="checkbox"
-          class="checkbox checkbox-sm"
-          bind:checked={modelsOnly}
-          data-testid="models-only"
-        />
-        <span class="label-text">Models only</span>
-      </label>
     </div>
   {/if}
 
@@ -460,6 +464,17 @@
                   onclick={() => preview(file)}
                 >
                   Preview
+                </button>
+              {/if}
+              {#if hasIntentOpen()}
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  data-testid="part-details"
+                  data-file-id={file.eventId}
+                  onclick={() => openPart(file)}
+                >
+                  Details
                 </button>
               {/if}
               {#if hasLink()}

@@ -229,6 +229,11 @@
     if (uri) void link.open(uri, { label: `Open ${part.name} in slicer` });
   }
 
+  function downloadPart(part: PartFile): void {
+    if (!hasLink()) return;
+    void link.open(part.url, { label: part.name });
+  }
+
   function openAllInSlicer(): void {
     if (!hasLink()) return;
     const uri = buildSlicerBridgeUri(slicerOpenableParts);
@@ -408,6 +413,16 @@
                     onclick={() => openInSlicer(part)}
                   >
                     Open in slicer
+                  </button>
+                {/if}
+                {#if hasLink() && part.url}
+                  <button
+                    class="btn btn-outline btn-sm"
+                    data-testid="download-part"
+                    data-file-id={part.id}
+                    onclick={() => downloadPart(part)}
+                  >
+                    Download
                   </button>
                 {/if}
               </div>

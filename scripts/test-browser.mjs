@@ -26,6 +26,7 @@ const testNapplets = [
   { name: 'user-profile', title: 'User Profile' },
   { name: 'print-edit', title: 'Edit Print' },
   { name: 'part-library', title: 'Part Library' },
+  { name: 'part-upload', title: 'Upload Part' },
   { name: 'stl-preview', title: 'STL Preview' },
   { name: 'part-detail', title: 'Part Detail' },
 ];

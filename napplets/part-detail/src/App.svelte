@@ -338,6 +338,11 @@
     if (uri) void link.open(uri, { label: `Open ${file.meta.name} in slicer` });
   }
 
+  function download(): void {
+    if (!file || !hasLink()) return;
+    void link.open(file.meta.url, { label: file.meta.name });
+  }
+
   async function openObject(entry: Usage): Promise<void> {
     if (!hasIntentOpen()) return;
     const result = await intent.open(DETAIL_ARCHETYPE, { address: entry.address });
@@ -451,6 +456,16 @@
           data-testid="part-open-in-slicer"
         >
           Open in slicer
+        </button>
+      {/if}
+      {#if file && hasLink()}
+        <button
+          type="button"
+          class="btn btn-outline"
+          onclick={download}
+          data-testid="part-download"
+        >
+          Download
         </button>
       {/if}
     </div>

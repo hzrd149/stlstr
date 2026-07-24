@@ -146,6 +146,7 @@ test('NAP-INTENT advertises the archetypes the shell can route', async () => {
       'make-detail',
       'part-detail',
       'part-library',
+      'part-upload',
       'printable-browse',
       'printable-create',
       'printable-detail',
