@@ -6,4 +6,4 @@ export {
   toPrintableObject,
   type PrintableImage,
   type PrintableObject,
-} from '../../../print-browse/src/lib/printables';
+} from '../../../print-search/src/lib/printables';

@@ -8,12 +8,12 @@ export default defineConfig({
     svelte(),
     tailwindcss(),
     nip5aManifest({
-      nappletType: 'print-browse',
+      nappletType: 'print-search',
       requires: ['outbox', 'inc', 'identity', 'common', 'count', 'resource', 'intent'],
       artifactMode: 'single-file',
       // The protocol names the payload SHAPE this role accepts — an unnumbered
       // convention per the naps repo, not a NAP domain.
-      archetypes: [{ slug: 'printable-browse', naps: ['napplet:printable-browse/open'] }],
+      archetypes: [{ slug: 'printable-search', naps: ['napplet:printable-search/open'] }],
     }),
   ],
   build: {

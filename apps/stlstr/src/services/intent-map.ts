@@ -248,8 +248,8 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     toHref: () => '/',
   },
 
-  'printable-browse': {
-    dTag: 'print-browse',
+  'printable-search': {
+    dTag: 'print-search',
     routeId: 'search',
     category: 'discover',
     nav: 'browse',
@@ -613,11 +613,11 @@ export function intentFromLocation(location: {
 
   if (path === '/search') {
     const query = search.get('q')?.trim() ?? '';
-    return intent('printable-browse', 'open', query ? { query } : {});
+    return intent('printable-search', 'open', query ? { query } : {});
   }
 
   if (parts[0] === 'tags' && parts[1]) {
-    return intent('printable-browse', 'open', { tag: decodePart(parts[1]) });
+    return intent('printable-search', 'open', { tag: decodePart(parts[1]) });
   }
 
   if (path === '/create') {

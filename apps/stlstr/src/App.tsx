@@ -658,7 +658,7 @@ function AccountNav() {
  * Mounts one napplet in a sandboxed iframe and gives it a shell bridge.
  *
  * `routeId` names the shell route mounting the napplet; it distinguishes windows
- * when several routes share one napplet (search/tag both mount `print-browse`).
+ * when several routes share one napplet (search/tag both mount `print-search`).
  * The iframe is keyed by pathname, so navigating between two printables tears the
  * napplet down and rebuilds it against the new address.
  */
@@ -1039,10 +1039,10 @@ function SearchRoute() {
 
   return (
     <NappletRouteFrame
-      archetype="printable-browse"
+      archetype="printable-search"
       routeId="search"
       title={query ? `Search: ${query}` : 'Search prints'}
-      intent={{ archetype: 'printable-browse', action: 'open', payload: query ? { query } : {} }}
+      intent={{ archetype: 'printable-search', action: 'open', payload: query ? { query } : {} }}
     />
   );
 }
@@ -1052,10 +1052,10 @@ function TagRoute() {
 
   return (
     <NappletRouteFrame
-      archetype="printable-browse"
+      archetype="printable-search"
       routeId="tag"
       title={`#${tag}`}
-      intent={{ archetype: 'printable-browse', action: 'open', payload: { tag } }}
+      intent={{ archetype: 'printable-search', action: 'open', payload: { tag } }}
     />
   );
 }
@@ -1258,7 +1258,7 @@ function ShellSearch() {
     event.preventDefault();
     const trimmed = query.trim();
     const href = intentToHref({
-      archetype: 'printable-browse',
+      archetype: 'printable-search',
       action: 'open',
       payload: trimmed ? { query: trimmed } : {},
     });

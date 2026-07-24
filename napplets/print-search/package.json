@@ -1,6 +1,6 @@
 {
-  "name": "print-browse",
-  "displayName": "Browse Printables",
+  "name": "print-search",
+  "displayName": "Printable Search",
   "version": "0.1.0",
   "private": true,
   "type": "module",

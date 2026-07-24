@@ -10,7 +10,7 @@ Each napplet declares one protocol-facing archetype. The folder name is the loca
 
 | Napplet        | Archetype          | Intent action      | Payload                   | Purpose                                                                                                                                                                         |
 | -------------- | ------------------ | ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `print-browse` | `printable-browse` | `open`             | Optional `query` or `tag` | Browse printables, search, and tag-filter printable feeds.                                                                                                                      |
+| `print-search` | `printable-search` | `open`             | Optional `query` or `tag` | Search printables and tag-filter printable feeds.                                                                                                                              |
 | `user-profile` | `profile`          | `open`             | `pubkey`                  | Show a maker profile and their published printables. This intentionally uses the generic `profile` archetype so profile links work across unrelated napplet collections.         |
 | `print-detail` | `printable-detail` | `open`             | `address`                 | Show one printable, its media/files, maker attribution, comments, reactions, and edit actions.                                                                                  |
 | `print-create` | `printable-create` | `open` or `create` | Optional `remixOf`        | Publish a new printable and upload its media/files.                                                                                                                             |
@@ -56,7 +56,7 @@ Useful starting points:
 
 - Fork `napplets/user-profile` to build a different profile view while keeping archetype `profile`.
 - Fork `napplets/print-detail` to make a custom printable detail page that still accepts `address`.
-- Fork `napplets/print-browse` to change discovery ranking or feed layout while keeping `printable-browse` open payloads.
+- Fork `napplets/print-search` to change search ranking or feed layout while keeping `printable-search` open payloads.
 - Build a new napplet with `pnpm napplet:new <name> "Display Title"`, then add a manifest archetype that matches one of the shared roles if it should be interchangeable.
 
 ## Development
