@@ -9,6 +9,7 @@ import type { ServiceHandler } from '@kehto/runtime';
 import {
   ARCHETYPES,
   PREVIEW_ARCHETYPE,
+  actionsFor,
   conventionsFor,
   intentToHref,
   normalizeObjectPayload,
@@ -55,7 +56,7 @@ function candidateFor(archetype: string): IntentCandidate {
   return {
     dTag: napplet?.dTag ?? entry.dTag,
     title: napplet?.title ?? entry.title,
-    actions: [...entry.actions],
+    actions: actionsFor(archetype),
     protocols: napplet?.protocols.length ? napplet.protocols : conventionsFor(archetype),
     isDefault: true,
   };
@@ -117,7 +118,7 @@ export function createStlstrIntentService({ navigate }: IntentServiceOptions): S
         const handlerDTag = napplet?.dTag ?? entry?.dTag;
 
         if (!entry) return failed(archetype, action, `no handler for ${archetype}`);
-        if (!entry.actions.includes(action)) {
+        if (!(action in entry.intents)) {
           return failed(archetype, action, `${handlerDTag} does not support "${action}"`);
         }
 

@@ -5,6 +5,7 @@ import {
   useState,
   useSyncExternalStore,
   type FormEvent,
+  type ReactNode,
   type RefObject,
 } from 'react';
 import {
@@ -20,6 +21,17 @@ import { use$ } from 'applesauce-react/hooks';
 import { NostrConnectSigner } from 'applesauce-signers/signers';
 import { verifyEvent } from 'nostr-tools';
 import { toDataURL } from 'qrcode';
+import {
+  ArrowLeft,
+  KeyRound,
+  Package,
+  Plug,
+  Puzzle,
+  QrCode,
+  RefreshCw,
+  Settings,
+  X,
+} from 'lucide-react';
 import {
   Link,
   NavLink,
@@ -69,6 +81,7 @@ import {
 } from './services/settings';
 import { createUploadService } from './services/upload';
 import SettingsView from './SettingsView';
+import NappletsView from './NappletsView';
 
 declare global {
   interface Window {
@@ -353,8 +366,9 @@ function LoginDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | n
         <button
           className="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
           onClick={closeDialog}
+          aria-label="Close login dialog"
         >
-          x
+          <X size={16} aria-hidden="true" />
         </button>
 
         <h2 className="text-2xl font-bold">Login to STLstr</h2>
@@ -380,27 +394,30 @@ function LoginDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | n
               </div>
             )}
             <button
-              className="btn btn-primary justify-start"
+              className="btn btn-primary justify-start gap-2"
               disabled={busy}
               onClick={handleExtensionLogin}
             >
+              <Plug size={18} aria-hidden="true" />
               Browser extension
             </button>
             <button
-              className="btn btn-outline justify-start"
+              className="btn btn-outline justify-start gap-2"
               disabled={busy}
               onClick={() => setMode('bunker')}
             >
+              <KeyRound size={18} aria-hidden="true" />
               Remote signer with bunker URI
             </button>
             <button
-              className="btn btn-outline justify-start"
+              className="btn btn-outline justify-start gap-2"
               disabled={busy}
               onClick={() => {
                 setMode('qr');
                 void handleQrLogin();
               }}
             >
+              <QrCode size={18} aria-hidden="true" />
               Remote signer with QR code
             </button>
           </div>
@@ -424,6 +441,7 @@ function LoginDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | n
                 disabled={busy}
                 onClick={returnToChooseMode}
               >
+                <ArrowLeft size={18} aria-hidden="true" />
                 Back
               </button>
               <button className="btn btn-primary" disabled={busy || !bunkerUri.trim()}>
@@ -472,6 +490,7 @@ function LoginDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | n
                   </>
                 ) : (
                   <button className="btn btn-primary" onClick={handleQrLogin}>
+                    <RefreshCw size={18} aria-hidden="true" />
                     Try again
                   </button>
                 )}
@@ -484,6 +503,7 @@ function LoginDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | n
                 disabled={busy && !qrDataUrl}
                 onClick={returnToChooseMode}
               >
+                <ArrowLeft size={18} aria-hidden="true" />
                 Back
               </button>
               {qrDataUrl && (
@@ -1204,10 +1224,12 @@ function NotFoundRoute() {
 function ShellNavLink({
   to,
   label,
+  icon,
   alsoActiveOn,
 }: {
   to: string;
   label: string;
+  icon?: ReactNode;
   alsoActiveOn?: RegExp;
 }) {
   const { pathname } = useLocation();
@@ -1221,6 +1243,7 @@ function ShellNavLink({
         onClick={closeDrawer}
         className={({ isActive }) => (isActive || activeOnSubRoute ? 'active' : undefined)}
       >
+        {icon}
         {label}
       </NavLink>
     </li>
@@ -1281,8 +1304,17 @@ function ShellLayout() {
     <>
       <ShellNavLink to="/" label="Discover" />
       <ShellNavLink to="/create" label="Create" />
-      <ShellNavLink to="/parts" label="Parts" alsoActiveOn={/^\/parts(\/|$)/} />
-      <ShellNavLink to="/settings" label="Settings" />
+      <ShellNavLink
+        to="/parts"
+        label="Parts"
+        icon={<Package size={18} aria-hidden="true" />}
+        alsoActiveOn={/^\/parts(\/|$)/}
+      />
+      <ShellNavLink
+        to="/settings"
+        label="Settings"
+        icon={<Settings size={18} aria-hidden="true" />}
+      />
     </>
   );
 
@@ -1300,10 +1332,19 @@ function ShellLayout() {
               <span className="text-xl">=</span>
             </label>
           </div>
-          <div className="flex-1">
+          <div className="flex flex-1 items-center gap-1">
             <Link className="btn btn-ghost gap-2 text-xl" to="/" onClick={closeDrawer}>
               <BrandLogo />
               STLstr
+            </Link>
+            <Link
+              to="/napplets"
+              className="btn btn-square btn-ghost btn-sm"
+              aria-label="Napplets"
+              title="Napplets"
+              onClick={closeDrawer}
+            >
+              <Puzzle size={18} aria-hidden="true" />
             </Link>
           </div>
           <div className="hidden flex-1 justify-center px-3 md:flex">
@@ -1373,6 +1414,7 @@ function App() {
         <Route path="parts" element={<PartLibraryRoute />} />
         <Route path="parts/upload" element={<PartUploadRoute />} />
         <Route path="settings" element={<SettingsView />} />
+        <Route path="napplets" element={<NappletsView />} />
         <Route path="profiles/:pubkey" element={<UserProfileRoute />} />
         <Route path="objects/:pubkey/:identifier" element={<ObjectDetailRoute />} />
         <Route path="objects/:pubkey/:identifier/edit" element={<ObjectEditRoute />} />

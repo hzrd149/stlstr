@@ -11,6 +11,51 @@ import { getLookupRelays, getSettings, type NappletOverride } from './settings';
 
 const NIP5A_KIND = 35129;
 const MANIFEST_TIMEOUT_MS = 5_000;
+
+/** The NIP-5A manifest event kind, for callers building addresses to a published napplet. */
+export const NAPPLET_MANIFEST_KIND = NIP5A_KIND;
+
+/**
+ * The Nostr identity the built-in napplets are published under — the `hzrd149` prod
+ * signing key from `.napplet/config.json`, as a raw hex pubkey.
+ *
+ * This is a static build constant so the Napplets reference page (`/napplets`) can show
+ * each napplet's canonical `naddr` to a visiting app developer without a network round
+ * trip or anyone being signed in. It is the *publishing* identity, independent of build
+ * mode: the address `35129:<this>:<dTag>` is the same one a prod deploy re-signs and
+ * publishes. Leave empty in a fork that has not set its own publishing key — the page
+ * then omits the copyable address rather than inventing one.
+ */
+export const NAPPLET_PUBLISHER_PUBKEY = '';
+
+/**
+ * Relay hints embedded in a published napplet's `naddr`. These mirror the prod deploy
+ * targets in `.napplet/config.json`, so a pasted address resolves on the relays the
+ * napplets are actually published to.
+ */
+export const NAPPLET_PUBLISH_RELAYS = [
+  'wss://relay.ditto.pub',
+  'wss://relay.damus.io',
+  'wss://relay.primal.net',
+  'wss://nos.lol',
+];
+
+/** The `kind:pubkey:dTag` address of a published built-in napplet, or null if unconfigured. */
+export function publishedNappletAddress(dTag: string): string | null {
+  if (!NAPPLET_PUBLISHER_PUBKEY) return null;
+  return `${NIP5A_KIND}:${NAPPLET_PUBLISHER_PUBKEY}:${dTag}`;
+}
+
+/** The shareable `naddr` for a published built-in napplet, or null if unconfigured. */
+export function publishedNappletNaddr(dTag: string): string | null {
+  if (!NAPPLET_PUBLISHER_PUBKEY) return null;
+  return nip19.naddrEncode({
+    identifier: dTag,
+    pubkey: NAPPLET_PUBLISHER_PUBKEY,
+    kind: NIP5A_KIND,
+    relays: NAPPLET_PUBLISH_RELAYS,
+  });
+}
 /** How long to wait for the active user's relay list before falling back. */
 const OUTBOX_RESOLVE_TIMEOUT_MS = 2_000;
 

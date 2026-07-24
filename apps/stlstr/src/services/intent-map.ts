@@ -17,6 +17,53 @@ export type StlstrIntent = {
   payload: IntentPayload;
 };
 
+/**
+ * Presentation groups for the Napplets reference page (`/napplets`), in display order.
+ * An archetype that omits a `category` is not shown there — that is the signal for a
+ * planned archetype the shell can route to but has no published napplet yet (e.g.
+ * `make-create`, which has a route but no `napplets/*` folder to build and deploy).
+ */
+export const NAPPLET_CATEGORIES = [
+  {
+    id: 'discover',
+    title: 'Discover',
+    description: 'Feeds and profiles for finding prints and makers.',
+  },
+  {
+    id: 'printables',
+    title: 'Printables',
+    description: 'View, publish, and edit 3D printable objects.',
+  },
+  { id: 'makes', title: 'Makes', description: 'Share and browse prints people actually made.' },
+  {
+    id: 'parts',
+    title: 'Parts',
+    description: 'Reusable NIP-94 part files that printables reference.',
+  },
+  { id: 'tools', title: 'Tools', description: 'Embeddable utility surfaces other apps can open.' },
+] as const;
+
+/** Id of one Napplets-page category. */
+export type NappletCategory = (typeof NAPPLET_CATEGORIES)[number]['id'];
+
+/** One field of an intent payload, documented for the archetype reference. */
+export type IntentField = {
+  /** Payload key the archetype reads. */
+  name: string;
+  /** Whether the action is meaningful without this field. */
+  required: boolean;
+  /** What the field carries and any shape constraints on it. */
+  description: string;
+};
+
+/** What one action (verb) of an archetype does and the payload it reads. */
+export type IntentDoc = {
+  /** One line on what invoking this action does. */
+  summary: string;
+  /** The payload fields this action reads, in the order a caller should think about them. */
+  fields: IntentField[];
+};
+
 /** One archetype the shell can route to, and the napplet that fulfills it. */
 export type ArchetypeEntry = {
   /** dTag of the napplet that handles this role. */
@@ -25,10 +72,19 @@ export type ArchetypeEntry = {
   routeId: string;
   /** Navigation group this archetype belongs to, when it is a top-level destination. */
   nav?: 'discover' | 'browse' | 'create' | 'parts' | 'settings';
+  /**
+   * Section this napplet appears under on the `/napplets` reference page. Omitted for
+   * archetypes with no published napplet, which keeps them off that page.
+   */
+  category?: NappletCategory;
   title: string;
   description: string;
-  /** Verbs this archetype accepts. */
-  actions: string[];
+  /**
+   * The verbs this archetype accepts, keyed by action name, each documenting what it does
+   * and the payload it reads. This is the single source for the archetype's supported
+   * actions — `actionsFor` derives the verb list from these keys.
+   */
+  intents: Record<string, IntentDoc>;
   /** Builds the shell href for a payload, or null when the payload cannot address a page. */
   toHref(payload: IntentPayload): string | null;
   /** Per-action title override, for pages that read differently by verb. */
@@ -179,20 +235,43 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   'printable-discovery': {
     dTag: 'print-discover',
     routeId: 'discovery',
+    category: 'discover',
     nav: 'discover',
     title: 'Discover prints',
     description: 'Find new, featured, and friend-adjacent printable models.',
-    actions: ['open'],
+    intents: {
+      open: {
+        summary: 'Open the discovery home — new, featured, and friend-adjacent printables.',
+        fields: [],
+      },
+    },
     toHref: () => '/',
   },
 
   'printable-browse': {
     dTag: 'print-browse',
     routeId: 'search',
+    category: 'discover',
     nav: 'browse',
     title: 'Search prints',
     description: 'Search printable models published as Nostr events.',
-    actions: ['open'],
+    intents: {
+      open: {
+        summary: 'Open the search feed, optionally scoped to a text query or a single tag.',
+        fields: [
+          {
+            name: 'query',
+            required: false,
+            description: 'Free-text search across printable titles, descriptions, and tags.',
+          },
+          {
+            name: 'tag',
+            required: false,
+            description: 'A single topic tag to filter the feed by. Takes precedence over query.',
+          },
+        ],
+      },
+    },
     toHref: (payload) => {
       const tag = payload.tag?.trim();
       if (tag) return `/tags/${encodeURIComponent(tag)}`;
@@ -210,9 +289,21 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   profile: {
     dTag: 'user-profile',
     routeId: 'user-profile',
+    category: 'discover',
     title: 'Maker profile',
     description: 'View a maker, their published prints, and their collections.',
-    actions: ['open'],
+    intents: {
+      open: {
+        summary: "Show a maker's profile and the printables they have published.",
+        fields: [
+          {
+            name: 'pubkey',
+            required: true,
+            description: 'Hex public key of the maker to display.',
+          },
+        ],
+      },
+    },
     toHref: (payload) => {
       const pubkey = payload.pubkey?.trim();
       return pubkey ? `/profiles/${encodeURIComponent(pubkey)}` : null;
@@ -222,9 +313,22 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   'printable-detail': {
     dTag: 'print-detail',
     routeId: 'printable-detail',
+    category: 'printables',
     title: 'Print details',
     description: 'View images, files, metadata, maker attribution, and print actions.',
-    actions: ['open'],
+    intents: {
+      open: {
+        summary: 'Show one printable object: media, files, maker attribution, and actions.',
+        fields: [
+          {
+            name: 'address',
+            required: true,
+            description:
+              'Object address 33500:<pubkey>:<d>. Also accepts { pubkey, identifier } instead.',
+          },
+        ],
+      },
+    },
     toHref: (payload) => {
       const normalized = normalizeObjectPayload(payload);
       return normalized ? encodeAddressPath(normalized.address) : null;
@@ -234,10 +338,32 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   'printable-create': {
     dTag: 'print-create',
     routeId: 'create',
+    category: 'printables',
     nav: 'create',
     title: 'Create print',
     description: 'Publish a new 3D printable model with images and files.',
-    actions: ['open', 'create'],
+    intents: {
+      open: {
+        summary: 'Open the publisher for a new printable object.',
+        fields: [
+          {
+            name: 'remixOf',
+            required: false,
+            description: 'Address of an existing object to remix; pre-fills remix attribution.',
+          },
+        ],
+      },
+      create: {
+        summary: 'Publish a new printable object with its images and files.',
+        fields: [
+          {
+            name: 'remixOf',
+            required: false,
+            description: 'Address of an existing object to remix; pre-fills remix attribution.',
+          },
+        ],
+      },
+    },
     toHref: (payload) => {
       const remixOf = payload.remixOf?.trim();
       if (!remixOf) return '/create';
@@ -248,9 +374,28 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   'stl-preview': {
     dTag: 'stl-preview',
     routeId: 'overlay-preview',
+    category: 'tools',
     title: 'STL preview',
     description: 'Inspect an STL file in 3D without leaving the page.',
-    actions: ['open'],
+    intents: {
+      open: {
+        summary: 'Preview an STL file in 3D, usually as an overlay over the current page.',
+        fields: [
+          {
+            name: 'url',
+            required: true,
+            description: 'URL of the STL resource to load into the viewer.',
+          },
+          { name: 'name', required: false, description: 'Display name for the file.' },
+          { name: 'mime', required: false, description: 'MIME type hint for the resource.' },
+          {
+            name: 'size',
+            required: false,
+            description: 'File size in bytes, for progress display.',
+          },
+        ],
+      },
+    },
     // An overlay modifies the current page rather than naming one of its own, so it has no
     // standalone href. `services/intent.ts` builds the URL from the ambient location.
     toHref: () => null,
@@ -259,9 +404,21 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   'part-detail': {
     dTag: 'part-detail',
     routeId: 'part-detail',
+    category: 'parts',
     title: 'Part details',
     description: 'View metadata for a published printable part file.',
-    actions: ['open'],
+    intents: {
+      open: {
+        summary: 'Show metadata for a published NIP-94 part file and its related actions.',
+        fields: [
+          {
+            name: 'fileId',
+            required: true,
+            description: "Event id (64-char hex) of the part's file event.",
+          },
+        ],
+      },
+    },
     toHref: (payload) => {
       const fileId = payload.fileId?.trim();
       return fileId && isFileId(fileId) ? `/part/${encodeURIComponent(fileId)}` : null;
@@ -271,28 +428,68 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   'part-library': {
     dTag: 'part-library',
     routeId: 'part-library',
+    category: 'parts',
     nav: 'parts',
     title: 'Your parts',
     description: 'Manage published part files and see which prints use them.',
-    actions: ['open'],
+    intents: {
+      open: {
+        summary: "List the signed-in user's own published part files and where they are used.",
+        fields: [],
+      },
+    },
     toHref: () => '/parts',
   },
 
   'part-upload': {
     dTag: 'part-upload',
     routeId: 'part-upload',
+    category: 'parts',
     title: 'Upload parts',
     description: 'Publish reusable file events for printables to reference.',
-    actions: ['open', 'create'],
+    intents: {
+      open: {
+        summary: 'Open the part uploader.',
+        fields: [],
+      },
+      create: {
+        summary: 'Publish a new reusable part file event for printables to reference.',
+        fields: [],
+      },
+    },
     toHref: () => '/parts/upload',
   },
 
   'printable-edit': {
     dTag: 'print-edit',
     routeId: 'printable-edit',
+    category: 'printables',
     title: 'Edit print',
     description: 'Load an owned print and publish a replacement event.',
-    actions: ['open', 'edit'],
+    intents: {
+      open: {
+        summary: 'Load an owned printable into the editor.',
+        fields: [
+          {
+            name: 'address',
+            required: true,
+            description:
+              'Object address 33500:<pubkey>:<d> of the printable to edit. Also accepts { pubkey, identifier }.',
+          },
+        ],
+      },
+      edit: {
+        summary: 'Load an owned printable and publish a replacement event.',
+        fields: [
+          {
+            name: 'address',
+            required: true,
+            description:
+              'Object address 33500:<pubkey>:<d> of the printable to edit. Also accepts { pubkey, identifier }.',
+          },
+        ],
+      },
+    },
     toHref: (payload) => {
       const normalized = normalizeObjectPayload(payload);
       return normalized ? encodeAddressPath(normalized.address, '/edit') : null;
@@ -304,7 +501,30 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     routeId: 'make-create',
     title: 'Post a make',
     description: 'Share photos and notes of a print you made from a printable object.',
-    actions: ['open', 'create'],
+    intents: {
+      open: {
+        summary: 'Open the composer to post a make for a printable you printed.',
+        fields: [
+          {
+            name: 'address',
+            required: true,
+            description:
+              'Object address 33500:<pubkey>:<d> of the printable the make was built from.',
+          },
+        ],
+      },
+      create: {
+        summary: 'Publish a make — photos and notes — for a printable object.',
+        fields: [
+          {
+            name: 'address',
+            required: true,
+            description:
+              'Object address 33500:<pubkey>:<d> of the printable the make was built from.',
+          },
+        ],
+      },
+    },
     toHref: (payload) => {
       const normalized = normalizeObjectPayload(payload);
       return normalized ? encodeAddressPath(normalized.address, '/makes/new') : null;
@@ -314,9 +534,21 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   'make-detail': {
     dTag: 'make-detail',
     routeId: 'make-detail',
+    category: 'makes',
     title: 'Make',
     description: 'View a single make: photos, notes, maker, and the printable it was made from.',
-    actions: ['open'],
+    intents: {
+      open: {
+        summary: 'Show a single make: photos, notes, maker, and the printable it came from.',
+        fields: [
+          {
+            name: 'eventId',
+            required: true,
+            description: 'Event id (64-char hex) of the make (kind 2351) event.',
+          },
+        ],
+      },
+    },
     toHref: (payload) => {
       const eventId = payload.eventId?.trim();
       return eventId && isEventId(eventId) ? `/makes/${encodeURIComponent(eventId)}` : null;
@@ -324,10 +556,15 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   },
 };
 
+/** The verbs an archetype accepts, derived from its documented intents. */
+export function actionsFor(archetype: string): string[] {
+  const entry = ARCHETYPES[archetype];
+  return entry ? Object.keys(entry.intents) : [];
+}
+
 /** Every convention id the shell can route, for manifest and capability reporting. */
 export function conventionsFor(archetype: string): string[] {
-  const entry = ARCHETYPES[archetype];
-  return entry ? entry.actions.map((action) => conventionId(archetype, action)) : [];
+  return actionsFor(archetype).map((action) => conventionId(archetype, action));
 }
 
 /**
@@ -338,7 +575,7 @@ export function conventionsFor(archetype: string): string[] {
  */
 export function intentToHref(intent: StlstrIntent): string | null {
   const entry = ARCHETYPES[intent.archetype];
-  if (!entry || !entry.actions.includes(intent.action)) return null;
+  if (!entry || !(intent.action in entry.intents)) return null;
   return entry.toHref(intent.payload);
 }
 
