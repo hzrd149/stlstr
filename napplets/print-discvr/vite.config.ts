@@ -8,7 +8,7 @@ export default defineConfig({
     svelte(),
     tailwindcss(),
     nip5aManifest({
-      nappletType: 'print-discover',
+      nappletType: 'print-discvr',
       requires: ['outbox', 'inc', 'intent', 'resource', 'identity'],
       artifactMode: 'single-file',
       archetypes: [{ slug: 'printable-discovery', naps: ['napplet:printable-discovery/open'] }],
