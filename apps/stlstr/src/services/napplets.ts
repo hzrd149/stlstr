@@ -25,8 +25,12 @@ export const NAPPLET_MANIFEST_KIND = NIP5A_KIND;
  * mode: the address `35129:<this>:<dTag>` is the same one a prod deploy re-signs and
  * publishes. Leave empty in a fork that has not set its own publishing key — the page
  * then omits the copyable address rather than inventing one.
+ *
+ * Mirrors `signing.pubkey` in `.napplet/config.json` (the `hzrd149` npub
+ * `npub1ye5ptcxfyyxl5vjvdjar2ua3f0hynkjzpx552mu5snj3qmx5pzjscpknpr`). Keep the two in sync.
  */
-export const NAPPLET_PUBLISHER_PUBKEY = '';
+export const NAPPLET_PUBLISHER_PUBKEY =
+  '266815e0c9210dfa324c6cba3573b14bee49da4209a9456f9484e5106cd408a5';
 
 /**
  * Relay hints embedded in a published napplet's `naddr`. These mirror the prod deploy
