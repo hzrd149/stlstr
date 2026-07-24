@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import puppeteer from 'puppeteer';
-import { MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
+import { MAKERS, PRINTABLES } from '../../scripts/lib/test-fixtures.mjs';
 
 /**
  * The preview dialog: an overlay archetype rendered over the current page instead of as a
@@ -14,11 +14,11 @@ import { MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
 
 const baseUrl = process.env.STLSTR_TEST_BASE_URL || 'http://127.0.0.1:5174';
 
-const OBJECT = OBJECTS.find((object) => object.identifier === 'adjustable-phone-stand');
-const OBJECT_PATH = `/objects/${MAKERS[OBJECT.maker].pubkey}/${OBJECT.identifier}`;
+const PRINTABLE = PRINTABLES.find((printable) => printable.identifier === 'adjustable-phone-stand');
+const PRINTABLE_PATH = `/printables/${MAKERS[PRINTABLE.maker].pubkey}/${PRINTABLE.identifier}`;
 const FILE_PAYLOAD = {
   url: `${baseUrl}/src/assets/cube.stl`,
-  name: `${OBJECT.identifier}.stl`,
+  name: `${PRINTABLE.identifier}.stl`,
   mime: 'model/stl',
   size: '684',
 };
@@ -84,7 +84,7 @@ async function openPreviewFromDetail(page) {
 }
 
 test('a part opens in the dialog and records itself in the URL', async () => {
-  const page = await openStlstr(OBJECT_PATH);
+  const page = await openStlstr(PRINTABLE_PATH);
 
   try {
     await openPreviewFromDetail(page);
@@ -101,7 +101,7 @@ test('a part opens in the dialog and records itself in the URL', async () => {
     );
 
     // The base route is untouched: an overlay modifies the current page, never replaces it.
-    assert.equal(await page.evaluate(() => window.location.pathname), OBJECT_PATH);
+    assert.equal(await page.evaluate(() => window.location.pathname), PRINTABLE_PATH);
 
     const preview = await renderedPreview(page);
     const name = await preview.$eval('[data-testid="preview-name"]', (node) => node.textContent);
@@ -121,7 +121,7 @@ test('a part opens in the dialog and records itself in the URL', async () => {
 });
 
 test('the page beneath the dialog keeps running', async () => {
-  const page = await openStlstr(OBJECT_PATH);
+  const page = await openStlstr(PRINTABLE_PATH);
 
   try {
     const detail = await openPreviewFromDetail(page);
@@ -129,22 +129,22 @@ test('the page beneath the dialog keeps running', async () => {
 
     // A remounted napplet would have torn its iframe down and rebuilt it; an intact
     // execution context proves the frame beneath was never destroyed.
-    const title = await detail.$eval('[data-testid="object-title"]', (node) => node.textContent);
-    assert.equal(title, OBJECT.title);
+    const title = await detail.$eval('[data-testid="printable-title"]', (node) => node.textContent);
+    assert.equal(title, PRINTABLE.title);
   } finally {
     await page.close();
   }
 });
 
 test('a payload sent to the dialog does not reach the napplet beneath it', async () => {
-  const page = await openStlstr(OBJECT_PATH);
+  const page = await openStlstr(PRINTABLE_PATH);
 
   try {
     await openPreviewFromDetail(page);
     await renderedPreview(page);
 
     // The detail napplet has no preview surface at all, so its own status line is the
-    // observable: the preview payload must not have disturbed the object it is showing.
+    // observable: the preview payload must not have disturbed the printable it is showing.
     const detail = await nappletFrame(page, 'Print details');
     const leaked = await detail.$('[data-testid="preview-name"]');
     assert.equal(leaked, null, 'the preview payload leaked into the page napplet');
@@ -154,7 +154,7 @@ test('a payload sent to the dialog does not reach the napplet beneath it', async
 });
 
 test('a deep-linked preview renders without any prior intent', async () => {
-  const page = await openStlstr(`${OBJECT_PATH}?stl=${ENCODED_FILE_PAYLOAD}`);
+  const page = await openStlstr(`${PRINTABLE_PATH}?stl=${ENCODED_FILE_PAYLOAD}`);
 
   try {
     const preview = await renderedPreview(page);
@@ -163,14 +163,14 @@ test('a deep-linked preview renders without any prior intent', async () => {
 
     // And the page underneath still loaded normally.
     const detail = await nappletFrame(page, 'Print details');
-    await detail.waitForSelector('[data-testid="object-title"]');
+    await detail.waitForSelector('[data-testid="printable-title"]');
   } finally {
     await page.close();
   }
 });
 
 test('closing the dialog restores the base URL', async () => {
-  const page = await openStlstr(OBJECT_PATH);
+  const page = await openStlstr(PRINTABLE_PATH);
 
   try {
     await openPreviewFromDetail(page);
@@ -180,7 +180,7 @@ test('closing the dialog restores the base URL', async () => {
     await close.click();
 
     await page.waitForFunction(() => !window.location.search.includes('stl='));
-    assert.equal(await page.evaluate(() => window.location.pathname), OBJECT_PATH);
+    assert.equal(await page.evaluate(() => window.location.pathname), PRINTABLE_PATH);
     assert.equal(await page.$('iframe[title="STL preview napplet"]'), null);
   } finally {
     await page.close();
@@ -188,7 +188,7 @@ test('closing the dialog restores the base URL', async () => {
 });
 
 test('back closes the dialog and forward reopens it with the payload', async () => {
-  const page = await openStlstr(OBJECT_PATH);
+  const page = await openStlstr(PRINTABLE_PATH);
 
   try {
     await openPreviewFromDetail(page);
@@ -209,7 +209,7 @@ test('back closes the dialog and forward reopens it with the payload', async () 
 });
 
 test('a deep-linked preview closes to the page beneath it', async () => {
-  const page = await openStlstr(`${OBJECT_PATH}?stl=${ENCODED_FILE_PAYLOAD}`);
+  const page = await openStlstr(`${PRINTABLE_PATH}?stl=${ENCODED_FILE_PAYLOAD}`);
 
   try {
     await renderedPreview(page);
@@ -220,14 +220,14 @@ test('a deep-linked preview closes to the page beneath it', async () => {
     // No history entry to go back to, so it collapses to the base page rather than
     // navigating out of the app.
     await page.waitForFunction(() => !window.location.search.includes('stl='));
-    assert.equal(await page.evaluate(() => window.location.pathname), OBJECT_PATH);
+    assert.equal(await page.evaluate(() => window.location.pathname), PRINTABLE_PATH);
   } finally {
     await page.close();
   }
 });
 
 test('the shell advertises the preview archetype it can route', async () => {
-  const page = await openStlstr(OBJECT_PATH);
+  const page = await openStlstr(PRINTABLE_PATH);
 
   try {
     const detail = await nappletFrame(page, 'Print details');

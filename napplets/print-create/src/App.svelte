@@ -126,7 +126,7 @@
   let coverLoadToken = 0;
 
   const currentIndex = $derived(STEPS.findIndex((step) => step.id === currentStep));
-  const objectSlug = $derived(slugify(slug || title));
+  const printableSlug = $derived(slugify(slug || title));
   const selectedExistingParts = $derived(
     existingParts.filter((part) => selectedExistingPartIds.includes(part.eventId)),
   );
@@ -179,7 +179,7 @@
   }
 
   function stepComplete(step: StepId): boolean {
-    if (step === 'basics') return Boolean(title.trim() && objectSlug && description.trim());
+    if (step === 'basics') return Boolean(title.trim() && printableSlug && description.trim());
     if (step === 'files') return resources.length + selectedExistingPartIds.length > 0;
     if (step === 'images') return galleryImages.length > 0 || Boolean(capturedCoverBlob);
     return stepComplete('basics') && stepComplete('images') && stepComplete('files');
@@ -630,7 +630,7 @@
     return { id: published.event.id, role: resource.role, filename: resource.file.name };
   }
 
-  async function publishObject(): Promise<void> {
+  async function publishPrintable(): Promise<void> {
     busy = true;
     publishedAddress = '';
     try {
@@ -666,7 +666,7 @@
       }
 
       const tags: NostrTag[] = [
-        ['d', objectSlug],
+        ['d', printableSlug],
         ['title', title.trim()],
         ['published_at', String(Math.floor(Date.now() / 1000))],
         ...imageTags,
@@ -690,7 +690,7 @@
         throw new Error(published.error ?? 'Failed to publish print.');
       }
 
-      publishedAddress = `33500:${published.event.pubkey}:${objectSlug}`;
+      publishedAddress = `33500:${published.event.pubkey}:${printableSlug}`;
       status = `Published ${title.trim()}.`;
       if (hasStorage()) await storage.removeItem(DRAFT_KEY);
     } catch (error) {
@@ -728,7 +728,7 @@
     status = 'Loaded saved text draft. Reselect files before publishing.';
   }
 
-  async function openPublishedObject(): Promise<void> {
+  async function openPublishedPrintable(): Promise<void> {
     if (!publishedAddress || !hasIntent()) return;
     await intent.open('printable-detail', { address: publishedAddress });
   }
@@ -804,7 +804,7 @@
         <label class="fieldset">
           <span class="fieldset-legend">Title</span>
           <input
-            id="object-title"
+            id="printable-title"
             class="input w-full"
             bind:value={title}
             placeholder="Adjustable phone stand"
@@ -1263,7 +1263,7 @@
     {:else}
       <section class="grid gap-4" aria-label="Review and publish">
         <p class="text-sm text-base-content/70">
-          Review uploads, NIP-94 file events, and the final object event before publishing.
+          Review uploads, NIP-94 file events, and the final printable event before publishing.
         </p>
 
         <dl class="grid gap-2 rounded-box bg-base-200 p-3">
@@ -1273,7 +1273,7 @@
           </div>
           <div class="grid gap-1 md:grid-cols-[8rem_1fr]">
             <dt>Address</dt>
-            <dd class="break-all">33500:&lt;pubkey&gt;:{objectSlug || '<d>'}</dd>
+            <dd class="break-all">33500:&lt;pubkey&gt;:{printableSlug || '<d>'}</dd>
           </div>
           <div class="grid gap-1 md:grid-cols-[8rem_1fr]">
             <dt>Images</dt>
@@ -1343,16 +1343,16 @@
           </span>
         {/if}
         {#if publishedAddress && hasIntent()}
-          <button type="button" class="btn btn-outline" onclick={openPublishedObject}
+          <button type="button" class="btn btn-outline" onclick={openPublishedPrintable}
             >Open print</button
           >
         {/if}
         <button
           type="button"
           class="btn btn-primary"
-          onclick={publishObject}
+          onclick={publishPrintable}
           disabled={busy || !signedIn}
-          data-testid="publish-object"
+          data-testid="publish-printable"
         >
           {busy ? 'Publishing...' : 'Publish print'}
         </button>

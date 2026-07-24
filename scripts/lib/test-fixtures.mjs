@@ -4,7 +4,7 @@ import { hexToBytes } from 'nostr-tools/utils';
 /**
  * Seed data for the browser-test relay.
  *
- * Keys and timestamps are fixed so assertions can name an exact maker or object, and so a
+ * Keys and timestamps are fixed so assertions can name an exact maker or printable, and so a
  * rerun produces the same feed order.
  */
 
@@ -13,7 +13,7 @@ const SECRET_KEYS = {
   otto: hexToBytes('2'.repeat(64)),
 };
 
-/** The two makers the fixture objects are published by. */
+/** The two makers the fixture printables are published by. */
 export const MAKERS = {
   vera: { name: 'Vera Prints', pubkey: getPublicKey(SECRET_KEYS.vera) },
   otto: { name: 'Otto Makes', pubkey: getPublicKey(SECRET_KEYS.otto) },
@@ -23,7 +23,7 @@ export const MAKERS = {
  * Bump this whenever fixture content changes.
  *
  * The dev relay is long-lived and shared, and `kind:33500` is addressable: a relay that
- * already holds a fixture object will keep the copy it has unless the replacement is
+  * already holds a fixture printable will keep the copy it has unless the replacement is
  * strictly newer. Without a bump, an edited description silently never reaches the tests.
  */
 const BASE_TIME = 1_784_900_000;
@@ -34,7 +34,7 @@ const BASE_TIME = 1_784_900_000;
  *
  * The hostile cases are fixtures, not decoration: a `javascript:` link, a `data:` image and
  * a raw HTML element are the three things a description must never be able to turn into
- * markup, so they are seeded here and asserted against in `object-markdown.test.mjs`.
+  * markup, so they are seeded here and asserted against in `printable-markdown.test.mjs`.
  */
 const MARKDOWN_DESCRIPTION = `## Print settings
 
@@ -75,10 +75,10 @@ Ampersands &amp; entities decode.
 `;
 
 /**
- * Objects in publication order, oldest first. The feed renders these newest first, so the
+ * Printables in publication order, oldest first. The feed renders these newest first, so the
  * last entry here is the first card on the page.
  */
-export const OBJECTS = [
+export const PRINTABLES = [
   {
     maker: 'otto',
     identifier: 'cable-comb',
@@ -103,9 +103,9 @@ export const OBJECTS = [
   },
 ];
 
-/** The `.content` a fixture object is published with, per NIP.md's Markdown Content rules. */
-export function descriptionOf(object, baseUrl) {
-  const source = object.description ?? `${object.summary}\n\nPrint at 0.2mm layer height.`;
+/** The `.content` a fixture printable is published with, per NIP.md's Markdown Content rules. */
+export function descriptionOf(printable, baseUrl) {
+  const source = printable.description ?? `${printable.summary}\n\nPrint at 0.2mm layer height.`;
   return source.replaceAll('{{baseUrl}}', baseUrl);
 }
 
@@ -116,12 +116,12 @@ export function descriptionOf(object, baseUrl) {
  *                NAP-RESOURCE has something real to proxy.
  */
 /**
- * The part file every fixture object carries, as a kind-1063 (NIP-94) event. It is a real
+  * The part file every fixture printable carries, as a kind-1063 (NIP-94) event. It is a real
  * 684-byte binary STL served by the test's own Vite server, so the detail napplets can
  * resolve a real NIP-94 event and the STL viewer can exercise NAP-RESOURCE fetch, parse,
  * render rather than a stub.
  */
-function buildFileEvent(baseUrl, object, index) {
+function buildFileEvent(baseUrl, printable, index) {
   return finalizeEvent(
     {
       kind: 1063,
@@ -130,11 +130,11 @@ function buildFileEvent(baseUrl, object, index) {
         ['url', `${baseUrl}/src/assets/cube.stl`],
         ['m', 'model/stl'],
         ['size', '684'],
-        ['name', `${object.identifier}.stl`],
+        ['name', `${printable.identifier}.stl`],
       ],
-      content: `Printable part for ${object.title}.`,
+      content: `Printable part for ${printable.title}.`,
     },
-    SECRET_KEYS[object.maker],
+    SECRET_KEYS[printable.maker],
   );
 }
 
@@ -151,46 +151,46 @@ export function buildFixtureEvents(baseUrl) {
     ),
   );
 
-  // Files are built first: an object's `e` tag has to name an id that already exists.
-  const files = OBJECTS.map((object, index) => buildFileEvent(baseUrl, object, index));
+  // Files are built first: a printable's `e` tag has to name an id that already exists.
+  const files = PRINTABLES.map((printable, index) => buildFileEvent(baseUrl, printable, index));
 
-  const objects = OBJECTS.map((object, index) =>
+  const printables = PRINTABLES.map((printable, index) =>
     finalizeEvent(
       {
         kind: 33500,
         created_at: BASE_TIME + index + 1,
         tags: [
-          ['d', object.identifier],
-          ['title', object.title],
-          ['summary', object.summary],
+          ['d', printable.identifier],
+          ['title', printable.title],
+          ['summary', printable.summary],
           [
             'imeta',
             `url ${baseUrl}/src/assets/hero.png`,
             'm image/png',
-            `alt ${object.title} printed in blue PLA`,
+            `alt ${printable.title} printed in blue PLA`,
           ],
           // Role-marked file reference: the fourth position names what the file is to
-          // this object, which is how the detail napplet tells parts from instructions.
+          // this printable, which is how the detail napplet tells parts from instructions.
           ['e', files[index].id, '', 'part'],
-          ...object.topics.map((topic) => ['t', topic]),
+          ...printable.topics.map((topic) => ['t', topic]),
         ],
-        content: descriptionOf(object, baseUrl),
+        content: descriptionOf(printable, baseUrl),
       },
-      SECRET_KEYS[object.maker],
+      SECRET_KEYS[printable.maker],
     ),
   );
 
-  return [...profiles, ...files, ...objects];
+  return [...profiles, ...files, ...printables];
 }
 
-/** The kind-1063 file event id for a fixture object, by its position in `OBJECTS`. */
+/** The kind-1063 file event id for a fixture printable, by its position in `PRINTABLES`. */
 export function fileIdOf(baseUrl, identifier) {
-  const index = OBJECTS.findIndex((object) => object.identifier === identifier);
-  if (index === -1) throw new Error(`No fixture object named ${identifier}`);
-  return buildFileEvent(baseUrl, OBJECTS[index], index).id;
+  const index = PRINTABLES.findIndex((printable) => printable.identifier === identifier);
+  if (index === -1) throw new Error(`No fixture printable named ${identifier}`);
+  return buildFileEvent(baseUrl, PRINTABLES[index], index).id;
 }
 
-/** The address the printable-detail intent should produce for a fixture object. */
-export function addressOf(object) {
-  return `33500:${MAKERS[object.maker].pubkey}:${object.identifier}`;
+/** The address the printable-detail intent should produce for a fixture printable. */
+export function addressOf(printable) {
+  return `33500:${MAKERS[printable.maker].pubkey}:${printable.identifier}`;
 }

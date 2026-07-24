@@ -14,12 +14,12 @@ const baseUrl = `http://${host}:${port}`;
 /**
  * The local dev relay, which is expected to already be running — the same one dev builds
  * read from via `STLSTR_DEV_RELAY`. Fixtures are seeded into it rather than served from a
- * throwaway relay, so tests and manual development see the same objects.
+ * throwaway relay, so tests and manual development see the same printables.
  */
 const relayUrl = process.env.STLSTR_TEST_RELAY_URL || 'ws://localhost:4869';
 const registryPath = join(root, 'apps', 'stlstr', 'public', 'napplets.dev.json');
 const testNapplets = [
-  { name: 'print-discover', title: 'Discover Prints' },
+  { name: 'print-discvr', title: 'Discover Prints' },
   { name: 'print-browse', title: 'Browse Prints' },
   { name: 'print-create', title: 'Create Print' },
   { name: 'print-detail', title: 'Print Detail' },

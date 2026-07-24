@@ -70,7 +70,7 @@ test('stlstr routes create to the printable-create napplet', async () => {
     assert.equal(await page.$('main h1'), null);
 
     const frame = await nappletFrame(page, 'Create print');
-    await frame.waitForSelector('#object-title');
+    await frame.waitForSelector('#printable-title');
     assert.equal(await frame.$('h1'), null);
     assert.equal(await frame.$('.card'), null);
   } finally {
@@ -78,20 +78,20 @@ test('stlstr routes create to the printable-create napplet', async () => {
   }
 });
 
-test('stlstr routes object details to a dedicated napplet', async () => {
-  const page = await openStlstr('/objects/testpubkey/test-object');
+test('stlstr routes printable details to a dedicated napplet', async () => {
+  const page = await openStlstr('/printables/testpubkey/test-printable');
 
   try {
     assert.equal(await page.$('main > .card'), null);
     assert.equal(await page.$('main h1'), null);
 
     const frame = await nappletFrame(page, 'Print details');
-    // This address names no fixture object, so the napplet reports that rather than
+    // This address names no fixture printable, so the napplet reports that rather than
     // rendering one — which is still the napplet owning the page, not the shell.
-    // Wait for the settled message: `object-status` also carries "Loading print...".
+    // Wait for the settled message: `printable-status` also carries "Loading print...".
     await frame.waitForFunction(() =>
       document
-        .querySelector('[data-testid="object-status"]')
+        .querySelector('[data-testid="printable-status"]')
         ?.textContent?.includes('not been published'),
     );
     assert.equal(await frame.$('h1'), null);
@@ -101,15 +101,15 @@ test('stlstr routes object details to a dedicated napplet', async () => {
   }
 });
 
-test('stlstr routes object edits to a dedicated napplet', async () => {
-  const page = await openStlstr('/objects/testpubkey/test-object/edit');
+test('stlstr routes printable edits to a dedicated napplet', async () => {
+  const page = await openStlstr('/printables/testpubkey/test-printable/edit');
 
   try {
     assert.equal(await page.$('main > .card'), null);
     assert.equal(await page.$('main h1'), null);
 
     const frame = await nappletFrame(page, 'Edit print');
-    // No such object exists, so the napplet says so rather than opening an editor.
+    // No such printable exists, so the napplet says so rather than opening an editor.
     await frame.waitForFunction(() =>
       document
         .querySelector('[data-testid="edit-status"]')

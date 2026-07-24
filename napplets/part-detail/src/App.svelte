@@ -16,7 +16,7 @@
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import {
     FILE_KIND,
-    OBJECT_KIND,
+    PRINTABLE_KIND,
     fileIdsFor,
     formatBytes,
     isPreviewable,
@@ -37,7 +37,7 @@
    * Part detail page for one NIP-94 file event.
    *
    * The page owns the file-event lookup, the NIP-22 file comment thread, and the reverse
-   * object lookup that answers "which printables include this part?". The STL viewer only
+   * usage lookup that answers "which printables include this part?". The STL viewer only
    * receives resource params, so preview remains a NAP-INTENT handoff.
    */
 
@@ -234,7 +234,7 @@
     usages = [];
 
     try {
-      const { events } = await outbox.query([{ kinds: [OBJECT_KIND], '#e': [id] }], {
+      const { events } = await outbox.query([{ kinds: [PRINTABLE_KIND], '#e': [id] }], {
         timeoutMs: 6000,
       });
       if (fileId !== id) return;
@@ -245,7 +245,7 @@
         const identifier = tagValue(event.tags, 'd');
         if (!identifier) continue;
 
-        const address = `${OBJECT_KIND}:${event.pubkey}:${identifier}`;
+        const address = `${PRINTABLE_KIND}:${event.pubkey}:${identifier}`;
         const current = newest.get(address);
         if (current && current.createdAt >= event.created_at) continue;
 
@@ -599,7 +599,7 @@
         data-testid="part-panel-comments"
       >
         <Comments
-          object={fileEvent}
+          event={fileEvent}
           {viewer}
           active={activeTab === 'comments'}
           placeholder="Ask about fit, print settings, or file compatibility..."

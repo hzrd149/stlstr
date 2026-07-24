@@ -1,6 +1,6 @@
 {
   "name": "print-edit",
-  "displayName": "Edit Object",
+  "displayName": "Edit Printable",
   "version": "0.1.0",
   "private": true,
   "type": "module",

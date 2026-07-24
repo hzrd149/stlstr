@@ -1,5 +1,5 @@
 /**
- * Markdown parsing for object descriptions (see NIP.md, "Markdown Content").
+ * Markdown parsing for printable descriptions (see NIP.md, "Markdown Content").
  *
  * The description is written by whoever published the event, so rendering it is a security
  * boundary rather than a formatting concern. This module produces a *token tree* and never

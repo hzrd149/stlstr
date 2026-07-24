@@ -22,15 +22,15 @@
    */
 
   const {
-    object,
+    event,
     viewer,
     active,
     onCommentPublished,
     placeholder = 'Share a print, a tip, or a question...',
     emptyText = 'No comments yet. Be the first to share how this printed.',
   }: {
-    /** The event being discussed: a printable object, a NIP-94 file, a make, etc. */
-    object: NostrEvent | null;
+    /** The event being discussed: a printable, a NIP-94 file, a make, etc. */
+    event: NostrEvent | null;
     viewer: string;
     active: boolean;
     onCommentPublished?: () => void;
@@ -120,7 +120,7 @@
   }
 
   $effect(() => {
-    const root = object;
+    const root = event;
     const scope = root ? commentScopeKey(root) : '';
     const author = root?.pubkey ?? '';
     const shouldLoad = active;
@@ -206,8 +206,8 @@
   }
 
   async function publishComment(): Promise<void> {
-    if (!object) return;
-    if (await publish(object, draft)) draft = '';
+    if (!event) return;
+    if (await publish(event, draft)) draft = '';
   }
 
   async function publishReply(): Promise<void> {
@@ -216,7 +216,7 @@
   }
 </script>
 
-<section class="grid gap-3" aria-label="Comments" data-testid="object-comments">
+<section class="grid gap-3" aria-label="Comments" data-testid="event-comments">
   {#if viewer}
     <div class="grid gap-2">
       <textarea
@@ -233,7 +233,7 @@
         type="button"
         class="btn btn-primary w-fit"
         data-testid="publish-comment"
-        disabled={publishing || draft.trim().length === 0 || !object}
+        disabled={publishing || draft.trim().length === 0 || !event}
         onclick={publishComment}
       >
         {publishing ? 'Posting...' : 'Post comment'}

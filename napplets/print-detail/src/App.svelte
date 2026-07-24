@@ -9,7 +9,7 @@
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import { formatBytes, isPreviewable, readFileMeta, type FileMeta } from '@stlstr/napplet-kit/files';
-  import { parseImages, type ObjectImage } from '@stlstr/napplet-kit/images';
+  import { parseImages, type PrintableImage } from '@stlstr/napplet-kit/images';
   import {
     buildSlicerBridgeUri,
     isSlicerOpenableFile,
@@ -21,7 +21,7 @@
   import Printer from '@lucide/svelte/icons/printer';
 
   /**
-   * The object detail page.
+   * The printable detail page.
    *
    * The gallery, part files, owner actions, and the NIP-22 comment thread are built here.
    * Makes and remixes are still to come.
@@ -53,7 +53,7 @@
   let title = $state('');
   let summary = $state('');
   let parts = $state<PartFile[]>([]);
-  let images = $state<ObjectImage[]>([]);
+  let images = $state<PrintableImage[]>([]);
   let activeImage = $state(0);
   let status = $state('Waiting for a print to open...');
   let canPreview = $state(false);
@@ -61,18 +61,18 @@
   let commentCount = $state<number | null>(null);
   let commentsCounting = $state(false);
 
-  /** Address and author of the object on screen, set once it loads. */
+  /** Address and author of the printable on screen, set once it loads. */
   let address = $state('');
   let owner = $state('');
   /**
-   * The object event itself. The comment thread needs the whole event, not its address:
+   * The printable event itself. The comment thread needs the whole event, not its address:
    * applesauce builds a comment's NIP-22 tags from the parent event it is given.
    *
    * `$state.raw` is required, not a preference. Applesauce's event helpers memoize onto the
    * event with symbol properties, and writing to a deep `$state` proxy from inside a
    * `$derived` throws `state_unsafe_mutation` — which killed the whole comment thread.
    */
-  let object = $state.raw<NostrEvent | null>(null);
+  let printableEvent = $state.raw<NostrEvent | null>(null);
   /** Who is signed in, per NAP-IDENTITY. Empty when nobody is, which is the safe default. */
   let viewer = $state('');
 
@@ -80,8 +80,8 @@
   const slicerOpenableParts = $derived(parts.map((part) => part.meta).filter(isSlicerOpenableFile));
   const slicerCompatibility = $derived(slicerCompatibilityInfo(slicerOpenableParts));
 
-  /** The object's Markdown body, per NIP.md. */
-  const description = $derived(object?.content.trim() ?? '');
+  /** The printable's Markdown body, per NIP.md. */
+  const description = $derived(printableEvent?.content.trim() ?? '');
 
   /**
    * The owner-only gate. NAP-IDENTITY is the sole source of truth for who is signed in, so
@@ -97,7 +97,7 @@
   const hasCount = () => hasMethods('count', 'query');
   const hasLink = () => hasMethods('link', 'open');
 
-  /** File references this object marks as printable parts, in publication order. */
+  /** File references this printable marks as printable parts, in publication order. */
   function partIds(tags: string[][]): string[] {
     return tags.filter((tag) => tag[0] === 'e' && tag[3] === 'part' && tag[1]).map((tag) => tag[1]);
   }
@@ -108,7 +108,7 @@
     const { events } = await outbox.query([{ ids }], { timeoutMs: 5000 });
     const byId = new Map(events.map((result) => [result.event.id, result.event]));
 
-    // Preserve the object's own ordering rather than relay arrival order.
+    // Preserve the printable's own ordering rather than relay arrival order.
     parts = ids.flatMap((id) => {
       const event = byId.get(id);
       if (!event) return [];
@@ -156,7 +156,7 @@
 
   // The parameter is deliberately not named `address`: that would shadow the state below,
   // and the assignments at the end would land on the local instead of the owner gate.
-  async function loadObject(requested: string): Promise<void> {
+  async function loadPrintable(requested: string): Promise<void> {
     const [kind, pubkey, ...rest] = requested.split(':');
     const identifier = rest.join(':');
 
@@ -176,7 +176,7 @@
     activeImage = 0;
     owner = '';
     address = '';
-    object = null;
+    printableEvent = null;
     commentCount = null;
     commentsCounting = false;
 
@@ -201,7 +201,7 @@
       // The author of the event is the owner — not whoever the address claimed.
       owner = newest.pubkey;
       address = `33500:${newest.pubkey}:${identifier}`;
-      object = newest;
+      printableEvent = newest;
       status = '';
       void loadCommentCount(address);
       await loadParts(partIds(newest.tags));
@@ -248,7 +248,7 @@
     if (uri) void link.open(uri, { label: `Open ${slicerOpenableParts.length} files in slicer` });
   }
 
-  /** Owner-only: hands the object to whichever napplet fulfills the `printable-edit` role. */
+  /** Owner-only: hands the printable to whichever napplet fulfills the `printable-edit` role. */
   async function edit(): Promise<void> {
     if (!address || !hasIntentOpen()) return;
     const result = await intent.open('printable-edit', { address });
@@ -262,7 +262,7 @@
       return;
     }
 
-    void loadObject(address);
+    void loadPrintable(address);
   }
 
   onMount(() => {
@@ -321,7 +321,7 @@
         </div>
 
         {#if images.length > 1}
-          <div class="flex gap-2 overflow-x-auto" data-testid="object-thumbnails">
+          <div class="flex gap-2 overflow-x-auto" data-testid="printable-thumbnails">
             {#each images as image, index (image.url)}
               <button
                 type="button"
@@ -354,13 +354,13 @@
 
     <section class="grid content-start gap-3 lg:col-span-2" aria-label="Print actions">
       {#if title}
-        <h1 class="text-2xl font-bold" data-testid="object-title">{title}</h1>
+        <h1 class="text-2xl font-bold" data-testid="printable-title">{title}</h1>
       {/if}
       {#if summary}
         <p class="text-base-content/70">{summary}</p>
       {/if}
       {#if status}
-        <p class="text-sm text-base-content/60" aria-live="polite" data-testid="object-status">
+        <p class="text-sm text-base-content/60" aria-live="polite" data-testid="printable-status">
           {status}
         </p>
       {/if}
@@ -380,7 +380,7 @@
             Open all
           </button>
         {/if}
-        <ul class="grid gap-2" data-testid="object-parts">
+        <ul class="grid gap-2" data-testid="printable-parts">
           {#each parts as part (part.id)}
             <li
               class="flex items-center justify-between gap-2 rounded-box border border-base-300 p-2"
@@ -471,18 +471,18 @@
       {#if isOwner}
         <!-- Owner-only: rendered solely when NAP-IDENTITY says the viewer authored this. -->
         <div class="divider my-0"></div>
-        <button type="button" class="btn btn-outline" data-testid="edit-object" onclick={edit}>
+        <button type="button" class="btn btn-outline" data-testid="edit-printable" onclick={edit}>
           Edit this print
         </button>
       {/if}
     </section>
   </div>
 
-  {#if object}
+  {#if printableEvent}
     <!-- The tabbed lower half. Panels are hidden rather than unmounted, so the comment
          thread keeps its live subscription and drafts across tab switches. -->
     <div class="mt-6">
-      <div role="tablist" class="tabs tabs-border" data-testid="object-tabs">
+      <div role="tablist" class="tabs tabs-border" data-testid="printable-tabs">
         {#each TABS as tab (tab.id)}
           <button
             type="button"
@@ -491,7 +491,7 @@
             class="tab {activeTab === tab.id ? 'tab-active' : ''}"
             aria-selected={activeTab === tab.id}
             aria-controls="panel-{tab.id}"
-            data-testid="object-tab"
+            data-testid="printable-tab"
             data-tab={tab.id}
             onclick={() => (activeTab = tab.id)}
           >
@@ -506,7 +506,7 @@
         aria-labelledby="tab-description"
         class="pt-4"
         hidden={activeTab !== 'description'}
-        data-testid="object-panel-description"
+        data-testid="printable-panel-description"
       >
         {#if description}
           <Markdown source={description} />
@@ -521,10 +521,10 @@
         aria-labelledby="tab-comments"
         class="pt-4"
         hidden={activeTab !== 'comments'}
-        data-testid="object-panel-comments"
+        data-testid="printable-panel-comments"
       >
         <Comments
-          {object}
+          event={printableEvent}
           {viewer}
           active={activeTab === 'comments'}
           onCommentPublished={incrementCommentCount}

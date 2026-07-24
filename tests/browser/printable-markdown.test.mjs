@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import puppeteer from 'puppeteer';
-import { MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
+import { MAKERS, PRINTABLES } from '../../scripts/lib/test-fixtures.mjs';
 
 /**
- * Markdown rendering of an object description, per NIP.md's "Markdown Content".
+ * Markdown rendering of a printable description, per NIP.md's "Markdown Content".
  *
  * Half of these assert formatting; the other half assert refusals. The refusals matter more:
  * the description is written by whoever published the event, and the napplet holds NAP grants
@@ -14,8 +14,8 @@ import { MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
 const baseUrl = process.env.STLSTR_TEST_BASE_URL || 'http://127.0.0.1:5174';
 
 /** The fixture carrying the Markdown description. */
-const SUBJECT = OBJECTS.find((object) => object.description);
-const objectPath = `/objects/${MAKERS[SUBJECT.maker].pubkey}/${SUBJECT.identifier}`;
+const SUBJECT = PRINTABLES.find((printable) => printable.description);
+const printablePath = `/printables/${MAKERS[SUBJECT.maker].pubkey}/${SUBJECT.identifier}`;
 
 let browser;
 let page;
@@ -30,14 +30,14 @@ before(async () => {
 
   page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
-  await page.goto(`${baseUrl}${objectPath}`, { waitUntil: 'networkidle0' });
+  await page.goto(`${baseUrl}${printablePath}`, { waitUntil: 'networkidle0' });
 
   const handle = await page.waitForSelector('iframe[title="Print details napplet"]');
   frame = await handle.contentFrame();
   assert.ok(frame, 'print detail iframe should be available');
 
   // The description tab is the default panel, but it only exists once the event loads.
-  await frame.waitForSelector('[data-testid="object-description"]');
+  await frame.waitForSelector('[data-testid="markdown-content"]');
 });
 
 after(async () => {
@@ -46,17 +46,17 @@ after(async () => {
 
 /** Text content of the description, with runs of whitespace collapsed. */
 async function descriptionText() {
-  return frame.$eval('[data-testid="object-description"]', (node) =>
+  return frame.$eval('[data-testid="markdown-content"]', (node) =>
     node.textContent.replace(/\s+/g, ' ').trim(),
   );
 }
 
 async function countIn(selector) {
-  return frame.$$eval(`[data-testid="object-description"] ${selector}`, (nodes) => nodes.length);
+  return frame.$$eval(`[data-testid="markdown-content"] ${selector}`, (nodes) => nodes.length);
 }
 
 test('block structure is rendered as elements, not as literal Markdown', async () => {
-  const structure = await frame.$eval('[data-testid="object-description"]', (node) => ({
+  const structure = await frame.$eval('[data-testid="markdown-content"]', (node) => ({
     headings: node.querySelectorAll('h2, h3').length,
     lists: node.querySelectorAll('ul, ol').length,
     blockquotes: node.querySelectorAll('blockquote').length,
@@ -84,13 +84,13 @@ test('inline formatting, tables and task lists render', async () => {
   assert.ok((await countIn('del')) >= 1, 'GFM strikethrough');
   assert.ok((await countIn('code')) >= 2, 'a code span as well as the fenced block');
 
-  const cells = await frame.$$eval('[data-testid="object-description"] table td', (nodes) =>
+  const cells = await frame.$$eval('[data-testid="markdown-content"] table td', (nodes) =>
     nodes.map((node) => node.textContent.trim()),
   );
   assert.deepEqual(cells, ['Layer height', '0.2mm', 'Infill', '15%']);
 
   const checkboxes = await frame.$$eval(
-    '[data-testid="object-description"] input[type="checkbox"]',
+    '[data-testid="markdown-content"] input[type="checkbox"]',
     (nodes) => nodes.map((node) => ({ checked: node.checked, disabled: node.disabled })),
   );
   assert.deepEqual(checkboxes, [
@@ -119,7 +119,7 @@ test('raw HTML in a description is never inserted into the document', async () =
 });
 
 test('a javascript: link is refused but its label still reads', async () => {
-  const hrefs = await frame.$$eval('[data-testid="object-description"] a', (nodes) =>
+  const hrefs = await frame.$$eval('[data-testid="markdown-content"] a', (nodes) =>
     nodes.map((node) => node.getAttribute('href')),
   );
 
@@ -138,10 +138,10 @@ test('a data: image is refused and a permitted image loads through NAP-RESOURCE'
   // Exactly one image is allowed to load: the https one. The data: URL must not become an
   // <img> at all, since loading it would put an author-controlled document in the frame.
   await frame.waitForFunction(
-    () => document.querySelectorAll('[data-testid="object-description"] img').length === 1,
+    () => document.querySelectorAll('[data-testid="markdown-content"] img').length === 1,
   );
 
-  const sources = await frame.$$eval('[data-testid="object-description"] img', (nodes) =>
+  const sources = await frame.$$eval('[data-testid="markdown-content"] img', (nodes) =>
     nodes.map((node) => node.getAttribute('src')),
   );
 
@@ -154,7 +154,7 @@ test('a data: image is refused and a permitted image loads through NAP-RESOURCE'
 test('a link click leaves through NAP-LINK rather than navigating the frame', async () => {
   const before = frame.url();
 
-  await frame.$eval('[data-testid="object-description"] a', (node) => node.click());
+  await frame.$eval('[data-testid="markdown-content"] a', (node) => node.click());
   // A sandboxed frame cannot navigate itself out; the point is that the anchor's default is
   // suppressed and the shell is asked instead, so the napplet stays put.
   await new Promise((resolve) => setTimeout(resolve, 250));

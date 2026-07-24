@@ -1,13 +1,13 @@
 <script lang="ts">
   import { loadImageUrl } from '@stlstr/napplet-kit/images';
-  import type { ObjectImage } from './objects';
+  import type { PrintableImage } from './printables';
 
   /**
    * A card's cover art. Three states: pending (skeleton), loaded (image), unavailable
    * (a neutral placeholder). A missing cover is normal, so it never reads as an error.
    */
 
-  const { cover, title }: { cover: ObjectImage | null; title: string } = $props();
+  const { cover, title }: { cover: PrintableImage | null; title: string } = $props();
 
   let objectUrl = $state('');
   let settled = $state(false);
@@ -33,7 +33,7 @@
 
     if (url) {
       void loadImageUrl(url).then((next) => {
-        // The card may have been recycled onto another object while this was in flight.
+        // The card may have been recycled onto another printable while this was in flight.
         if (stale) {
           if (next) URL.revokeObjectURL(next);
           return;

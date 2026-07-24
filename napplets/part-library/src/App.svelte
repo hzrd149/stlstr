@@ -2,7 +2,7 @@
   import { identity, inc, intent, link, outbox, type NostrEvent } from '@napplet/sdk';
   import {
     FILE_KIND,
-    OBJECT_KIND,
+    PRINTABLE_KIND,
     PRINTABLE_PART_MIME_TYPES,
     fileIdsFor,
     formatBytes,
@@ -28,13 +28,13 @@
    * The signed-in user's own part files.
    *
    * Every file is an independent NIP-94 `kind:1063` event (see NIP.md). Until now they were
-   * only ever created as a side effect of publishing an object, which made them invisible
-   * to the person who owns them: unreachable except through whichever object happens to
+    * only ever created as a side effect of publishing a printable, which made them invisible
+    * to the person who owns them: unreachable except through whichever printable happens to
    * reference them, and impossible to audit or reuse.
    *
    * The role a file plays — `part`, `instructions`, `aux` — lives on the referencing
-   * object's `e` tag, not on the file event, because the same file can be a part in one
-   * object and an auxiliary in another. So this page cannot group or filter by role. It
+    * printable's `e` tag, not on the file event, because the same file can be a part in one
+    * printable and an auxiliary in another. So this page cannot group or filter by role. It
    * shows files, and answers "what uses this" by querying the other direction.
    */
 
@@ -62,7 +62,7 @@
     description: string;
   };
 
-  /** One object that references a file. May belong to someone else — see `loadUsage`. */
+  /** One printable that references a file. May belong to someone else — see `loadUsage`. */
   type Usage = {
     address: string;
     title: string;
@@ -180,11 +180,11 @@
   }
 
   /**
-   * Resolves which objects reference these files, per NIP.md's "find objects using a
-   * specific file event" query.
+    * Resolves which printables reference these files, per NIP.md's "find printables using a
+    * specific file event" query.
    *
    * Deliberately **not** author-scoped. Files are meant to be shared — the NIP asks clients
-   * to let objects reference other people's file events — so a stranger's object appearing
+    * to let printables reference other people's file events — so a stranger's printable appearing
    * here is correct, and is exactly what someone needs to know before removing a file.
    *
    * What it finds is bounded by the relays the shell reads. An empty result means "nothing
@@ -203,7 +203,7 @@
     try {
       for (let start = 0; start < ids.length; start += USAGE_BATCH) {
         const batch = ids.slice(start, start + USAGE_BATCH);
-        const { events } = await outbox.query([{ kinds: [OBJECT_KIND], '#e': batch }], {
+        const { events } = await outbox.query([{ kinds: [PRINTABLE_KIND], '#e': batch }], {
           timeoutMs: 6000,
         });
         if (viewer !== pubkey) return;
@@ -215,7 +215,7 @@
           const identifier = tagValue(event.tags, 'd');
           if (!identifier) continue;
 
-          const address = `${OBJECT_KIND}:${event.pubkey}:${identifier}`;
+          const address = `${PRINTABLE_KIND}:${event.pubkey}:${identifier}`;
           // Addressable events arrive in several revisions; one entry per address.
           if (seen.has(address)) continue;
           seen.add(address);
@@ -226,7 +226,7 @@
             pubkey: event.pubkey,
           };
 
-          // One object can reference several of the files in this batch.
+          // One printable can reference several of the files in this batch.
           for (const fileId of fileIdsFor(event)) {
             if (!inBatch.has(fileId)) continue;
             collected.set(fileId, [...(collected.get(fileId) ?? []), entry]);
@@ -245,7 +245,7 @@
     }
   }
 
-  /** Names for the other people whose objects use these files. */
+  /** Names for the other people whose printables use these files. */
   async function loadMakers(pubkeys: string[]): Promise<void> {
     const resolved = await fetchMakers(pubkeys);
     const next = new Map(makers);
@@ -293,10 +293,10 @@
     if (uri) void link.open(uri, { label: `Open ${file.meta.name} in slicer` });
   }
 
-  async function openObject(entry: Usage): Promise<void> {
+  async function openPrintable(entry: Usage): Promise<void> {
     if (!hasIntentOpen()) return;
     const result = await intent.open(DETAIL_ARCHETYPE, { address: entry.address });
-    if (!result.ok) status = result.error ?? 'Could not open that object.';
+    if (!result.ok) status = result.error ?? 'Could not open that printable.';
   }
 
   async function openPart(file: LibraryFile): Promise<void> {
@@ -379,7 +379,7 @@
     <div>
       <h1 class="text-2xl font-bold">Your parts</h1>
       <p class="text-sm text-base-content/70">
-        Files you have published, and the objects that use them.
+        Files you have published, and the printables that use them.
       </p>
     </div>
     {#if canUpload && signedIn}
@@ -554,7 +554,7 @@
             <div class="mt-3 border-t border-base-300 pt-3" data-testid="part-usage">
               {#if uses.length === 0}
                 <p class="text-sm text-base-content/70">
-                  No object on the relays we can reach references this file. That is not proof none
+                  No printable on the relays we can reach references this file. That is not proof none
                   does.
                 </p>
               {:else}
@@ -566,12 +566,12 @@
                         class="link"
                         data-testid="open-usage"
                         data-address={entry.address}
-                        onclick={() => openObject(entry)}
+                        onclick={() => openPrintable(entry)}
                       >
                         {entry.title}
                       </button>
                       {#if entry.pubkey !== viewer}
-                        <!-- Someone else's object. Correct and expected — the NIP asks
+                        <!-- Someone else's printable. Correct and expected — the NIP asks
                              clients to allow it — but it must never look like the user's. -->
                         <span class="badge badge-ghost badge-sm" data-testid="usage-other-author">
                           by {makerDisplayName(makers.get(entry.pubkey))}

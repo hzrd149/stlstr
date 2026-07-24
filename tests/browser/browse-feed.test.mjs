@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import puppeteer from 'puppeteer';
-import { addressOf, MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
+import { addressOf, MAKERS, PRINTABLES } from '../../scripts/lib/test-fixtures.mjs';
 
 /**
- * The search feed, end to end: objects published to the test relay are read through
+ * The search feed, end to end: printables published to the test relay are read through
  * NAP-OUTBOX, covers are proxied through NAP-RESOURCE, and both click targets on a card
  * dispatch NAP-INTENT.
  */
@@ -12,7 +12,7 @@ import { addressOf, MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs'
 const baseUrl = process.env.STLSTR_TEST_BASE_URL || 'http://127.0.0.1:5174';
 
 /** Fixtures are ordered oldest first, so the last one is the newest card. */
-const NEWEST = OBJECTS[OBJECTS.length - 1];
+const NEWEST = PRINTABLES[PRINTABLES.length - 1];
 
 let browser;
 
@@ -46,28 +46,30 @@ function textsOf(frame, selector) {
   return frame.$$eval(selector, (nodes) => nodes.map((node) => node.textContent?.trim() ?? ''));
 }
 
-test('the feed lists recently published objects, newest first', async () => {
+test('the feed lists recently published printables, newest first', async () => {
   const { page, frame } = await openBrowse();
 
   try {
-    // The dev relay is shared with manual development, so it may hold objects beyond the
+    // The dev relay is shared with manual development, so it may hold printables beyond the
     // fixtures. Assert on the fixtures rather than on the whole feed.
     await frame.waitForFunction(
       (expected) => {
-        const shown = [...document.querySelectorAll('[data-testid="object-title"]')].map(
+        const shown = [...document.querySelectorAll('[data-testid="printable-title"]')].map(
           (node) => node.textContent?.trim() ?? '',
         );
         return expected.every((title) => shown.includes(title));
       },
       {},
-      OBJECTS.map((object) => object.title),
+      PRINTABLES.map((printable) => printable.title),
     );
 
-    const titles = await textsOf(frame, '[data-testid="object-title"]');
-    const fixtureOrder = titles.filter((title) => OBJECTS.some((object) => object.title === title));
+    const titles = await textsOf(frame, '[data-testid="printable-title"]');
+    const fixtureOrder = titles.filter((title) =>
+      PRINTABLES.some((printable) => printable.title === title),
+    );
     assert.deepEqual(
       fixtureOrder,
-      [...OBJECTS].reverse().map((object) => object.title),
+      [...PRINTABLES].reverse().map((printable) => printable.title),
     );
   } finally {
     await page.close();
@@ -99,7 +101,7 @@ test('a cover image is proxied through NAP-RESOURCE', async () => {
   const { page, frame } = await openBrowse();
 
   try {
-    const image = await frame.waitForSelector('[data-testid="object-result"] img');
+    const image = await frame.waitForSelector('[data-testid="printable-result"] img');
 
     // A blob: URL is the proof it came through resource.bytes rather than a bare <img src>.
     assert.match(await image.evaluate((node) => node.src), /^blob:/);
@@ -109,19 +111,19 @@ test('a cover image is proxied through NAP-RESOURCE', async () => {
   }
 });
 
-test('clicking a card opens the object detail route', async () => {
+test('clicking a card opens the printable detail route', async () => {
   const { page, frame } = await openBrowse();
 
   try {
     const card = await frame.waitForSelector(
-      `[data-testid="open-object"][data-address="${addressOf(NEWEST)}"]`,
+      `[data-testid="open-printable"][data-address="${addressOf(NEWEST)}"]`,
     );
     await card.click();
 
     await page.waitForFunction(
       (expected) => window.location.pathname === expected,
       {},
-      `/objects/${MAKERS[NEWEST.maker].pubkey}/${NEWEST.identifier}`,
+      `/printables/${MAKERS[NEWEST.maker].pubkey}/${NEWEST.identifier}`,
     );
     await page.waitForSelector('iframe[title="Print details napplet"]');
   } finally {
@@ -164,22 +166,22 @@ test('a tag route narrows the feed to that topic', async () => {
   const { page, frame } = await openBrowse('/tags/workshop', '#workshop');
 
   try {
-    const expected = OBJECTS.filter((object) => object.topics.includes('workshop'));
+    const expected = PRINTABLES.filter((printable) => printable.topics.includes('workshop'));
     await frame.waitForFunction(
       (titles) => {
-        const shown = [...document.querySelectorAll('[data-testid="object-title"]')].map(
+        const shown = [...document.querySelectorAll('[data-testid="printable-title"]')].map(
           (node) => node.textContent?.trim() ?? '',
         );
         return titles.every((title) => shown.includes(title));
       },
       {},
-      expected.map((object) => object.title),
+      expected.map((printable) => printable.title),
     );
 
-    // Objects that carry the tag are shown; the ones that do not are filtered out.
-    const titles = await textsOf(frame, '[data-testid="object-title"]');
-    const excluded = OBJECTS.filter((object) => !object.topics.includes('workshop'));
-    for (const object of excluded) assert.ok(!titles.includes(object.title), object.title);
+    // Printables that carry the tag are shown; the ones that do not are filtered out.
+    const titles = await textsOf(frame, '[data-testid="printable-title"]');
+    const excluded = PRINTABLES.filter((printable) => !printable.topics.includes('workshop'));
+    for (const printable of excluded) assert.ok(!titles.includes(printable.title), printable.title);
   } finally {
     await page.close();
   }
@@ -199,16 +201,16 @@ test('searching routes through the shell and filters the feed', async () => {
     const searched = await handle.contentFrame();
     await searched.waitForSelector('[data-testid="browse-results"]');
     await searched.waitForFunction(() =>
-      [...document.querySelectorAll('[data-testid="object-title"]')].some(
+      [...document.querySelectorAll('[data-testid="printable-title"]')].some(
         (node) => node.textContent?.trim() === 'Hex Bit Holder',
       ),
     );
 
     // Every result matched the query; the other fixtures are gone.
-    const titles = await textsOf(searched, '[data-testid="object-title"]');
-    for (const object of OBJECTS) {
-      if (object.title === 'Hex Bit Holder') continue;
-      assert.ok(!titles.includes(object.title), `${object.title} should not match "hex bit"`);
+    const titles = await textsOf(searched, '[data-testid="printable-title"]');
+    for (const printable of PRINTABLES) {
+      if (printable.title === 'Hex Bit Holder') continue;
+      assert.ok(!titles.includes(printable.title), `${printable.title} should not match "hex bit"`);
     }
   } finally {
     await page.close();

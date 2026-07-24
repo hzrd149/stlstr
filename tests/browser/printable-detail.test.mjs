@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import puppeteer from 'puppeteer';
-import { MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
+import { MAKERS, PRINTABLES } from '../../scripts/lib/test-fixtures.mjs';
 
 /**
- * The object detail page: images arrive through NAP-RESOURCE, and the owner-only edit
+ * The printable detail page: images arrive through NAP-RESOURCE, and the owner-only edit
  * action is gated on NAP-IDENTITY.
  */
 
 const baseUrl = process.env.STLSTR_TEST_BASE_URL || 'http://127.0.0.1:5174';
 
-const SUBJECT = OBJECTS[OBJECTS.length - 1];
+const SUBJECT = PRINTABLES[PRINTABLES.length - 1];
 const OWNER = MAKERS[SUBJECT.maker];
-/** A maker who exists but did not publish the object under test. */
+/** A maker who exists but did not publish the printable under test. */
 const STRANGER = Object.values(MAKERS).find((maker) => maker.pubkey !== OWNER.pubkey);
 
-const objectPath = `/objects/${OWNER.pubkey}/${SUBJECT.identifier}`;
+const printablePath = `/printables/${OWNER.pubkey}/${SUBJECT.identifier}`;
 
 let browser;
 
@@ -59,11 +59,11 @@ async function freshPage() {
 }
 
 async function openObject(page) {
-  await page.goto(`${baseUrl}${objectPath}`, { waitUntil: 'networkidle0' });
+  await page.goto(`${baseUrl}${printablePath}`, { waitUntil: 'networkidle0' });
   const handle = await page.waitForSelector('iframe[title="Print details napplet"]');
   const frame = await handle.contentFrame();
   assert.ok(frame, 'print detail iframe should be available');
-  await frame.waitForSelector('[data-testid="object-title"]');
+  await frame.waitForSelector('[data-testid="printable-title"]');
   return frame;
 }
 
@@ -104,7 +104,7 @@ test('the print page renders its title and gallery image', async () => {
     const frame = await openObject(page);
 
     assert.equal(
-      await frame.$eval('[data-testid="object-title"]', (node) => node.textContent?.trim()),
+      await frame.$eval('[data-testid="printable-title"]', (node) => node.textContent?.trim()),
       SUBJECT.title,
     );
 
@@ -126,7 +126,7 @@ test('the edit action stays hidden when nobody is signed in', async () => {
     // The gallery having loaded means the page is settled, so an absent button is a
     // decision rather than a race.
     await frame.waitForSelector('section[aria-label="Print gallery"] img');
-    assert.equal(await frame.$('[data-testid="edit-object"]'), null);
+    assert.equal(await frame.$('[data-testid="edit-printable"]'), null);
   } finally {
     await close();
   }
@@ -143,7 +143,7 @@ test('the edit action stays hidden for a signed-in non-owner', async () => {
     // The gallery having loaded means the page is settled, so an absent button is a
     // decision rather than a race.
     await frame.waitForSelector('section[aria-label="Print gallery"] img');
-    assert.equal(await frame.$('[data-testid="edit-object"]'), null);
+    assert.equal(await frame.$('[data-testid="edit-printable"]'), null);
   } finally {
     await close();
   }
@@ -157,13 +157,13 @@ test('the owner sees the edit action and it opens the editor', async () => {
     const frame = await openObject(page);
     await signIn(page);
 
-    const edit = await frame.waitForSelector('[data-testid="edit-object"]');
+    const edit = await frame.waitForSelector('[data-testid="edit-printable"]');
     await edit.click();
 
     await page.waitForFunction(
       (expected) => window.location.pathname === expected,
       {},
-      `${objectPath}/edit`,
+      `${printablePath}/edit`,
     );
     await page.waitForSelector('iframe[title="Edit print napplet"]');
   } finally {

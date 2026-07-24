@@ -19,7 +19,7 @@ const FETCH_TIMEOUT_MS = 30_000;
 const MAX_CONCURRENT_FETCHES = 8;
 
 /**
- * Grant sentinel. Object cover images live on arbitrary Blossom servers and CDNs, so a
+ * Grant sentinel. Printable cover images live on arbitrary Blossom servers and CDNs, so a
  * static per-napplet origin allowlist cannot work for this product. Every napplet gets
  * the wildcard and `isOriginGranted` applies the URL policy below instead.
  */

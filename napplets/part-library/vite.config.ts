@@ -15,7 +15,7 @@ export default defineConfig({
       //
       // No `count`: per-file usage counts would need one count query per row, while a
       // single `#e` query over every file id returns the exact same numbers *and* the
-      // referencing objects themselves. Declaring it would grant a capability never used.
+      // referencing printables themselves. Declaring it would grant a capability never used.
       //
       // `resource` fetches thumbnail bytes. Pointing an `<img>` at a published `thumb` URL
       // would work, and would leak the reader's IP to whatever host the author chose.

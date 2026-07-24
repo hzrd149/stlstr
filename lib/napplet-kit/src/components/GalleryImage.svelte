@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { loadImageUrl, type ObjectImage } from '../images';
+  import { loadImageUrl, type PrintableImage } from '../images';
 
   /**
    * One image from the gallery, fetched through NAP-RESOURCE.
@@ -12,7 +12,7 @@
     image,
     fallbackAlt = '',
     fit = 'contain',
-  }: { image: ObjectImage | null; fallbackAlt?: string; fit?: 'contain' | 'cover' } = $props();
+  }: { image: PrintableImage | null; fallbackAlt?: string; fit?: 'contain' | 'cover' } = $props();
 
   let objectUrl = $state('');
   let settled = $state(false);

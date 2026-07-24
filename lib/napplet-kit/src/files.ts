@@ -1,11 +1,11 @@
 /**
  * Shared NIP-94 (`kind:1063`) file handling for napplets.
  *
- * Per NIP.md a printable object does not contain its files: it references them as
- * independent `kind:1063` events, marked with a role on the object's `e` tag. The role
+ * Per NIP.md a printable does not contain its files: it references them as
+ * independent `kind:1063` events, marked with a role on the printable's `e` tag. The role
  * therefore belongs to the *reference*, not to the file — the same event can be a `part`
- * in one object and `aux` in another — so nothing in this module carries a role field.
- * Callers that have an object in hand read the role off the `e` tag themselves.
+ * in one printable and `aux` in another — so nothing in this module carries a role field.
+ * Callers that have a printable in hand read the role off the `e` tag themselves.
  */
 
 import type { NostrEvent, NostrTag } from '@napplet/sdk';
@@ -14,10 +14,10 @@ import { tagValue } from './tags';
 /** The `kind:1063` events this module reads and writes. */
 export const FILE_KIND = 1063;
 
-/** The `kind:33500` printable objects that reference them. */
-export const OBJECT_KIND = 33500;
+/** The `kind:33500` printables that reference them. */
+export const PRINTABLE_KIND = 33500;
 
-/** The `kind:2351` makes users publish for a printable object (NIP.md). */
+/** The `kind:2351` makes users publish for a printable (NIP.md). */
 export const MAKE_KIND = 2351;
 
 /**
@@ -200,9 +200,9 @@ export function imetaFromNip94(tags: NostrTag[], alt: string, blurhash?: string)
 }
 
 /**
- * The file ids an object references, optionally narrowed to one role.
+ * The file ids a printable references, optionally narrowed to one role.
  *
- * The role is the fourth element of the `e` tag, per NIP.md. Order is the object's own
+ * The role is the fourth element of the `e` tag, per NIP.md. Order is the printable's own
  * publication order and is preserved: it is the only sequencing a client has.
  */
 export function fileIdsFor(event: NostrEvent, role?: string): string[] {

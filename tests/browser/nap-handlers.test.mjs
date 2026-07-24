@@ -175,7 +175,7 @@ test('NAP-INTENT open navigates the shell to the print route', async () => {
     assert.equal(result.handler, 'print-detail');
 
     await page.waitForFunction(
-      () => window.location.pathname === '/objects/deadbeef/adjustable-phone-stand',
+      () => window.location.pathname === '/printables/deadbeef/adjustable-phone-stand',
     );
     await page.waitForSelector('iframe[title="Print details napplet"]');
   } finally {

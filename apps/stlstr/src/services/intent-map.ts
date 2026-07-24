@@ -32,7 +32,7 @@ export const NAPPLET_CATEGORIES = [
   {
     id: 'printables',
     title: 'Printables',
-    description: 'View, publish, and edit 3D printable objects.',
+    description: 'View, publish, and edit 3D printables.',
   },
   { id: 'makes', title: 'Makes', description: 'Share and browse prints people actually made.' },
   {
@@ -114,8 +114,8 @@ export function readyTopic(archetype: string): string {
   return `${archetype}:ready`;
 }
 
-/** Address of a printable object: `33500:<pubkey>:<d>`. */
-const OBJECT_KIND = '33500';
+/** Address of a printable: `33500:<pubkey>:<d>`. */
+const PRINTABLE_KIND = '33500';
 
 /**
  * The one archetype the shell renders as a centered dialog over the current page rather
@@ -213,27 +213,27 @@ export function baseHref(currentUrl: string): string {
 function encodeAddressPath(address: string, suffix = ''): string | null {
   const [kind, pubkey, ...rest] = address.split(':');
   const identifier = rest.join(':');
-  if (kind !== OBJECT_KIND || !pubkey || !identifier) return null;
-  return `/objects/${encodeURIComponent(pubkey)}/${encodeURIComponent(identifier)}${suffix}`;
+  if (kind !== PRINTABLE_KIND || !pubkey || !identifier) return null;
+  return `/printables/${encodeURIComponent(pubkey)}/${encodeURIComponent(identifier)}${suffix}`;
 }
 
 /**
- * Normalizes the two accepted object references into one `address` field so napplets
+ * Normalizes the two accepted printable references into one `address` field so napplets
  * only ever parse a single shape.
  */
-export function normalizeObjectPayload(payload: IntentPayload): IntentPayload | null {
+export function normalizePrintablePayload(payload: IntentPayload): IntentPayload | null {
   const address = payload.address?.trim();
   if (address) return encodeAddressPath(address) ? { address } : null;
 
   const pubkey = payload.pubkey?.trim();
   const identifier = (payload.identifier ?? payload.d)?.trim();
-  if (pubkey && identifier) return { address: `${OBJECT_KIND}:${pubkey}:${identifier}` };
+  if (pubkey && identifier) return { address: `${PRINTABLE_KIND}:${pubkey}:${identifier}` };
   return null;
 }
 
 export const ARCHETYPES: Record<string, ArchetypeEntry> = {
   'printable-discovery': {
-    dTag: 'print-discover',
+    dTag: 'print-discvr',
     routeId: 'discovery',
     category: 'discover',
     nav: 'discover',
@@ -318,19 +318,19 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     description: 'View images, files, metadata, maker attribution, and print actions.',
     intents: {
       open: {
-        summary: 'Show one printable object: media, files, maker attribution, and actions.',
+        summary: 'Show one printable: media, files, maker attribution, and actions.',
         fields: [
           {
             name: 'address',
             required: true,
             description:
-              'Object address 33500:<pubkey>:<d>. Also accepts { pubkey, identifier } instead.',
+              'Printable address 33500:<pubkey>:<d>. Also accepts { pubkey, identifier } instead.',
           },
         ],
       },
     },
     toHref: (payload) => {
-      const normalized = normalizeObjectPayload(payload);
+      const normalized = normalizePrintablePayload(payload);
       return normalized ? encodeAddressPath(normalized.address) : null;
     },
   },
@@ -344,22 +344,22 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     description: 'Publish a new 3D printable model with images and files.',
     intents: {
       open: {
-        summary: 'Open the publisher for a new printable object.',
+        summary: 'Open the publisher for a new printable.',
         fields: [
           {
             name: 'remixOf',
             required: false,
-            description: 'Address of an existing object to remix; pre-fills remix attribution.',
+            description: 'Address of an existing printable to remix; pre-fills remix attribution.',
           },
         ],
       },
       create: {
-        summary: 'Publish a new printable object with its images and files.',
+        summary: 'Publish a new printable with its images and files.',
         fields: [
           {
             name: 'remixOf',
             required: false,
-            description: 'Address of an existing object to remix; pre-fills remix attribution.',
+            description: 'Address of an existing printable to remix; pre-fills remix attribution.',
           },
         ],
       },
@@ -474,7 +474,7 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
             name: 'address',
             required: true,
             description:
-              'Object address 33500:<pubkey>:<d> of the printable to edit. Also accepts { pubkey, identifier }.',
+              'Printable address 33500:<pubkey>:<d> of the printable to edit. Also accepts { pubkey, identifier }.',
           },
         ],
       },
@@ -485,13 +485,13 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
             name: 'address',
             required: true,
             description:
-              'Object address 33500:<pubkey>:<d> of the printable to edit. Also accepts { pubkey, identifier }.',
+              'Printable address 33500:<pubkey>:<d> of the printable to edit. Also accepts { pubkey, identifier }.',
           },
         ],
       },
     },
     toHref: (payload) => {
-      const normalized = normalizeObjectPayload(payload);
+      const normalized = normalizePrintablePayload(payload);
       return normalized ? encodeAddressPath(normalized.address, '/edit') : null;
     },
   },
@@ -500,7 +500,7 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     dTag: 'make-create',
     routeId: 'make-create',
     title: 'Post a make',
-    description: 'Share photos and notes of a print you made from a printable object.',
+    description: 'Share photos and notes of a print you made from a printable.',
     intents: {
       open: {
         summary: 'Open the composer to post a make for a printable you printed.',
@@ -509,24 +509,24 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
             name: 'address',
             required: true,
             description:
-              'Object address 33500:<pubkey>:<d> of the printable the make was built from.',
+              'Printable address 33500:<pubkey>:<d> of the printable the make was built from.',
           },
         ],
       },
       create: {
-        summary: 'Publish a make — photos and notes — for a printable object.',
+        summary: 'Publish a make — photos and notes — for a printable.',
         fields: [
           {
             name: 'address',
             required: true,
             description:
-              'Object address 33500:<pubkey>:<d> of the printable the make was built from.',
+              'Printable address 33500:<pubkey>:<d> of the printable the make was built from.',
           },
         ],
       },
     },
     toHref: (payload) => {
-      const normalized = normalizeObjectPayload(payload);
+      const normalized = normalizePrintablePayload(payload);
       return normalized ? encodeAddressPath(normalized.address, '/makes/new') : null;
     },
   },
@@ -633,8 +633,8 @@ export function intentFromLocation(location: {
     return intent('profile', 'open', { pubkey: decodePart(parts[1]) });
   }
 
-  if (parts[0] === 'objects' && parts[1] && parts[2]) {
-    const address = `${OBJECT_KIND}:${decodePart(parts[1])}:${decodePart(parts[2])}`;
+  if (parts[0] === 'printables' && parts[1] && parts[2]) {
+    const address = `${PRINTABLE_KIND}:${decodePart(parts[1])}:${decodePart(parts[2])}`;
     if (parts[3] === 'edit') return intent('printable-edit', 'edit', { address });
     if (parts[3] === 'makes' && parts[4] === 'new')
       return intent('make-create', 'open', { address });

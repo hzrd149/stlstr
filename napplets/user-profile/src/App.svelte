@@ -5,15 +5,15 @@
   import { loadImageUrl } from '@stlstr/napplet-kit/images';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import {
-    collectObject,
-    OBJECT_KIND,
+    collectPrintable,
+    PRINTABLE_KIND,
     sortByNewest,
     toPrintableObject,
     type PrintableObject,
-  } from './lib/objects';
+  } from './lib/printables';
 
   /**
-   * Renders one user's profile (kind 0) and the printable objects they have published.
+   * Renders one user's profile (kind 0) and the printables they have published.
    *
    * The pubkey arrives over the NAP-INTENT delivery seam: NAP-INTENT's SDK surface is
    * outbound only, so the shell hands the payload over as a targeted `inc.event` on
@@ -24,11 +24,11 @@
   const OPEN_TOPIC = 'profile:open';
   const READY_TOPIC = 'profile:ready';
 
-  /** How many of the maker's objects to pull. Pagination is a follow-up. */
-  const OBJECT_LIMIT = 60;
+  /** How many of the maker's printables to pull. Pagination is a follow-up. */
+  const PRINTABLE_LIMIT = 60;
 
   /** Relays that hold nothing for this maker never close, so the empty state needs a deadline. */
-  const OBJECT_DEADLINE_MS = 6000;
+  const PRINTABLE_DEADLINE_MS = 6000;
 
   type ProfileMetadata = {
     name?: string;
@@ -45,11 +45,11 @@
   let status = $state('Waiting for a profile to open...');
   let loading = $state(false);
 
-  let objects = $state(new Map<string, PrintableObject>());
-  let objectsLoading = $state(false);
-  let objectsStatus = $state('');
+  let printables = $state(new Map<string, PrintableObject>());
+  let printablesLoading = $state(false);
+  let printablesStatus = $state('');
 
-  const published = $derived(sortByNewest(objects.values()));
+  const published = $derived(sortByNewest(printables.values()));
 
   const displayName = $derived(
     profile?.display_name?.trim() || profile?.name?.trim() || 'Unnamed maker',
@@ -121,50 +121,50 @@
     }
   }
 
-  // ---------------------------------------------------------------- published objects
+  // ---------------------------------------------------------------- published printables
 
   /** Torn down when a different maker is opened, so two subscriptions never overlap. */
-  let closeObjects: (() => void) | undefined;
+  let closePrintables: (() => void) | undefined;
 
   function ingest(event: Parameters<typeof toPrintableObject>[0]): void {
-    const object = toPrintableObject(event);
-    if (!object) return;
+    const printable = toPrintableObject(event);
+    if (!printable) return;
 
-    const merged = collectObject(objects, object);
-    if (merged === objects) return;
+    const merged = collectPrintable(printables, printable);
+    if (merged === printables) return;
 
-    objects = merged;
-    objectsLoading = false;
+    printables = merged;
+    printablesLoading = false;
   }
 
-  function loadObjects(nextPubkey: string): void {
-    closeObjects?.();
-    closeObjects = undefined;
-    objects = new Map();
-    objectsStatus = '';
+  function loadPrintables(nextPubkey: string): void {
+    closePrintables?.();
+    closePrintables = undefined;
+    printables = new Map();
+    printablesStatus = '';
 
     if (!hasOutboxSubscribe()) {
-      objectsLoading = false;
-      objectsStatus = 'This shell does not provide relay access, so prints cannot be listed.';
+      printablesLoading = false;
+      printablesStatus = 'This shell does not provide relay access, so prints cannot be listed.';
       return;
     }
 
-    objectsLoading = true;
+    printablesLoading = true;
 
     const subscription = outbox.subscribe([
-      { kinds: [OBJECT_KIND], authors: [nextPubkey], limit: OBJECT_LIMIT },
+      { kinds: [PRINTABLE_KIND], authors: [nextPubkey], limit: PRINTABLE_LIMIT },
     ]);
     subscription.on('event', (result) => ingest(result.event));
     subscription.on('closed', (reason) => {
-      objectsLoading = false;
-      if (reason) objectsStatus = 'The connection to the relays dropped. Reload to try again.';
+      printablesLoading = false;
+      if (reason) printablesStatus = 'The connection to the relays dropped. Reload to try again.';
     });
 
     const deadline = window.setTimeout(() => {
-      objectsLoading = false;
-    }, OBJECT_DEADLINE_MS);
+      printablesLoading = false;
+    }, PRINTABLE_DEADLINE_MS);
 
-    closeObjects = () => {
+    closePrintables = () => {
       window.clearTimeout(deadline);
       subscription.close();
     };
@@ -172,15 +172,15 @@
 
   // ---------------------------------------------------------------- navigation
 
-  /** Hands the object to whichever napplet fulfills the `printable-detail` role. */
-  async function openObject(object: PrintableObject): Promise<void> {
+  /** Hands the printable to whichever napplet fulfills the `printable-detail` role. */
+  async function openPrintable(printable: PrintableObject): Promise<void> {
     if (!hasIntent()) {
-      objectsStatus = 'This shell cannot open prints.';
+      printablesStatus = 'This shell cannot open prints.';
       return;
     }
 
-    const result = await intent.open('printable-detail', { address: object.address });
-    if (!result.ok) objectsStatus = result.error ?? 'Could not open that print.';
+    const result = await intent.open('printable-detail', { address: printable.address });
+    if (!result.ok) printablesStatus = result.error ?? 'Could not open that print.';
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -194,7 +194,7 @@
 
     pubkey = next;
     void loadProfile(next);
-    loadObjects(next);
+    loadPrintables(next);
   }
 
   onMount(() => {
@@ -209,7 +209,7 @@
 
     return () => {
       subscription.unsubscribe();
-      closeObjects?.();
+      closePrintables?.();
       revokePicture();
     };
   });
@@ -261,7 +261,7 @@
         Prints by {profile ? displayName : 'this maker'}
       </h2>
 
-      {#if objectsLoading && published.length === 0}
+      {#if printablesLoading && published.length === 0}
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Loading prints">
           {#each [0, 1, 2] as placeholder (placeholder)}
             <div class="grid gap-2">
@@ -271,24 +271,24 @@
           {/each}
         </div>
       {:else if published.length === 0}
-        <p class="text-base-content/70" data-testid="profile-objects-empty">
+        <p class="text-base-content/70" data-testid="profile-printables-empty">
           This maker has not published any prints yet.
         </p>
       {:else}
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="profile-objects">
-          {#each published as object (object.address)}
-            <article class="grid content-start gap-2" data-testid="object-result">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="profile-printables">
+          {#each published as printable (printable.address)}
+            <article class="grid content-start gap-2" data-testid="printable-result">
               <button
                 type="button"
                 class="grid gap-2 text-left"
-                data-testid="open-object"
-                data-address={object.address}
-                onclick={() => openObject(object)}
+                data-testid="open-printable"
+                data-address={printable.address}
+                onclick={() => openPrintable(printable)}
               >
-                <CoverImage cover={object.cover} title={object.title} />
-                <span class="font-medium" data-testid="object-title">{object.title}</span>
-                {#if object.summary}
-                  <span class="line-clamp-2 text-sm text-base-content/70">{object.summary}</span>
+                <CoverImage cover={printable.cover} title={printable.title} />
+                <span class="font-medium" data-testid="printable-title">{printable.title}</span>
+                {#if printable.summary}
+                  <span class="line-clamp-2 text-sm text-base-content/70">{printable.summary}</span>
                 {/if}
               </button>
             </article>
@@ -296,13 +296,13 @@
         </div>
       {/if}
 
-      {#if objectsStatus}
+      {#if printablesStatus}
         <p
           class="text-sm text-base-content/60"
           aria-live="polite"
-          data-testid="profile-objects-status"
+          data-testid="profile-printables-status"
         >
-          {objectsStatus}
+          {printablesStatus}
         </p>
       {/if}
     </section>

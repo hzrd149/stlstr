@@ -10,7 +10,7 @@ export default defineConfig({
     nip5aManifest({
       nappletType: 'make-detail',
       // `inc` delivers the route payload, `outbox` resolves the kind:2351 make, its parent
-      // object, and its comments; `identity` names the viewer so comments can be composed;
+      // printable, and its comments; `identity` names the viewer so comments can be composed;
       // `count` shows the comment count; `resource` fetches make photos; `intent` opens the
       // parent print and the maker profile.
       requires: ['inc', 'outbox', 'identity', 'count', 'resource', 'intent', 'theme'],

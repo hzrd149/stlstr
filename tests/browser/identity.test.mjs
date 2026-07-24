@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import puppeteer from 'puppeteer';
-import { MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
+import { MAKERS, PRINTABLES } from '../../scripts/lib/test-fixtures.mjs';
 
 /**
  * NAP-IDENTITY end to end: a napplet asks the shell who the user is, and the shell answers
@@ -11,10 +11,10 @@ import { MAKERS, OBJECTS } from '../../scripts/lib/test-fixtures.mjs';
 
 const baseUrl = process.env.STLSTR_TEST_BASE_URL || 'http://127.0.0.1:5174';
 
-const SUBJECT = OBJECTS[OBJECTS.length - 1];
+const SUBJECT = PRINTABLES[PRINTABLES.length - 1];
 const USER = MAKERS[SUBJECT.maker];
 /** printable-detail declares `identity`, so its route is granted the domain. */
-const objectPath = `/objects/${USER.pubkey}/${SUBJECT.identifier}`;
+const printablePath = `/printables/${USER.pubkey}/${SUBJECT.identifier}`;
 
 let browser;
 
@@ -53,7 +53,7 @@ async function withExtension(page, pubkey) {
 }
 
 async function openNapplet(page) {
-  await page.goto(`${baseUrl}${objectPath}`, { waitUntil: 'networkidle0' });
+  await page.goto(`${baseUrl}${printablePath}`, { waitUntil: 'networkidle0' });
   const handle = await page.waitForSelector('iframe[title="Print details napplet"]');
   const frame = await handle.contentFrame();
   assert.ok(frame, 'print detail iframe should be available');

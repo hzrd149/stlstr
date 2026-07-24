@@ -12,7 +12,7 @@ import {
   actionsFor,
   conventionsFor,
   intentToHref,
-  normalizeObjectPayload,
+  normalizePrintablePayload,
   previewHref,
   type IntentPayload,
   type StlstrIntent,
@@ -42,12 +42,12 @@ function asPayload(value: unknown): IntentPayload {
 }
 
 /**
- * Object-addressing archetypes accept either `{ address }` or `{ pubkey, identifier }`;
+ * Printable-addressing archetypes accept either `{ address }` or `{ pubkey, identifier }`;
  * normalize so everything downstream — href, delivery, napplet — sees one shape.
  */
 function normalizePayload(archetype: string, payload: IntentPayload): IntentPayload | null {
   if (archetype !== 'printable-detail' && archetype !== 'printable-edit') return payload;
-  return normalizeObjectPayload(payload);
+  return normalizePrintablePayload(payload);
 }
 
 function candidateFor(archetype: string): IntentCandidate {
@@ -141,7 +141,7 @@ export function createStlstrIntentService({ navigate }: IntentServiceOptions): S
         }
 
         const payload = normalizePayload(archetype, asPayload(request.payload));
-        if (!payload) return failed(archetype, action, 'payload is not a printable object address');
+        if (!payload) return failed(archetype, action, 'payload is not a printable address');
 
         const intent: StlstrIntent = { archetype, action, payload };
         const href = hrefFor(intent);

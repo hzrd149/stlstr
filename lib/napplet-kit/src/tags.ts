@@ -2,7 +2,7 @@
  * Reading Nostr tags.
  *
  * Every napplet that inspects an event ends up wanting the first value of a named tag —
- * an object's `d`, `title`, or `summary`, a file's `url` — trimmed, with a missing tag
+ * a printable's `d`, `title`, or `summary`, a file's `url` — trimmed, with a missing tag
  * treated the same as an empty one. This is that one helper.
  */
 

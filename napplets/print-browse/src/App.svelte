@@ -6,16 +6,16 @@
   import { onMount } from 'svelte';
   import CoverImage from './lib/CoverImage.svelte';
   import {
-    collectObject,
-    filterObjects,
-    OBJECT_KIND,
+    collectPrintable,
+    filterPrintables,
+    PRINTABLE_KIND,
     sortByNewest,
     toPrintableObject,
     type PrintableObject,
-  } from './lib/objects';
+  } from './lib/printables';
 
   /**
-   * The home page: a live feed of recently published printable objects.
+   * The home page: a live feed of recently published printables.
    *
    * Its own payload (a search query or tag) arrives over the NAP-INTENT delivery seam, and
    * it dispatches onward navigation the same way — by archetype, never by URL, so the shell
@@ -25,7 +25,7 @@
   const OPEN_TOPIC = 'printable-browse:open';
   const READY_TOPIC = 'printable-browse:ready';
 
-  /** How many objects to pull for the feed. Pagination is a follow-up. */
+  /** How many printables to pull for the feed. Pagination is a follow-up. */
   const FEED_LIMIT = 60;
 
   /** Names are looked up in batches so a fast-streaming feed does not fan out per card. */
@@ -39,7 +39,7 @@
     [key: `&${string}`]: string[] | undefined;
   };
 
-  let objects = $state(new Map<string, PrintableObject>());
+  let printables = $state(new Map<string, PrintableObject>());
   let makers = $state(new Map<string, MakerProfile>());
   let query = $state('');
   let searchInput = $state('');
@@ -49,9 +49,9 @@
   let loading = $state(true);
 
   const orderedObjects = $derived(
-    query && sortMode === 'relevance' ? [...objects.values()] : sortByNewest(objects.values()),
+    query && sortMode === 'relevance' ? [...printables.values()] : sortByNewest(printables.values()),
   );
-  const feed = $derived(filterObjects(orderedObjects, { query, topics }));
+  const feed = $derived(filterPrintables(orderedObjects, { query, topics }));
 
   const hasInc = () => hasMethods('inc', 'emit', 'on');
   const hasIntent = () => hasMethods('intent', 'open');
@@ -88,7 +88,7 @@
   }
 
   function buildFilter(): BrowseFilter {
-    const filter: BrowseFilter = { kinds: [OBJECT_KIND], limit: FEED_LIMIT };
+    const filter: BrowseFilter = { kinds: [PRINTABLE_KIND], limit: FEED_LIMIT };
     const tagFilters = [...topics];
     // Text matching is applied client-side below. Keeping the relay query broad makes search
     // work on basic NIP-01 relays that do not implement NIP-50.
@@ -127,15 +127,15 @@
   let closeFeed: (() => void) | undefined;
 
   function ingest(event: Parameters<typeof toPrintableObject>[0]): void {
-    const object = toPrintableObject(event);
-    if (!object) return;
+    const printable = toPrintableObject(event);
+    if (!printable) return;
 
-    const merged = collectObject(objects, object);
-    if (merged === objects) return;
+    const merged = collectPrintable(printables, printable);
+    if (merged === printables) return;
 
-    objects = merged;
+    printables = merged;
     loading = false;
-    scheduleMakerLookup(object.pubkey);
+    scheduleMakerLookup(printable.pubkey);
   }
 
   function openFeed(): (() => void) | undefined {
@@ -167,7 +167,7 @@
   function restartFeed(): void {
     closeFeed?.();
     closeFeed = undefined;
-    objects = new Map();
+    printables = new Map();
     status = '';
     loading = true;
     closeFeed = openFeed();
@@ -175,14 +175,14 @@
 
   // ---------------------------------------------------------------- navigation
 
-  /** Hands the object to whichever napplet fulfills the `printable-detail` role. */
-  async function openObject(object: PrintableObject): Promise<void> {
+  /** Hands the printable to whichever napplet fulfills the `printable-detail` role. */
+  async function openPrintable(printable: PrintableObject): Promise<void> {
     if (!hasIntent()) {
       status = 'This shell cannot open prints.';
       return;
     }
 
-    const result = await intent.open('printable-detail', { address: object.address });
+    const result = await intent.open('printable-detail', { address: printable.address });
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 
@@ -355,25 +355,25 @@
       aria-label={query ? 'Search results' : 'Recently published prints'}
       data-testid="browse-results"
     >
-      {#each feed as object (object.address)}
-        <article class="grid content-start gap-2" data-testid="object-result">
+      {#each feed as printable (printable.address)}
+        <article class="grid content-start gap-2" data-testid="printable-result">
           <button
             type="button"
             class="grid gap-2 text-left"
-            data-testid="open-object"
-            data-address={object.address}
-            onclick={() => openObject(object)}
+            data-testid="open-printable"
+            data-address={printable.address}
+            onclick={() => openPrintable(printable)}
           >
-            <CoverImage cover={object.cover} title={object.title} />
-            <span class="font-medium" data-testid="object-title">{object.title}</span>
-            {#if object.summary}
-              <span class="line-clamp-2 text-sm text-base-content/70">{object.summary}</span>
+            <CoverImage cover={printable.cover} title={printable.title} />
+            <span class="font-medium" data-testid="printable-title">{printable.title}</span>
+            {#if printable.summary}
+              <span class="line-clamp-2 text-sm text-base-content/70">{printable.summary}</span>
             {/if}
           </button>
 
           <MakerLink
-            pubkey={object.pubkey}
-            profile={makers.get(object.pubkey)}
+            pubkey={printable.pubkey}
+            profile={makers.get(printable.pubkey)}
             testId="open-maker"
             buttonClass="link flex w-fit items-center gap-2 text-sm text-base-content/70"
             fallbackClass="flex w-fit items-center gap-2 text-sm text-base-content/70"
@@ -381,13 +381,13 @@
             onError={(message) => (status = message)}
           />
 
-          {#if object.topics.length > 0}
+          {#if printable.topics.length > 0}
             <div class="flex flex-wrap gap-1">
-              {#each object.topics.slice(0, 3) as entry (entry)}
+              {#each printable.topics.slice(0, 3) as entry (entry)}
                 <button
                   type="button"
                   class="badge badge-ghost badge-sm"
-                  data-testid="object-topic"
+                  data-testid="printable-topic"
                   onclick={() => openTopic(entry)}
                 >
                   #{entry}

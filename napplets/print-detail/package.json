@@ -1,6 +1,6 @@
 {
   "name": "print-detail",
-  "displayName": "Object Detail",
+  "displayName": "Printable Detail",
   "version": "0.1.0",
   "private": true,
   "type": "module",

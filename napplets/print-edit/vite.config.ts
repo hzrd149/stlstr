@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'print-edit',
-      // `intent` sends the user to the object after a successful save; `storage`
+      // `intent` sends the user to the printable after a successful save; `storage`
       // keeps the unsaved draft. Both stay optional at runtime (guarded via
       // `napplets().intent` / `.storage`), but the shell grants exactly this list,
       // so leaving them out is what makes the feature dead rather than degraded.

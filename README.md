@@ -1,6 +1,6 @@
 # stlstr
 
-stlstr is a Thingiverse-style app for publishing, browsing, and discussing 3D printable objects on Nostr. The host app is intentionally small: it owns identity, relays, Blossom uploads, routing, and sandbox policy. Product UI lives in NIP-5D napplets under `napplets/*`.
+stlstr is a Thingiverse-style app for publishing, browsing, and discussing 3D printables on Nostr. The host app is intentionally small: it owns identity, relays, Blossom uploads, routing, and sandbox policy. Product UI lives in NIP-5D napplets under `napplets/*`.
 
 This repo publishes those napplets as reusable app surfaces. Other napplet runtimes can embed them by granting the NAP domains in their manifests and delivering the intent payloads for the archetypes below.
 
@@ -10,15 +10,15 @@ Each napplet declares one protocol-facing archetype. The folder name is the loca
 
 | Napplet        | Archetype          | Intent action      | Payload                   | Purpose                                                                                                                                                                         |
 | -------------- | ------------------ | ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `print-browse` | `printable-browse` | `open`             | Optional `query` or `tag` | Browse printable objects, search, and tag-filter object feeds.                                                                                                                  |
-| `user-profile` | `profile`          | `open`             | `pubkey`                  | Show a maker profile and their published printable objects. This intentionally uses the generic `profile` archetype so profile links work across unrelated napplet collections. |
-| `print-detail` | `printable-detail` | `open`             | `address`                 | Show one printable object, its media/files, maker attribution, comments, reactions, and edit actions.                                                                           |
-| `print-create` | `printable-create` | `open` or `create` | Optional `remixOf`        | Publish a new printable object and upload its media/files.                                                                                                                      |
-| `print-edit`   | `printable-edit`   | `edit`             | `address`                 | Load an owned printable object and publish a replacement event.                                                                                                                 |
+| `print-browse` | `printable-browse` | `open`             | Optional `query` or `tag` | Browse printables, search, and tag-filter printable feeds.                                                                                                                      |
+| `user-profile` | `profile`          | `open`             | `pubkey`                  | Show a maker profile and their published printables. This intentionally uses the generic `profile` archetype so profile links work across unrelated napplet collections.         |
+| `print-detail` | `printable-detail` | `open`             | `address`                 | Show one printable, its media/files, maker attribution, comments, reactions, and edit actions.                                                                                  |
+| `print-create` | `printable-create` | `open` or `create` | Optional `remixOf`        | Publish a new printable and upload its media/files.                                                                                                                             |
+| `print-edit`   | `printable-edit`   | `edit`             | `address`                 | Load an owned printable and publish a replacement event.                                                                                                                        |
 | `part-detail`  | `part-detail`      | `open`             | `fileId`                  | Show metadata for a NIP-94 part file and offer relevant actions.                                                                                                                |
 | `stl-preview`  | `stl-preview`      | `open`             | `url`, optional metadata  | Preview an STL file in 3D from NAP-RESOURCE fetch parameters, usually as an overlay.                                                                                            |
 
-Object addresses use `33500:<pubkey>:<d>`, where kind `33500` is stlstr's printable object event kind. Part details use a Nostr file event id as `fileId`. STL previews use resource metadata such as `{ url, name, mime, size }`; callers resolve any Nostr event before opening the viewer.
+Printable addresses use `33500:<pubkey>:<d>`, where kind `33500` is stlstr's printable event kind. Part details use a Nostr file event id as `fileId`. STL previews use resource metadata such as `{ url, name, mime, size }`; callers resolve any Nostr event before opening the viewer.
 
 ## Runtime Contract
 
@@ -30,7 +30,7 @@ Common requirements:
 - `inc`: deliver inbound intent payloads on `<archetype>:<action>` topics after the napplet emits `<archetype>:ready`.
 - `outbox`: query and publish Nostr events through the runtime's relay/signing policy.
 - `identity`: expose the current user's pubkey/profile/follows when a napplet needs owner-aware UI.
-- `upload`: upload object files and images to runtime-managed Blossom servers.
+- `upload`: upload printable files and images to runtime-managed Blossom servers.
 - `resource`: fetch external media/file URLs through the runtime's network policy.
 - `storage`: keep drafts and local UI state under runtime control.
 - `link`, `theme`, `common`, and `count`: optional richer shell integrations used by detail, preview, and browse surfaces.

@@ -1,6 +1,6 @@
 {
   "name": "print-create",
-  "displayName": "Create Object",
+  "displayName": "Create Printable",
   "version": "0.1.0",
   "private": true,
   "type": "module",

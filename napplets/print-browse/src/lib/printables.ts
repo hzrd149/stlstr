@@ -1,5 +1,5 @@
 /**
- * Parsing and collation for printable objects (`kind:33500`, see NIP.md).
+ * Parsing and collation for printables (`kind:33500`, see NIP.md).
  *
  * Kept free of SDK calls so it stays a pure data layer: events in, view models out.
  */
@@ -8,13 +8,13 @@ import type { NostrEvent } from '@napplet/sdk';
 import { tagValue } from '@stlstr/napplet-kit/tags';
 
 /** One image from an `imeta` tag. */
-export type ObjectImage = {
+export type PrintableImage = {
   url: string;
   alt: string;
   mime: string;
 };
 
-/** A printable object, reduced to what a result card needs. */
+/** A printable, reduced to what a result card needs. */
 export type PrintableObject = {
   /** `33500:<pubkey>:<d>` — the address the printable-detail intent takes. */
   address: string;
@@ -24,17 +24,17 @@ export type PrintableObject = {
   summary: string;
   topics: string[];
   /** The first `imeta` tag, which NIP.md defines as the cover image. */
-  cover: ObjectImage | null;
+  cover: PrintableImage | null;
   createdAt: number;
 };
 
-export const OBJECT_KIND = 33500;
+export const PRINTABLE_KIND = 33500;
 
 /**
  * Parses one `imeta` tag. NIP-92 packs fields as space-separated `key value` pairs across
  * the tag's values, so `url` may sit in any position.
  */
-function parseImeta(tag: string[]): ObjectImage | null {
+function parseImeta(tag: string[]): PrintableImage | null {
   const fields: Record<string, string> = {};
 
   for (const entry of tag.slice(1)) {
@@ -50,13 +50,13 @@ function parseImeta(tag: string[]): ObjectImage | null {
 }
 
 /**
- * Converts an event into a card, or null when it is not a usable object.
+ * Converts an event into a card, or null when it is not a usable printable.
  *
  * `d` and `title` are the two required tags; without a title we would have to fall back to
  * raw identifiers, and showing hex to users is against the product rules in AGENTS.md.
  */
 export function toPrintableObject(event: NostrEvent): PrintableObject | null {
-  if (event.kind !== OBJECT_KIND) return null;
+  if (event.kind !== PRINTABLE_KIND) return null;
 
   const identifier = tagValue(event.tags, 'd');
   const title = tagValue(event.tags, 'title');
@@ -65,10 +65,10 @@ export function toPrintableObject(event: NostrEvent): PrintableObject | null {
   const cover = event.tags
     .filter((tag) => tag[0] === 'imeta')
     .map(parseImeta)
-    .find((image): image is ObjectImage => image !== null);
+    .find((image): image is PrintableImage => image !== null);
 
   return {
-    address: `${OBJECT_KIND}:${event.pubkey}:${identifier}`,
+    address: `${PRINTABLE_KIND}:${event.pubkey}:${identifier}`,
     pubkey: event.pubkey,
     identifier,
     title,
@@ -87,12 +87,12 @@ export function toPrintableObject(event: NostrEvent): PrintableObject | null {
 }
 
 /**
- * Folds an object into an address-keyed collection, keeping the newest revision.
+ * Folds a printable into an address-keyed collection, keeping the newest revision.
  *
  * Addressable events are replaceable, so the same address arrives repeatedly from
- * different relays; only the latest `created_at` is the object.
+ * different relays; only the latest `created_at` is the printable.
  */
-export function collectObject(
+export function collectPrintable(
   known: Map<string, PrintableObject>,
   next: PrintableObject,
 ): Map<string, PrintableObject> {
@@ -106,8 +106,8 @@ export function collectObject(
 }
 
 /** Newest first — the home page is a "recently published" feed. */
-export function sortByNewest(objects: Iterable<PrintableObject>): PrintableObject[] {
-  return [...objects].sort((a, b) => b.createdAt - a.createdAt);
+export function sortByNewest(printables: Iterable<PrintableObject>): PrintableObject[] {
+  return [...printables].sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /**
@@ -115,20 +115,20 @@ export function sortByNewest(objects: Iterable<PrintableObject>): PrintableObjec
  * NIP-91 `&t` filters too, but local filtering keeps results precise when a relay ignores
  * either extension and falls back to broader NIP-01 `#t` semantics.
  */
-export function filterObjects(
-  objects: PrintableObject[],
+export function filterPrintables(
+  printables: PrintableObject[],
   { query = '', topics = [] }: { query?: string; topics?: string[] },
 ): PrintableObject[] {
   const needle = query.trim().toLowerCase();
   const wanted = topics.map((topic) => topic.trim().toLowerCase()).filter(Boolean);
 
-  return objects.filter((object) => {
-    if (wanted.some((topic) => !object.topics.includes(topic))) return false;
+  return printables.filter((printable) => {
+    if (wanted.some((topic) => !printable.topics.includes(topic))) return false;
     if (!needle) return true;
     return (
-      object.title.toLowerCase().includes(needle) ||
-      object.summary.toLowerCase().includes(needle) ||
-      object.topics.some((entry) => entry.includes(needle))
+      printable.title.toLowerCase().includes(needle) ||
+      printable.summary.toLowerCase().includes(needle) ||
+      printable.topics.some((entry) => entry.includes(needle))
     );
   });
 }

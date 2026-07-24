@@ -26,7 +26,7 @@
   };
 
   /**
-   * Edit one printable object (`kind:33500`).
+   * Edit one printable (`kind:33500`).
    *
    * The address arrives over the NAP-INTENT delivery seam as a targeted `inc.event` on
    * `printable-edit:edit`. Subscribe FIRST, then emit `printable-edit:ready`.
@@ -35,7 +35,7 @@
    * untrusted — it crossed a sandbox boundary, and anyone can type any URL — so the owner
    * is taken from the loaded event's author and compared against the signed-in user. The
    * gate has to be right before replacement publishing exists, because publishing a
-   * replacement is what would overwrite someone else's object.
+    * replacement is what would overwrite someone else's printable.
    */
 
   const OPEN_TOPIC = 'printable-edit:edit';
@@ -305,7 +305,7 @@
     }
   }
 
-  async function loadObject(requested: string): Promise<void> {
+  async function loadPrintable(requested: string): Promise<void> {
     const [kind, pubkey, ...rest] = requested.split(':');
     const requestedIdentifier = rest.join(':');
 
@@ -367,7 +367,7 @@
       status = 'The shell opened this page without a print to edit.';
       return;
     }
-    void loadObject(requested);
+    void loadPrintable(requested);
   }
 
   /**
@@ -377,7 +377,7 @@
    * Reports whether the shell actually took the navigation, so callers can stay put
    * and keep offering the manual route instead of assuming they are gone.
    */
-  async function viewObject(): Promise<boolean> {
+  async function viewPrintable(): Promise<boolean> {
     if (!address || !hasIntent()) return false;
     const result = await intent.open('printable-detail', { address });
     if (!result.ok) status = result.error ?? 'Could not open that print.';
@@ -524,7 +524,7 @@
       // a form they are finished with. This unmounts the frame, so it goes last, and
       // a shell that cannot route the intent falls back to the button below.
       leaving = true;
-      if (!(await viewObject())) leaving = false;
+      if (!(await viewPrintable())) leaving = false;
     } catch (error) {
       status = error instanceof Error ? error.message : 'Publishing failed.';
     } finally {
@@ -578,7 +578,7 @@
         </span>
       </div>
       {#if hasIntent()}
-        <button type="button" class="btn btn-outline w-fit" onclick={viewObject}>
+        <button type="button" class="btn btn-outline w-fit" onclick={viewPrintable}>
           View this print instead
         </button>
       {/if}
@@ -594,7 +594,7 @@
       <form class="grid gap-4" data-testid="edit-form" onsubmit={(event) => event.preventDefault()}>
         {#if draftLoaded}
           <div class="alert alert-info">
-            <span>A saved draft is loaded. Publishing will replace the current object event.</span>
+            <span>A saved draft is loaded. Publishing will replace the current printable event.</span>
           </div>
         {/if}
 
@@ -689,7 +689,7 @@
                     {#if image.previewUrl}
                       <img
                         src={image.previewUrl}
-                        alt={image.alt || title || `Object image ${index + 1}`}
+                        alt={image.alt || title || `Printable image ${index + 1}`}
                         class="h-full w-full object-cover"
                       />
                     {:else}

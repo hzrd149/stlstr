@@ -14,6 +14,6 @@
   const tokens = $derived(parseMarkdown(source));
 </script>
 
-<div class="grid max-w-prose gap-3 text-base-content/90" data-testid="object-description">
+<div class="grid max-w-prose gap-3 text-base-content/90" data-testid="markdown-content">
   <MarkdownBlocks {tokens} />
 </div>

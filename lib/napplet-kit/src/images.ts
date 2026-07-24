@@ -38,15 +38,15 @@ export function hasResource(): boolean {
   return hasDomain('resource');
 }
 
-/** One image from an object's or make's ordered `imeta` gallery (NIP.md, NIP-92). */
-export type ObjectImage = {
+/** One image from a printable's or make's ordered `imeta` gallery (NIP.md, NIP-92). */
+export type PrintableImage = {
   url: string;
   alt: string;
   mime: string;
 };
 
 /** NIP-92 packs `key value` pairs across an `imeta` tag's values, in any order. */
-function parseImeta(tag: string[]): ObjectImage | null {
+function parseImeta(tag: string[]): PrintableImage | null {
   const fields: Record<string, string> = {};
 
   for (const entry of tag.slice(1)) {
@@ -64,14 +64,14 @@ function parseImeta(tag: string[]): ObjectImage | null {
 /**
  * The ordered image gallery from an event's tags. NIP.md is explicit that image `imeta`
  * tags ARE the gallery — clients must not wait for the URLs to also appear in `.content` —
- * and that the first one is the cover. This holds for both `kind:33500` objects and
+ * and that the first one is the cover. This holds for both `kind:33500` printables and
  * `kind:2351` makes.
  */
-export function parseImages(tags: string[][]): ObjectImage[] {
+export function parseImages(tags: string[][]): PrintableImage[] {
   return tags
     .filter((tag) => tag[0] === 'imeta')
     .map(parseImeta)
-    .filter((image): image is ObjectImage => image !== null);
+    .filter((image): image is PrintableImage => image !== null);
 }
 
 /**

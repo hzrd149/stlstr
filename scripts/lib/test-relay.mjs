@@ -6,7 +6,7 @@ import { WebSocket } from 'ws';
  * Browser tests run against `STLSTR_DEV_MODE`, which pins every read to the local dev relay
  * — the same one that is expected to be running for `pnpm dev`. Rather than stand up a
  * second relay, the fixtures are published into that one, so tests and manual development
- * see the same objects.
+ * see the same printables.
  *
  * Seeding is idempotent: fixture keys and timestamps are fixed, so republishing produces
  * the same event ids rather than accumulating duplicates.

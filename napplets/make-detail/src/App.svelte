@@ -7,8 +7,8 @@
   import Markdown from '@stlstr/napplet-kit/components/Markdown.svelte';
   import { eventThreadFilter } from '@stlstr/napplet-kit/comments';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import { MAKE_KIND, OBJECT_KIND } from '@stlstr/napplet-kit/files';
-  import { parseImages, type ObjectImage } from '@stlstr/napplet-kit/images';
+  import { MAKE_KIND, PRINTABLE_KIND } from '@stlstr/napplet-kit/files';
+  import { parseImages, type PrintableImage } from '@stlstr/napplet-kit/images';
   import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
   import { tagValue } from '@stlstr/napplet-kit/tags';
 
@@ -34,7 +34,7 @@
 
   let eventId = $state('');
   let makeEvent = $state.raw<NostrEvent | null>(null);
-  let images = $state<ObjectImage[]>([]);
+  let images = $state<PrintableImage[]>([]);
   let notes = $state('');
   let status = $state('Waiting for a make to open...');
   let activeTab = $state<TabId>('notes');
@@ -66,7 +66,7 @@
   /** The `a` tag names the printable this make was made from (NIP.md requires it). */
   function parentAddressOf(event: NostrEvent): string {
     const address = event.tags.find((tag) => tag[0] === 'a')?.[1]?.trim() ?? '';
-    return address.startsWith(`${OBJECT_KIND}:`) ? address : '';
+    return address.startsWith(`${PRINTABLE_KIND}:`) ? address : '';
   }
 
   function commentLabel(): string {
@@ -113,7 +113,7 @@
 
     try {
       const { events } = await outbox.query(
-        [{ kinds: [OBJECT_KIND], authors: [pubkey], '#d': [identifier], limit: 1 }],
+        [{ kinds: [PRINTABLE_KIND], authors: [pubkey], '#d': [identifier], limit: 1 }],
         { timeoutMs: 5000 },
       );
       const event = events.map((result) => result.event).find((candidate) => candidate);
@@ -231,7 +231,7 @@
               data-address={parentAddress}
               onclick={openParent}
             >
-              {parentTitle || 'a printable object'}
+              {parentTitle || 'a printable'}
             </button>
           </p>
         {/if}
@@ -314,7 +314,7 @@
           data-testid="make-panel-comments"
         >
           <Comments
-            object={makeEvent}
+            event={makeEvent}
             {viewer}
             active={activeTab === 'comments'}
             placeholder="Ask the maker about settings, materials, or how it turned out..."

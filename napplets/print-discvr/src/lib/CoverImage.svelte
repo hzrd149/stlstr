@@ -1,12 +1,12 @@
 <script lang="ts">
   import { loadImageUrl } from '@stlstr/napplet-kit/images';
-  import type { ObjectImage } from './objects';
+  import type { PrintableImage } from './printables';
 
   const {
     cover,
     title,
     class: className = '',
-  }: { cover: ObjectImage | null; title: string; class?: string } = $props();
+  }: { cover: PrintableImage | null; title: string; class?: string } = $props();
 
   let objectUrl = $state('');
   let settled = $state(false);

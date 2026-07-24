@@ -1,5 +1,5 @@
 /**
- * Shared NIP-22 (`kind:1111`) comment helpers for printable objects and files.
+ * Shared NIP-22 (`kind:1111`) comment helpers for printables and files.
  *
  * Tag construction and tag reading are Applesauce's job: `CommentFactory` builds the
  * root/parent tag pairs and `getCommentReplyPointer` reads them back. This module makes no
@@ -39,7 +39,7 @@ export function addressThreadFilter(address: string): NostrFilter {
   return { kinds: [COMMENT_KIND], '#A': [address] };
 }
 
-/** Backwards-compatible alias for printable-object callers. */
+/** Alias for printable callers. */
 export const threadFilter = addressThreadFilter;
 
 /** Comments scoped to a regular-event root, such as a NIP-94 `kind:1063` file event. */

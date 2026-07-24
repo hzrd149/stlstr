@@ -15,7 +15,7 @@
 
 ## Product UX
 
-- stlstr is a user-facing product, not a protocol debugger. Normal UI should show human-readable names, profile metadata, object titles, thumbnails, and friendly status text instead of raw hex IDs, event JSON, full pubkeys, relay internals, or other debug/protocol details.
+- stlstr is a user-facing product, not a protocol debugger. Normal UI should show human-readable names, profile metadata, printable titles, thumbnails, and friendly status text instead of raw hex IDs, event JSON, full pubkeys, relay internals, or other debug/protocol details.
 - Raw pubkeys, event IDs, relay URLs, and JSON are acceptable only in explicit advanced/debug views, logs, developer tooling, or copy/export actions where the user intentionally asks for protocol-level data.
 
 ## Repo Shape

@@ -7,13 +7,13 @@
   import { onMount } from 'svelte';
   import CoverImage from './lib/CoverImage.svelte';
   import {
-    collectObject,
-    OBJECT_KIND,
+    collectPrintable,
+    PRINTABLE_KIND,
     sortByNewest,
     toPrintableObject,
-    type ObjectImage,
+    type PrintableImage,
     type PrintableObject,
-  } from './lib/objects';
+  } from './lib/printables';
 
   const OPEN_TOPIC = 'printable-discovery:open';
   const READY_TOPIC = 'printable-discovery:ready';
@@ -30,12 +30,12 @@
     address: string;
     title: string;
     note: string;
-    cover: ObjectImage | null;
+    cover: PrintableImage | null;
     createdAt: number;
   };
 
-  let objects = $state(new Map<string, PrintableObject>());
-  let friendObjects = $state(new Map<string, PrintableObject>());
+  let printables = $state(new Map<string, PrintableObject>());
+  let friendPrintables = $state(new Map<string, PrintableObject>());
   let makes = $state(new Map<string, Make>());
   let makers = $state(new Map<string, MakerProfile>());
   let status = $state('');
@@ -45,21 +45,21 @@
   let friendsLoading = $state(false);
   let makesLoading = $state(true);
 
-  const newest = $derived(sortByNewest(objects.values()));
+  const newest = $derived(sortByNewest(printables.values()));
   const featured = $derived.by(() => {
-    const scored = newest.map((object) => ({
-      object,
+    const scored = newest.map((printable) => ({
+      printable,
       score:
-        object.topics.length * 4 +
-        (object.cover ? 8 : 0) +
-        Math.min(object.summary.length, 160) / 40,
+        printable.topics.length * 4 +
+        (printable.cover ? 8 : 0) +
+        Math.min(printable.summary.length, 160) / 40,
     }));
     return scored
-      .sort((a, b) => b.score - a.score || b.object.createdAt - a.object.createdAt)
+      .sort((a, b) => b.score - a.score || b.printable.createdAt - a.printable.createdAt)
       .slice(0, 6);
   });
   const recent = $derived(newest.slice(0, 12));
-  const fromFriends = $derived(sortByNewest(friendObjects.values()).slice(0, 8));
+  const fromFriends = $derived(sortByNewest(friendPrintables.values()).slice(0, 8));
   const freshMakes = $derived(
     [...makes.values()].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6),
   );
@@ -91,7 +91,7 @@
     }, MAKER_LOOKUP_DELAY_MS);
   }
 
-  function parseImeta(tag: string[]): ObjectImage | null {
+  function parseImeta(tag: string[]): PrintableImage | null {
     const fields: Record<string, string> = {};
     for (const entry of tag.slice(1)) {
       const separator = entry.indexOf(' ');
@@ -105,12 +105,12 @@
   function toMake(event: NostrEvent): Make | null {
     if (event.kind !== MAKE_KIND) return null;
     const address = tagValue(event.tags, 'a');
-    if (!address?.startsWith(`${OBJECT_KIND}:`)) return null;
+    if (!address?.startsWith(`${PRINTABLE_KIND}:`)) return null;
 
     const cover = event.tags
       .filter((tag) => tag[0] === 'imeta')
       .map(parseImeta)
-      .find((image): image is ObjectImage => image !== null);
+      .find((image): image is PrintableImage => image !== null);
 
     return {
       id: event.id,
@@ -123,14 +123,14 @@
     };
   }
 
-  function ingestObject(event: NostrEvent): void {
-    const object = toPrintableObject(event);
-    if (!object) return;
-    const merged = collectObject(objects, object);
-    if (merged === objects) return;
-    objects = merged;
+  function ingestPrintable(event: NostrEvent): void {
+    const printable = toPrintableObject(event);
+    if (!printable) return;
+    const merged = collectPrintable(printables, printable);
+    if (merged === printables) return;
+    printables = merged;
     loading = false;
-    scheduleMakerLookup(object.pubkey);
+    scheduleMakerLookup(printable.pubkey);
   }
 
   function ingestMake(event: NostrEvent): void {
@@ -152,8 +152,8 @@
       return undefined;
     }
 
-    const subscription = outbox.subscribe([{ kinds: [OBJECT_KIND], limit: DISCOVERY_LIMIT }]);
-    subscription.on('event', (result) => ingestObject(result.event));
+    const subscription = outbox.subscribe([{ kinds: [PRINTABLE_KIND], limit: DISCOVERY_LIMIT }]);
+    subscription.on('event', (result) => ingestPrintable(result.event));
     subscription.on('closed', (reason) => {
       loading = false;
       if (reason) status = 'The connection to the relays dropped. Reload to try again.';
@@ -193,7 +193,7 @@
   }
 
   async function loadFriends(pubkey: string): Promise<void> {
-    friendObjects = new Map();
+    friendPrintables = new Map();
     friendsStatus = '';
 
     if (!pubkey) {
@@ -216,18 +216,18 @@
       }
 
       const { events } = await outbox.query(
-        [{ kinds: [OBJECT_KIND], authors: follows, limit: FRIEND_LIMIT }],
+        [{ kinds: [PRINTABLE_KIND], authors: follows, limit: FRIEND_LIMIT }],
         { authors: follows, timeoutMs: 6000 },
       );
 
       let next = new Map<string, PrintableObject>();
       for (const { event } of events) {
-        const object = toPrintableObject(event);
-        if (!object) continue;
-        next = collectObject(next, object);
-        scheduleMakerLookup(object.pubkey);
+        const printable = toPrintableObject(event);
+        if (!printable) continue;
+        next = collectPrintable(next, printable);
+        scheduleMakerLookup(printable.pubkey);
       }
-      friendObjects = next;
+      friendPrintables = next;
       friendsStatus = next.size === 0 ? 'No followed makers have published prints here yet.' : '';
     } catch (error) {
       friendsStatus = error instanceof Error ? error.message : 'Could not load your follows.';
@@ -236,12 +236,12 @@
     }
   }
 
-  async function openObject(object: PrintableObject): Promise<void> {
+  async function openPrintable(printable: PrintableObject): Promise<void> {
     if (!hasIntent()) {
       status = 'This shell cannot open prints.';
       return;
     }
-    const result = await intent.open('printable-detail', { address: object.address });
+    const result = await intent.open('printable-detail', { address: printable.address });
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 
@@ -264,7 +264,7 @@
   function applyIntent(): void {
     closeDiscovery?.();
     closeMakes?.();
-    objects = new Map();
+    printables = new Map();
     makes = new Map();
     status = '';
     makesStatus = '';
@@ -441,34 +441,34 @@
       </p>
     {:else}
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="discover-featured">
-        {#each featured as entry (entry.object.address)}
-          {@const object = entry.object}
-          <article class="grid content-start gap-2" data-testid="discover-object">
+        {#each featured as entry (entry.printable.address)}
+          {@const printable = entry.printable}
+          <article class="grid content-start gap-2" data-testid="discover-printable">
             <button
               type="button"
               class="grid gap-2 text-left"
-              data-testid="open-object"
-              data-address={object.address}
-              onclick={() => openObject(object)}
+              data-testid="open-printable"
+              data-address={printable.address}
+              onclick={() => openPrintable(printable)}
             >
-              <CoverImage cover={object.cover} title={object.title} class="aspect-[4/3]" />
-              <span class="text-lg font-bold" data-testid="object-title">{object.title}</span>
-              {#if object.summary}
-                <span class="line-clamp-2 text-sm text-base-content/70">{object.summary}</span>
+              <CoverImage cover={printable.cover} title={printable.title} class="aspect-[4/3]" />
+              <span class="text-lg font-bold" data-testid="printable-title">{printable.title}</span>
+              {#if printable.summary}
+                <span class="line-clamp-2 text-sm text-base-content/70">{printable.summary}</span>
               {/if}
             </button>
             <MakerLink
-              pubkey={object.pubkey}
-              profile={makers.get(object.pubkey)}
+              pubkey={printable.pubkey}
+              profile={makers.get(printable.pubkey)}
               testId="open-maker"
               buttonClass="link flex w-fit items-center gap-2 text-sm text-base-content/70"
               fallbackClass="flex w-fit items-center gap-2 text-sm text-base-content/70"
               labelClass="truncate"
               onError={(message) => (status = message)}
             />
-            {#if object.topics.length > 0}
+            {#if printable.topics.length > 0}
               <div class="flex flex-wrap gap-1">
-                {#each object.topics.slice(0, 4) as topic (topic)}
+                {#each printable.topics.slice(0, 4) as topic (topic)}
                   <button
                     type="button"
                     class="badge badge-ghost badge-sm"
@@ -489,20 +489,20 @@
     <div class="grid content-start gap-4" aria-label="Newest designs">
       <h2 class="text-xl font-bold">Newest designs</h2>
       <div class="grid gap-3" data-testid="discover-recent">
-        {#each recent as object (object.address)}
+        {#each recent as printable (printable.address)}
           <article class="grid grid-cols-[7rem_minmax(0,1fr)] gap-3">
-            <button type="button" class="text-left" onclick={() => openObject(object)}>
-              <CoverImage cover={object.cover} title={object.title} class="aspect-video" />
+            <button type="button" class="text-left" onclick={() => openPrintable(printable)}>
+              <CoverImage cover={printable.cover} title={printable.title} class="aspect-video" />
             </button>
             <div class="min-w-0 content-center">
               <button
                 type="button"
                 class="line-clamp-2 text-left font-semibold"
-                onclick={() => openObject(object)}
+                onclick={() => openPrintable(printable)}
               >
-                {object.title}
+                {printable.title}
               </button>
-              <p class="line-clamp-1 text-sm text-base-content/60">{object.summary}</p>
+              <p class="line-clamp-1 text-sm text-base-content/60">{printable.summary}</p>
             </div>
           </article>
         {/each}
@@ -528,22 +528,22 @@
         </p>
       {:else}
         <div class="grid gap-3" data-testid="discover-friends">
-          {#each fromFriends as object (object.address)}
+          {#each fromFriends as printable (printable.address)}
             <article class="grid grid-cols-[7rem_minmax(0,1fr)] gap-3">
-              <button type="button" class="text-left" onclick={() => openObject(object)}>
-                <CoverImage cover={object.cover} title={object.title} class="aspect-video" />
+              <button type="button" class="text-left" onclick={() => openPrintable(printable)}>
+                <CoverImage cover={printable.cover} title={printable.title} class="aspect-video" />
               </button>
               <div class="min-w-0 content-center">
                 <button
                   type="button"
                   class="line-clamp-2 text-left font-semibold"
-                  onclick={() => openObject(object)}
+                  onclick={() => openPrintable(printable)}
                 >
-                  {object.title}
+                  {printable.title}
                 </button>
                 <MakerLink
-                  pubkey={object.pubkey}
-                  profile={makers.get(object.pubkey)}
+                  pubkey={printable.pubkey}
+                  profile={makers.get(printable.pubkey)}
                   testId="open-maker"
                   buttonClass="link mt-1 flex w-fit items-center gap-2 text-xs text-base-content/65"
                   fallbackClass="mt-1 flex w-fit items-center gap-2 text-xs text-base-content/65"

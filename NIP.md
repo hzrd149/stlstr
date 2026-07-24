@@ -1,14 +1,14 @@
-# NIP: Printable Objects
+# NIP: Printables
 
 `draft` `optional`
 
-This NIP defines events for publishing 3D-printable objects on Nostr. It is intended for Thingiverse-like clients where a top-level object contains a description, image gallery, references to printable part files, user makes, and user collections.
+This NIP defines events for publishing 3D printables on Nostr. It is intended for Thingiverse-like clients where a top-level printable contains a description, image gallery, references to printable part files, user makes, and user collections.
 
 The design reuses existing Nostr primitives where possible:
 
-- [NIP-92](https://github.com/nostr-protocol/nips/blob/master/92.md) `imeta` tags for object and make images.
+- [NIP-92](https://github.com/nostr-protocol/nips/blob/master/92.md) `imeta` tags for printable and make images.
 - [NIP-94](https://github.com/nostr-protocol/nips/blob/master/94.md) `kind:1063` file metadata events for reusable files such as STL, 3MF, PDFs, videos, slicer profiles, and other non-image resources.
-- [NIP-22](https://github.com/nostr-protocol/nips/blob/master/22.md) comments for object, make, and file discussion.
+- [NIP-22](https://github.com/nostr-protocol/nips/blob/master/22.md) comments for printable, make, and file discussion.
 - [NIP-25](https://github.com/nostr-protocol/nips/blob/master/25.md) reactions.
 - [NIP-51](https://github.com/nostr-protocol/nips/blob/master/51.md) list/set semantics for user collections.
 
@@ -16,13 +16,13 @@ The design reuses existing Nostr primitives where possible:
 
 | kind    | name                 | type        |
 | ------- | -------------------- | ----------- |
-| `33500` | Printable Object     | addressable |
+| `33500` | Printable            | addressable |
 | `2351`  | Make                 | regular     |
-| `30050` | Printable Object Set | addressable |
+| `30050` | Printable Set        | addressable |
 
 ## Markdown Content
 
-The `.content` field of `kind:33500` printable objects and `kind:2351` makes is Markdown, as is the `.content` of the `kind:1063` file metadata events an object references.
+The `.content` field of `kind:33500` printables and `kind:2351` makes is Markdown, as is the `.content` of the `kind:1063` file metadata events a printable references.
 
 Content SHOULD be [CommonMark](https://spec.commonmark.org/). Clients MAY additionally support the [GitHub Flavored Markdown](https://github.github.com/gfm/) extensions for tables, task lists, strikethrough, and autolinks.
 
@@ -35,17 +35,17 @@ This content is authored by arbitrary third parties and read by clients that may
 - Clients SHOULD treat relative link and image destinations as invalid. An event has no base URL, so a relative destination resolves against the client's own origin rather than anything the author meant.
 - Clients MAY defer, proxy, or refuse remote images referenced from Markdown. Loading them directly discloses the reader's IP address to whatever host the author chose.
 
-Images embedded in `.content` are illustrations within the description. They are not part of the object's gallery: the ordered `imeta` tags defined below are the object's image set, and clients SHOULD NOT promote a Markdown image into it.
+Images embedded in `.content` are illustrations within the description. They are not part of the printable's gallery: the ordered `imeta` tags defined below are the printable's image set, and clients SHOULD NOT promote a Markdown image into it.
 
 Clients MAY render `nostr:` URIs and [NIP-21](https://github.com/nostr-protocol/nips/blob/master/21.md) entities as mentions. Clients that do not MUST render them as plain text.
 
 Clients that do not render Markdown SHOULD display `.content` as plain text.
 
-## Printable Object
+## Printable
 
-A printable object is an addressable event of kind `33500`.
+A printable is an addressable event of kind `33500`.
 
-Its `.content` field is a Markdown description of the object, as defined in [Markdown Content](#markdown-content). It MAY include print instructions, assembly notes, attribution, changelogs, or any other human-readable information.
+Its `.content` field is a Markdown description of the printable, as defined in [Markdown Content](#markdown-content). It MAY include print instructions, assembly notes, attribution, changelogs, or any other human-readable information.
 
 ```json
 {
@@ -84,12 +84,12 @@ Its `.content` field is a Markdown description of the object, as defined in [Mar
 
 ### Required Tags
 
-- `d`: unique identifier for this author's object.
+- `d`: unique identifier for this author's printable.
 - `title`: display title.
 
 ### Recommended Tags
 
-- `summary`: short object summary.
+- `summary`: short printable summary.
 - `published_at`: Unix timestamp, as a string, for the first publication time.
 - `imeta`: one or more image metadata tags. Image `imeta` tags are ordered; the first image is the cover image and subsequent images are gallery images.
 - `e`: references to NIP-94 `kind:1063` file metadata events for non-image resources.
@@ -98,7 +98,7 @@ Its `.content` field is a Markdown description of the object, as defined in [Mar
 
 ### Image Metadata
 
-All object images SHOULD be represented as `imeta` tags on the object event itself. Clients implementing this NIP MUST treat image `imeta` tags as the object's ordered image gallery even when the image URLs are not present in `.content`.
+All printable images SHOULD be represented as `imeta` tags on the printable event itself. Clients implementing this NIP MUST treat image `imeta` tags as the printable's ordered image gallery even when the image URLs are not present in `.content`.
 
 The first image `imeta` tag is the cover image. Additional image `imeta` tags are gallery images.
 
@@ -112,11 +112,11 @@ Image `imeta` tags SHOULD include fields from NIP-92 and NIP-94 where available,
 - `alt`
 - `fallback`
 
-Object images SHOULD NOT require separate NIP-94 events. NIP-94 file metadata events are reserved for resources that benefit from independent referencing, reuse, or file-specific discussion.
+Printable images SHOULD NOT require separate NIP-94 events. NIP-94 file metadata events are reserved for resources that benefit from independent referencing, reuse, or file-specific discussion.
 
 ### File References
 
-Non-image object resources SHOULD be published as NIP-94 `kind:1063` file metadata events and referenced from the object using `e` tags.
+Non-image printable resources SHOULD be published as NIP-94 `kind:1063` file metadata events and referenced from the printable using `e` tags.
 
 The fourth element of the `e` tag is a role marker:
 
@@ -129,7 +129,7 @@ Defined roles:
 | role           | meaning                                                    |
 | -------------- | ---------------------------------------------------------- |
 | `part`         | printable or manufacturing file, such as STL or 3MF        |
-| `video`        | video related to the object                                |
+| `video`        | video related to the printable                             |
 | `instructions` | PDF, HTML, or other standalone instruction document        |
 | `preview`      | non-image preview, such as an animated/video preview       |
 | `aux`          | auxiliary resource, such as slicer profiles or setup files |
@@ -146,25 +146,25 @@ NIP-94 does not define `name`; this NIP adds it, because a printable file's name
 
 ### Imported Source URL
 
-Objects imported from another platform MAY include an `i` tag pointing to the canonical source URL:
+Printables imported from another platform MAY include an `i` tag pointing to the canonical source URL:
 
 ```json
 ["i", "https://www.thingiverse.com/thing:1234567"]
 ```
 
-The URL SHOULD be normalized and SHOULD NOT include a fragment. Native Nostr-first objects SHOULD omit this tag unless they intentionally mirror an external page.
+The URL SHOULD be normalized and SHOULD NOT include a fragment. Native Nostr-first printables SHOULD omit this tag unless they intentionally mirror an external page.
 
-Clients MAY use this tag to show provenance, link to the source page, detect duplicate imports, or group mirrors of the same external object.
+Clients MAY use this tag to show provenance, link to the source page, detect duplicate imports, or group mirrors of the same external printable.
 
 ### Remixes and Derivations
 
-Objects that remix, derive from, or depend on another printable object SHOULD reference the parent object with an `a` tag:
+Printables that remix, derive from, or depend on another printable SHOULD reference the parent printable with an `a` tag:
 
 ```json
 ["a", "33500:<pubkey>:<d>", "<relay-hint>", "remix"]
 ```
 
-Clients MAY ignore unknown `a` tag markers. Clients can query remixes of an object using `#a` filters.
+Clients MAY ignore unknown `a` tag markers. Clients can query remixes of a printable using `#a` filters.
 
 ### File Thumbnails
 
@@ -188,7 +188,7 @@ Thumbnails SHOULD be a raster format such as `image/png`, `image/webp`, or `imag
 
 A thumbnail MAY be rendered by the publishing client from the file's geometry, or extracted from formats that already embed one, such as the thumbnail image inside a 3MF package or the preview a slicer writes into G-code. An extracted thumbnail SHOULD be preferred, because it depicts what the author's own tooling produced.
 
-Thumbnails are **not** part of the object's image gallery. The object's ordered `imeta` tags are its gallery, as defined in [Image Metadata](#image-metadata); clients SHOULD NOT promote a file thumbnail into it, in the same way they do not promote images embedded in Markdown.
+Thumbnails are **not** part of the printable's image gallery. The printable's ordered `imeta` tags are its gallery, as defined in [Image Metadata](#image-metadata); clients SHOULD NOT promote a file thumbnail into it, in the same way they do not promote images embedded in Markdown.
 
 A thumbnail is author-supplied metadata and is not verifiable against the file it describes: nothing prevents a `thumb` that depicts geometry the file does not contain. Clients MUST NOT present a thumbnail as evidence of what a file will print, and SHOULD apply the same fetching policy they apply to any other remote image referenced by an untrusted author.
 
@@ -196,9 +196,9 @@ Clients SHOULD fall back to a placeholder derived from the file's `m` type or fi
 
 ### Optional Print Metadata on File Events
 
-Print details MAY be written in the object's Markdown description or in the `.content` field of referenced NIP-94 file metadata events.
+Print details MAY be written in the printable's Markdown description or in the `.content` field of referenced NIP-94 file metadata events.
 
-NIP-94 file events MAY also include custom tags for common print metadata. These tags are optional and MUST NOT be required for a valid object or part.
+NIP-94 file events MAY also include custom tags for common print metadata. These tags are optional and MUST NOT be required for a valid printable or part.
 
 Examples:
 
@@ -238,11 +238,11 @@ Example NIP-94 part event:
 
 ## Make
 
-A make is a regular event of kind `2351`. It represents a user's print, build, remix attempt, or physical result for a printable object.
+A make is a regular event of kind `2351`. It represents a user's print, build, remix attempt, or physical result for a printable.
 
 Its `.content` field is Markdown, as defined in [Markdown Content](#markdown-content), and MAY include print settings, build notes, problems encountered, or a story about the make.
 
-Makes MUST reference the printable object with an `a` tag:
+Makes MUST reference the printable with an `a` tag:
 
 ```json
 ["a", "33500:<pubkey>:<d>", "<relay-hint>"]
@@ -272,13 +272,13 @@ Example:
 }
 ```
 
-Makes are regular events, so a user MAY publish multiple makes for the same object. Makes MAY have their own comments using NIP-22.
+Makes are regular events, so a user MAY publish multiple makes for the same printable. Makes MAY have their own comments using NIP-22.
 
-## Printable Object Set
+## Printable Set
 
-A printable object set is an addressable NIP-51-style set of kind `30050`. It is used for user-created collections of printable objects.
+A printable set is an addressable NIP-51-style set of kind `30050`. It is used for user-created collections of printables.
 
-Printable object sets MUST use `a` tags to reference `kind:33500` printable objects.
+Printable sets MUST use `a` tags to reference `kind:33500` printables.
 
 They SHOULD follow NIP-51 set conventions for metadata tags:
 
@@ -286,7 +286,7 @@ They SHOULD follow NIP-51 set conventions for metadata tags:
 - `title`: display title.
 - `image`: collection image.
 - `description`: collection description.
-- `a`: printable object address.
+- `a`: printable address.
 - `t`: optional category tags.
 
 Example:
@@ -298,7 +298,7 @@ Example:
   "tags": [
     ["d", "desk-accessories"],
     ["title", "Desk Accessories"],
-    ["description", "Useful printable objects for a cleaner desk."],
+    ["description", "Useful printables for a cleaner desk."],
     ["image", "https://cdn.example/desk-accessories.jpg"],
     ["a", "33500:<pubkey-a>:adjustable-phone-stand", "wss://relay.example"],
     ["a", "33500:<pubkey-b>:cable-clip", "wss://relay.example"],
@@ -313,16 +313,16 @@ Private collection items MAY be stored in encrypted `.content` using the private
 
 Comments SHOULD use NIP-22 `kind:1111`.
 
-For comments on a printable object, the root scope is the object address:
+For comments on a printable, the root scope is the printable address:
 
 ```json
 [
   ["A", "33500:<pubkey>:<d>", "<relay-hint>"],
   ["K", "33500"],
-  ["P", "<object-author-pubkey>", "<relay-hint>"],
+  ["P", "<printable-author-pubkey>", "<relay-hint>"],
   ["a", "33500:<pubkey>:<d>", "<relay-hint>"],
   ["k", "33500"],
-  ["p", "<object-author-pubkey>", "<relay-hint>"]
+  ["p", "<printable-author-pubkey>", "<relay-hint>"]
 ]
 ```
 
@@ -341,53 +341,53 @@ For comments on a make, the root scope is the make event id:
 
 For comments on an individual part file, use the NIP-22 pattern for comments on NIP-94 files.
 
-Reactions SHOULD use NIP-25 `kind:7` with the appropriate object, make, or file reference.
+Reactions SHOULD use NIP-25 `kind:7` with the appropriate printable, make, or file reference.
 
 ## Queries
 
-Browse printable objects:
+Browse printables:
 
 ```json
 { "kinds": [33500] }
 ```
 
-Fetch one printable object by address:
+Fetch one printable by address:
 
 ```json
 { "kinds": [33500], "authors": ["<pubkey>"], "#d": ["<d>"] }
 ```
 
-Fetch resources referenced by an object:
+Fetch resources referenced by a printable:
 
 ```json
 { "ids": ["<1063-event-id>"] }
 ```
 
-Find all makes of an object:
+Find all makes of a printable:
 
 ```json
 { "kinds": [2351], "#a": ["33500:<pubkey>:<d>"] }
 ```
 
-Find objects using a specific file event:
+Find printables using a specific file event:
 
 ```json
 { "kinds": [33500], "#e": ["<1063-event-id>"] }
 ```
 
-Find remixes of an object:
+Find remixes of a printable:
 
 ```json
 { "kinds": [33500], "#a": ["33500:<pubkey>:<d>"] }
 ```
 
-Find objects imported from a source URL:
+Find printables imported from a source URL:
 
 ```json
 { "kinds": [33500], "#i": ["https://www.printables.com/model/12345-adjustable-phone-stand"] }
 ```
 
-Find a user's printable object sets:
+Find a user's printable sets:
 
 ```json
 { "kinds": [30050], "authors": ["<pubkey>"] }
@@ -397,13 +397,13 @@ Find a user's printable object sets:
 
 Clients SHOULD render `.content` as Markdown, subject to the rules in [Markdown Content](#markdown-content).
 
-Clients SHOULD render the first image `imeta` tag on a printable object as the cover image.
+Clients SHOULD render the first image `imeta` tag on a printable as the cover image.
 
 Clients SHOULD render remaining image `imeta` tags as the gallery.
 
 Clients SHOULD resolve role-marked `e` tags to NIP-94 file metadata events before presenting downloads.
 
-Clients SHOULD allow objects to reference NIP-94 file events authored by other users. This enables multiple objects to share the same part file.
+Clients SHOULD allow printables to reference NIP-94 file events authored by other users. This enables multiple printables to share the same part file.
 
 Clients SHOULD render a file's `thumb` tag when listing files, and SHOULD fall back to a placeholder derived from `m` or `name` when there is none. See [File Thumbnails](#file-thumbnails).
 
@@ -411,4 +411,4 @@ Clients that publish files SHOULD write a `name` tag, and SHOULD generate or ext
 
 Clients SHOULD treat `i` source URL tags as unverified provenance metadata. They do not prove authorship or ownership of the external source.
 
-Clients SHOULD NOT require optional print metadata tags to display, download, or print an object.
+Clients SHOULD NOT require optional print metadata tags to display, download, or print a printable.

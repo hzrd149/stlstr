@@ -659,7 +659,7 @@ function AccountNav() {
  *
  * `routeId` names the shell route mounting the napplet; it distinguishes windows
  * when several routes share one napplet (search/tag both mount `print-browse`).
- * The iframe is keyed by pathname, so navigating between two objects tears the
+ * The iframe is keyed by pathname, so navigating between two printables tears the
  * napplet down and rebuilds it against the new address.
  */
 function NappletFrame({
@@ -697,7 +697,7 @@ function NappletFrame({
     nappletRef.current = napplet;
   }, [napplet]);
 
-  // Serializing keeps the effect dep stable across the fresh object each render builds.
+  // Serializing keeps the effect dep stable across the fresh payload each render builds.
   const intentKey = intent ? JSON.stringify(intent) : '';
 
   // The payload is NOT a mount dep: a new payload for the same frame is redelivered to the
@@ -1116,7 +1116,7 @@ function UserProfileRoute() {
   );
 }
 
-function ObjectDetailRoute() {
+function PrintableDetailRoute() {
   const { pubkey = '', identifier = '' } = useParams();
 
   return (
@@ -1150,7 +1150,7 @@ function PartDetailRoute() {
   );
 }
 
-/** "I made one" — publish an immutable kind-2351 make for a printable object. */
+/** "I made one" — publish an immutable kind-2351 make for a printable. */
 function MakeCreateRoute() {
   const { pubkey = '', identifier = '' } = useParams();
 
@@ -1186,7 +1186,7 @@ function MakeDetailRoute() {
   );
 }
 
-function ObjectEditRoute() {
+function PrintableEditRoute() {
   const { pubkey = '', identifier = '' } = useParams();
 
   return (
@@ -1400,8 +1400,8 @@ function ShellLayout() {
  * and drawer persist across navigations. Settings is the one route the shell
  * renders itself; everything else mounts a napplet.
  *
- * Route ranking is by specificity, not declaration order, so `objects/:pubkey/
- * :identifier/edit` wins over `objects/:pubkey/:identifier` on its own.
+ * Route ranking is by specificity, not declaration order, so `printables/:pubkey/
+ * :identifier/edit` wins over `printables/:pubkey/:identifier` on its own.
  */
 function App() {
   return (
@@ -1416,9 +1416,9 @@ function App() {
         <Route path="settings" element={<SettingsView />} />
         <Route path="napplets" element={<NappletsView />} />
         <Route path="profiles/:pubkey" element={<UserProfileRoute />} />
-        <Route path="objects/:pubkey/:identifier" element={<ObjectDetailRoute />} />
-        <Route path="objects/:pubkey/:identifier/edit" element={<ObjectEditRoute />} />
-        <Route path="objects/:pubkey/:identifier/makes/new" element={<MakeCreateRoute />} />
+        <Route path="printables/:pubkey/:identifier" element={<PrintableDetailRoute />} />
+        <Route path="printables/:pubkey/:identifier/edit" element={<PrintableEditRoute />} />
+        <Route path="printables/:pubkey/:identifier/makes/new" element={<MakeCreateRoute />} />
         <Route path="makes/:eventId" element={<MakeDetailRoute />} />
         <Route path="part/:fileId" element={<PartDetailRoute />} />
         <Route path="*" element={<NotFoundRoute />} />
