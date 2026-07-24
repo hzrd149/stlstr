@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import {
   Box,
   Camera,
@@ -123,21 +123,52 @@ function useCopy() {
   return { copied, copy };
 }
 
-/** A read-only monospace value with a one-click copy button. */
+/** A small button that copies a bare value, showing it inline. */
+function CopyChip({
+  value,
+  copied,
+  onCopy,
+  title,
+}: {
+  value: string;
+  copied: boolean;
+  onCopy: (value: string) => void;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="btn btn-ghost btn-sm h-auto min-h-0 gap-1 px-2 py-1 font-mono font-normal"
+      onClick={() => onCopy(value)}
+      title={title}
+      aria-label={copied ? `${title} copied` : title}
+    >
+      {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+      {value}
+    </button>
+  );
+}
+
+/** A read-only monospace value with a one-click copy button, plus an optional label-row action. */
 function CopyField({
   label,
   value,
   copied,
   onCopy,
+  action,
 }: {
   label: string;
   value: string;
   copied: boolean;
   onCopy: (value: string) => void;
+  action?: ReactNode;
 }) {
   return (
     <div className="grid gap-1">
-      <span className="text-sm font-medium text-base-content/60">{label}</span>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <span className="text-sm font-medium text-base-content/60">{label}</span>
+        {action}
+      </div>
       <div className="join w-full">
         <input
           className="input input-sm join-item w-full font-mono text-sm"
@@ -207,6 +238,16 @@ function Showcase({ copied, onCopy }: { copied: string | null; onCopy: (value: s
                       value={naddr}
                       copied={copied === naddr}
                       onCopy={onCopy}
+                      // Temporary: lets callers copy the archetype until napplets advertise
+                      // their own archetype and it can be read from the manifest instead.
+                      action={
+                        <CopyChip
+                          value={archetype}
+                          copied={copied === archetype}
+                          onCopy={onCopy}
+                          title="Copy archetype"
+                        />
+                      }
                     />
                     <a
                       href={pajaUrl(naddr)}

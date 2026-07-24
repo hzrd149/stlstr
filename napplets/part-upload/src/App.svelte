@@ -10,6 +10,7 @@
   } from '@napplet/sdk';
   import {
     FILE_KIND,
+    type FileMeta,
     formatBytes,
     nip94TagsFromUpload,
     readFileMeta,
@@ -23,6 +24,7 @@
   const CREATE_TOPIC = 'part-upload:create';
   const READY_TOPIC = 'part-upload:ready';
   const LIBRARY_ARCHETYPE = 'part-library';
+  const PART_DETAIL_ARCHETYPE = 'part-detail';
 
   type UploadResult = Awaited<ReturnType<typeof upload.upload>>;
   type RowStatus =
@@ -34,13 +36,19 @@
     | 'publishing'
     | 'done'
     | 'error';
+  type DuplicatePart = {
+    id: string;
+    meta: FileMeta;
+    description: string;
+    createdAt: number;
+  };
   type SelectedPart = {
     id: string;
     file: File;
     name: string;
     description: string;
     sha256: string;
-    duplicateId: string;
+    duplicate: DuplicatePart | null;
     publishedId: string;
     thumbnailBlob: Blob | null;
     thumbnailUrl: string;
@@ -67,7 +75,15 @@
 
   const signedIn = $derived(Boolean(viewer));
   const publishableRows = $derived(rows.filter((row) => row.status !== 'done'));
-  const canPublish = $derived(signedIn && rows.length > 0 && !busy);
+  const inspecting = $derived(rows.some((row) => row.status === 'hashing'));
+  const canPublish = $derived(signedIn && rows.length > 0 && !busy && !inspecting);
+  const publishButtonLabel = $derived.by(() => {
+    if (busy) return 'Publishing...';
+    const remaining = rows.filter((row) => row.status !== 'done');
+    if (remaining.length > 0 && remaining.every((row) => row.duplicate))
+      return 'Reuse existing parts';
+    return 'Publish parts';
+  });
 
   const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
   const hasInc = () => hasMethods('inc', 'on', 'emit');
@@ -110,6 +126,26 @@
     const dot = file.name.lastIndexOf('.');
     const base = dot > 0 ? file.name.slice(0, dot) : file.name;
     return `${base}-thumbnail.png`;
+  }
+
+  function formatDate(seconds: number): string {
+    if (!seconds) return 'unknown date';
+    return new Date(seconds * 1000).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+
+  function duplicateFromEvent(event: NostrEvent): DuplicatePart | null {
+    const meta = readFileMeta(event.tags);
+    if (!meta) return null;
+    return {
+      id: event.id,
+      meta,
+      description: event.content.trim(),
+      createdAt: event.created_at,
+    };
   }
 
   async function renderThumbnail(rowId: string): Promise<void> {
@@ -251,13 +287,15 @@
     return hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
   }
 
-  async function findDuplicate(pubkey: string, hash: string): Promise<NostrEvent | null> {
+  async function findDuplicate(pubkey: string, hash: string): Promise<DuplicatePart | null> {
     if (!hash || !hasOutbox()) return null;
     const { events } = await outbox.query(
       [{ kinds: [FILE_KIND], authors: [pubkey], '#x': [hash], limit: 1 }],
       { timeoutMs: 5000 },
     );
-    return events.map((result) => result.event).find((event) => readFileMeta(event.tags)) ?? null;
+    return (
+      events.map((result) => duplicateFromEvent(result.event)).find((part) => part !== null) ?? null
+    );
   }
 
   async function prepareRow(row: SelectedPart, pubkey: string): Promise<void> {
@@ -268,9 +306,10 @@
       if (duplicate) {
         setRow(row.id, {
           sha256: hash,
-          duplicateId: duplicate.id,
+          duplicate,
           status: 'duplicate',
-          message: 'This exact file is already in your library. It will be reused.',
+          message:
+            'Duplicate found. stlstr will reuse the existing part instead of uploading another copy.',
         });
       } else {
         setRow(row.id, { sha256: hash, status: 'ready', message: 'Ready to publish.' });
@@ -296,7 +335,7 @@
       name: file.name,
       description: '',
       sha256: '',
-      duplicateId: '',
+      duplicate: null,
       publishedId: '',
       thumbnailBlob: null,
       thumbnailUrl: '',
@@ -377,10 +416,10 @@
   async function publishRow(row: SelectedPart): Promise<void> {
     if (row.status === 'done') return;
 
-    if (row.duplicateId) {
+    if (row.duplicate) {
       setRow(row.id, {
         status: 'done',
-        publishedId: row.duplicateId,
+        publishedId: row.duplicate.id,
         message: 'Reusing existing part.',
       });
       return;
@@ -422,6 +461,10 @@
       status = 'This shell does not provide publishing and upload access.';
       return;
     }
+    if (inspecting) {
+      status = 'Wait for duplicate checks to finish before publishing.';
+      return;
+    }
 
     busy = true;
     status = 'Publishing selected parts...';
@@ -443,11 +486,22 @@
         return;
       }
 
-      status = 'Parts published.';
+      const reused = rows.filter((row) => row.publishedId && row.duplicate).length;
+      const published = rows.filter((row) => row.publishedId && !row.duplicate).length;
+      if (published && reused)
+        status = 'New parts published. Duplicate files reused from your library.';
+      else if (reused) status = 'Duplicate files reused from your library.';
+      else status = 'Parts published.';
       if (hasIntent()) await intent.open(LIBRARY_ARCHETYPE, {});
     } finally {
       busy = false;
     }
+  }
+
+  async function openDuplicatePart(row: SelectedPart): Promise<void> {
+    if (!row.duplicate || !hasIntent()) return;
+    const result = await intent.open(PART_DETAIL_ARCHETYPE, { fileId: row.duplicate.id });
+    if (!result.ok) status = result.error ?? 'Could not open the existing part.';
   }
 
   function applyIntent(): void {
@@ -534,7 +588,7 @@
                 type="button"
                 class="grid aspect-square place-items-center overflow-hidden rounded-box bg-base-200 text-left"
                 onclick={() => openThumbnailEditor(row)}
-                disabled={!isStlFile(row.file) || row.status === 'done' || busy}
+                disabled={!isStlFile(row.file) || row.status === 'done' || row.duplicate || busy}
                 aria-label={`Edit thumbnail for ${row.name || row.file.name}`}
                 data-testid="edit-upload-thumbnail"
               >
@@ -556,7 +610,7 @@
                   </span>
                 {/if}
               </button>
-              {#if isStlFile(row.file) && row.thumbnailStatus !== 'none'}
+              {#if isStlFile(row.file) && row.thumbnailStatus !== 'none' && !row.duplicate}
                 <p class="text-center text-xs text-base-content/60">Click to rotate</p>
               {/if}
             </div>
@@ -569,7 +623,7 @@
                   value={row.name}
                   oninput={(event) =>
                     updateName(row.id, (event.currentTarget as HTMLInputElement).value)}
-                  disabled={busy || row.status === 'done'}
+                  disabled={busy || row.status === 'done' || Boolean(row.duplicate)}
                 />
               </label>
               <textarea
@@ -579,15 +633,15 @@
                 value={row.description}
                 oninput={(event) =>
                   updateDescription(row.id, (event.currentTarget as HTMLTextAreaElement).value)}
-                disabled={busy || row.status === 'done'}
+                disabled={busy || row.status === 'done' || Boolean(row.duplicate)}
               ></textarea>
             </div>
 
             <div class="text-sm text-base-content/70">
               <div class="truncate font-medium">{row.file.name}</div>
               <div>{formatBytes(row.file.size)} · {row.file.type || 'unknown type'}</div>
-              {#if row.sha256}
-                <div class="mt-1 truncate text-xs">sha256 {row.sha256}</div>
+              {#if row.sha256 && !row.duplicate}
+                <div class="mt-1 text-xs">Fingerprint checked</div>
               {/if}
             </div>
 
@@ -618,6 +672,50 @@
                 {row.message}
               </p>
             {/if}
+
+            {#if row.duplicate}
+              <div class="alert alert-warning md:col-span-4" data-testid="upload-duplicate-warning">
+                <div class="grid gap-2">
+                  <div>
+                    <p class="font-semibold">This file already exists in your part library.</p>
+                    <p class="text-sm">
+                      It matches an existing part byte-for-byte, so stlstr will not upload another
+                      copy or publish a second part event. Publishing will reuse the existing part
+                      instead.
+                    </p>
+                  </div>
+                  <div class="text-sm">
+                    Existing part: <span class="font-medium">{row.duplicate.meta.name}</span>
+                    {#if row.duplicate.meta.sizeBytes}
+                      · {formatBytes(row.duplicate.meta.sizeBytes)}
+                    {/if}
+                    {#if row.duplicate.meta.mime}
+                      · {row.duplicate.meta.mime}
+                    {/if}
+                    · published {formatDate(row.duplicate.createdAt)}
+                  </div>
+                  {#if row.duplicate.description}
+                    <p class="line-clamp-2 text-sm">{row.duplicate.description}</p>
+                  {/if}
+                  <p class="text-sm">
+                    If this is meant to be a new revision, remove this row, change or export the
+                    file again, then select the revised file.
+                  </p>
+                  {#if hasIntent()}
+                    <div>
+                      <button
+                        type="button"
+                        class="btn btn-outline btn-sm"
+                        onclick={() => openDuplicatePart(row)}
+                        disabled={busy}
+                      >
+                        View existing part
+                      </button>
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            {/if}
           </article>
         {/each}
       </div>
@@ -636,7 +734,7 @@
         disabled={!canPublish}
         data-testid="publish-parts"
       >
-        {busy ? 'Publishing...' : 'Publish parts'}
+        {publishButtonLabel}
       </button>
     </footer>
   </section>

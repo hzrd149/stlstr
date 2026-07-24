@@ -658,7 +658,7 @@ importers:
         specifier: ^8.1.4
         version: 8.1.5(@types/node@24.13.3)(jiti@2.7.0)
 
-  napplets/print-discover:
+  napplets/print-discvr:
     dependencies:
       '@lucide/svelte':
         specifier: ^1.26.0
