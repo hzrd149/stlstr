@@ -11,7 +11,7 @@ export default defineConfig({
       nappletType: 'part-detail',
       // `inc` delivers the route payload, `outbox` resolves the NIP-94 file event and its
       // comments/usages, `identity` gates comment compose, and `intent` opens related views.
-      requires: ['inc', 'outbox', 'resource', 'intent', 'theme', 'identity', 'count'],
+      requires: ['inc', 'outbox', 'resource', 'intent', 'link', 'theme', 'identity', 'count'],
       artifactMode: 'single-file',
       archetypes: [{ slug: 'part-detail', naps: ['napplet:part-detail/open'] }],
     }),

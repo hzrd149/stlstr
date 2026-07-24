@@ -14,6 +14,7 @@
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
+  import { buildSlicerBridgeUri, isSlicerOpenableFile } from '@stlstr/napplet-kit/slicers';
   import { onMount } from 'svelte';
 
   /**
@@ -267,6 +268,12 @@
     if (hasLink()) void link.open(file.meta.url, { label: file.meta.name });
   }
 
+  function openInSlicer(file: LibraryFile): void {
+    if (!hasLink()) return;
+    const uri = buildSlicerBridgeUri([file.meta]);
+    if (uri) void link.open(uri, { label: `Open ${file.meta.name} in slicer` });
+  }
+
   async function openObject(entry: Usage): Promise<void> {
     if (!hasIntentOpen()) return;
     const result = await intent.open(DETAIL_ARCHETYPE, { address: entry.address });
@@ -456,6 +463,16 @@
                 </button>
               {/if}
               {#if hasLink()}
+                {#if isSlicerOpenableFile(file.meta)}
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    data-testid="open-in-slicer"
+                    onclick={() => openInSlicer(file)}
+                  >
+                    Open in slicer
+                  </button>
+                {/if}
                 <button
                   type="button"
                   class="btn btn-outline btn-sm"

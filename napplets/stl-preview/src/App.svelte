@@ -2,6 +2,7 @@
   import { inc, link, resource } from '@napplet/sdk';
   import { looksLikeStl, parseStl } from '@stlstr/napplet-kit/stl';
   import { hasDomain } from '@stlstr/napplet-kit/capabilities';
+  import { buildSlicerBridgeUri, isSlicerOpenableFile } from '@stlstr/napplet-kit/slicers';
   import { onMount, tick } from 'svelte';
   import { createViewer, type Viewer } from './viewer';
 
@@ -80,6 +81,12 @@
   function download(): void {
     if (!file) return;
     if (hasLink()) void link.open(file.url, { label: file.name });
+  }
+
+  function openInSlicer(): void {
+    if (!file || !hasLink()) return;
+    const uri = buildSlicerBridgeUri([{ url: file.url, name: file.name }]);
+    if (uri) void link.open(uri, { label: `Open ${file.name} in slicer` });
   }
 
   async function render(bytes: Uint8Array): Promise<void> {
@@ -202,14 +209,26 @@
       <p class="text-base-content/70" aria-live="polite" data-testid="preview-status">{status}</p>
 
       {#if file && (phase === 'too-large' || phase === 'unsupported')}
-        <button
-          class="btn btn-primary btn-sm justify-self-center"
-          disabled={!hasLink()}
-          onclick={download}
-          data-testid="preview-download"
-        >
-          Download {file.name}
-        </button>
+        <div class="flex flex-wrap justify-center gap-2">
+          {#if isSlicerOpenableFile(file)}
+            <button
+              class="btn btn-primary btn-sm"
+              disabled={!hasLink()}
+              onclick={openInSlicer}
+              data-testid="preview-open-in-slicer"
+            >
+              Open in slicer
+            </button>
+          {/if}
+          <button
+            class="btn btn-outline btn-sm"
+            disabled={!hasLink()}
+            onclick={download}
+            data-testid="preview-download"
+          >
+            Download {file.name}
+          </button>
+        </div>
       {/if}
     </div>
   {/if}
@@ -219,12 +238,24 @@
       class="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 px-4 py-2 text-sm"
     >
       <span class="min-w-0 truncate font-medium" data-testid="preview-name">{file.name}</span>
-      <span class="text-base-content/60">
-        {formatBytes(file.sizeBytes)}
-        {#if triangles}
-          · {triangles.toLocaleString()} triangles
+      <div class="flex flex-wrap items-center justify-end gap-2 text-base-content/60">
+        <span>
+          {formatBytes(file.sizeBytes)}
+          {#if triangles}
+            · {triangles.toLocaleString()} triangles
+          {/if}
+        </span>
+        {#if isSlicerOpenableFile(file)}
+          <button
+            class="btn btn-outline btn-xs"
+            disabled={!hasLink()}
+            onclick={openInSlicer}
+            data-testid="preview-footer-open-in-slicer"
+          >
+            Open in slicer
+          </button>
         {/if}
-      </span>
+      </div>
     </footer>
   {/if}
 </main>

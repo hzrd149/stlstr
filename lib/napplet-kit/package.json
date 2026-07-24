@@ -17,6 +17,7 @@
     "./components/Comments.svelte": "./src/components/Comments.svelte",
     "./components/PartThumb.svelte": "./src/components/PartThumb.svelte",
     "./profiles": "./src/profiles.ts",
+    "./slicers": "./src/slicers.ts",
     "./components/MakerLink.svelte": "./src/components/MakerLink.svelte",
     "./components/Markdown.svelte": "./src/components/Markdown.svelte",
     "./components/GalleryImage.svelte": "./src/components/GalleryImage.svelte"

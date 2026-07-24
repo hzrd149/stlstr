@@ -1,5 +1,14 @@
 <script lang="ts">
-  import { count, identity, inc, intent, outbox, resource, type NostrEvent } from '@napplet/sdk';
+  import {
+    count,
+    identity,
+    inc,
+    intent,
+    link,
+    outbox,
+    resource,
+    type NostrEvent,
+  } from '@napplet/sdk';
   import Comments from '@stlstr/napplet-kit/components/Comments.svelte';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { eventThreadFilter } from '@stlstr/napplet-kit/comments';
@@ -15,6 +24,7 @@
     type FileMeta,
   } from '@stlstr/napplet-kit/files';
   import { fetchMakers, makerDisplayName, type MakerProfile } from '@stlstr/napplet-kit/profiles';
+  import { buildSlicerBridgeUri, isSlicerOpenableFile } from '@stlstr/napplet-kit/slicers';
   import { looksLikeStl, parseStl } from '@stlstr/napplet-kit/stl';
   import { createViewer, type Viewer } from '@stlstr/napplet-kit/stl-viewer';
   import { onMount, tick } from 'svelte';
@@ -88,6 +98,7 @@
   const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
   const hasCount = () => hasMethods('count', 'query');
   const hasResource = () => hasMethods('resource', 'bytes');
+  const hasLink = () => hasMethods('link', 'open');
 
   function roleFor(event: NostrEvent, id: string): string {
     return event.tags.find((tag) => tag[0] === 'e' && tag[1] === id)?.[3]?.trim() ?? '';
@@ -321,6 +332,12 @@
     });
   }
 
+  function openInSlicer(): void {
+    if (!file || !hasLink()) return;
+    const uri = buildSlicerBridgeUri([file.meta]);
+    if (uri) void link.open(uri, { label: `Open ${file.meta.name} in slicer` });
+  }
+
   async function openObject(entry: Usage): Promise<void> {
     if (!hasIntentOpen()) return;
     const result = await intent.open(DETAIL_ARCHETYPE, { address: entry.address });
@@ -404,7 +421,11 @@
             </p>
           {/if}
           {#if status}
-            <p class="mt-2 text-sm text-base-content/70" aria-live="polite" data-testid="part-status">
+            <p
+              class="mt-2 text-sm text-base-content/70"
+              aria-live="polite"
+              data-testid="part-status"
+            >
               {status}
             </p>
           {/if}
@@ -422,6 +443,16 @@
       >
         Preview STL
       </button>
+      {#if file && hasLink() && isSlicerOpenableFile(file.meta)}
+        <button
+          type="button"
+          class="btn btn-outline"
+          onclick={openInSlicer}
+          data-testid="part-open-in-slicer"
+        >
+          Open in slicer
+        </button>
+      {/if}
     </div>
   </section>
 
@@ -452,7 +483,11 @@
             <PartThumb file={file.meta} size="h-24 w-24 justify-self-center sm:h-32 sm:w-32" />
           {/if}
           {#if previewStatus}
-            <p class="text-sm text-base-content/70" aria-live="polite" data-testid="part-preview-status">
+            <p
+              class="text-sm text-base-content/70"
+              aria-live="polite"
+              data-testid="part-preview-status"
+            >
               {previewStatus}
             </p>
           {/if}
@@ -460,7 +495,9 @@
       {/if}
 
       {#if previewPhase === 'ready'}
-        <footer class="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 px-4 py-2 text-sm">
+        <footer
+          class="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 px-4 py-2 text-sm"
+        >
           <span class="min-w-0 truncate font-medium">{file.meta.name}</span>
           <span class="text-base-content/60">
             {formatBytes(file.meta.sizeBytes)}

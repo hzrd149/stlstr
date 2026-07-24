@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { count, identity, inc, intent, outbox, type NostrEvent } from '@napplet/sdk';
+  import { count, identity, inc, intent, link, outbox, type NostrEvent } from '@napplet/sdk';
   import { onMount } from 'svelte';
   import Comments from '@stlstr/napplet-kit/components/Comments.svelte';
   import GalleryImage from '@stlstr/napplet-kit/components/GalleryImage.svelte';
@@ -8,6 +8,11 @@
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import { parseImages, type ObjectImage } from '@stlstr/napplet-kit/images';
+  import {
+    buildSlicerBridgeUri,
+    isSlicerOpenableFile,
+    slicerCompatibilityInfo,
+  } from '@stlstr/napplet-kit/slicers';
 
   /**
    * The object detail page.
@@ -69,6 +74,8 @@
   let viewer = $state('');
 
   const cover = $derived(images[activeImage] ?? images[0] ?? null);
+  const slicerOpenableParts = $derived(parts.filter(isSlicerOpenableFile));
+  const slicerCompatibility = $derived(slicerCompatibilityInfo(slicerOpenableParts));
 
   /** The object's Markdown body, per NIP.md. */
   const description = $derived(object?.content.trim() ?? '');
@@ -85,6 +92,7 @@
   const hasIntentAvailable = () => hasMethods('intent', 'available');
   const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
   const hasCount = () => hasMethods('count', 'query');
+  const hasLink = () => hasMethods('link', 'open');
 
   /** File references this object marks as printable parts, in publication order. */
   function partIds(tags: string[][]): string[] {
@@ -215,6 +223,18 @@
     void intent.open('part-detail', { fileId: part.id });
   }
 
+  function openInSlicer(part: PartFile): void {
+    if (!hasLink()) return;
+    const uri = buildSlicerBridgeUri([part]);
+    if (uri) void link.open(uri, { label: `Open ${part.name} in slicer` });
+  }
+
+  function openAllInSlicer(): void {
+    if (!hasLink()) return;
+    const uri = buildSlicerBridgeUri(slicerOpenableParts);
+    if (uri) void link.open(uri, { label: `Open ${slicerOpenableParts.length} files in slicer` });
+  }
+
   /** Owner-only: hands the object to whichever napplet fulfills the `printable-edit` role. */
   async function edit(): Promise<void> {
     if (!address || !hasIntentOpen()) return;
@@ -340,6 +360,18 @@
 
       {#if parts.length > 0}
         <div class="divider my-0">Files</div>
+        {#if hasLink() && slicerOpenableParts.length > 1}
+          <button
+            type="button"
+            class="btn btn-outline btn-sm justify-self-start"
+            disabled={!slicerCompatibility.ok}
+            title={'reason' in slicerCompatibility ? slicerCompatibility.reason : ''}
+            data-testid="open-all-in-slicer"
+            onclick={openAllInSlicer}
+          >
+            Open all in slicer
+          </button>
+        {/if}
         <ul class="grid gap-2" data-testid="object-parts">
           {#each parts as part (part.id)}
             <li
@@ -366,6 +398,16 @@
                     onclick={() => preview(part)}
                   >
                     Preview
+                  </button>
+                {/if}
+                {#if hasLink() && isSlicerOpenableFile(part)}
+                  <button
+                    class="btn btn-outline btn-sm"
+                    data-testid="open-in-slicer"
+                    data-file-id={part.id}
+                    onclick={() => openInSlicer(part)}
+                  >
+                    Open in slicer
                   </button>
                 {/if}
               </div>
