@@ -132,7 +132,7 @@ test('stlstr renders settings in the shell and saves changes', async () => {
 
     // Theme choices apply immediately and persist.
     await page.click('button[aria-label="Dark"]');
-    assert.equal(await page.$eval('html', (node) => node.getAttribute('data-theme')), 'dark');
+    assert.equal(await page.$eval('html', (node) => node.getAttribute('data-theme')), 'abyss');
 
     await page.click('button[role="tab"]:nth-child(2)');
 
@@ -147,7 +147,7 @@ test('stlstr renders settings in the shell and saves changes', async () => {
 
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('main [role="tablist"]');
-    assert.equal(await page.$eval('html', (node) => node.getAttribute('data-theme')), 'dark');
+    assert.equal(await page.$eval('html', (node) => node.getAttribute('data-theme')), 'abyss');
   } finally {
     // Settings live in localStorage, which is shared with the other tests.
     await page.evaluate(() => localStorage.removeItem('stlstr.settings.v1')).catch(() => {});

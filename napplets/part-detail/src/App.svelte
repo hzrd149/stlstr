@@ -27,6 +27,10 @@
   import { buildSlicerBridgeUri, isSlicerOpenableFile } from '@stlstr/napplet-kit/slicers';
   import { looksLikeStl, parseStl } from '@stlstr/napplet-kit/stl';
   import { createViewer, type Viewer } from '@stlstr/napplet-kit/stl-viewer';
+  import Download from '@lucide/svelte/icons/download';
+  import Eye from '@lucide/svelte/icons/eye';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import Printer from '@lucide/svelte/icons/printer';
   import { onMount, tick } from 'svelte';
 
   /**
@@ -441,30 +445,33 @@
     <div class="flex flex-wrap items-start justify-start gap-2 lg:justify-end">
       <button
         type="button"
-        class="btn btn-primary"
+        class="btn btn-primary gap-2"
         disabled={!canPreviewFile}
         onclick={preview}
         data-testid="part-stl-preview"
       >
-        Preview STL
+        <Eye size={18} aria-hidden="true" />
+        Preview
       </button>
       {#if file && hasLink() && isSlicerOpenableFile(file.meta)}
         <button
           type="button"
-          class="btn btn-outline"
+          class="btn btn-outline gap-2"
           onclick={openInSlicer}
           data-testid="part-open-in-slicer"
         >
+          <Printer size={18} aria-hidden="true" />
           Open in slicer
         </button>
       {/if}
       {#if file && hasLink()}
         <button
           type="button"
-          class="btn btn-outline"
+          class="btn btn-outline gap-2"
           onclick={download}
           data-testid="part-download"
         >
+          <Download size={18} aria-hidden="true" />
           Download
         </button>
       {/if}
@@ -483,9 +490,10 @@
 
         <button
           type="button"
-          class="btn btn-ghost btn-xs absolute right-2 top-2"
+          class="btn btn-ghost btn-xs absolute right-2 top-2 gap-1"
           onclick={() => stlViewer?.resetView()}
         >
+          <RotateCcw size={14} aria-hidden="true" />
           Reset view
         </button>
       </div>

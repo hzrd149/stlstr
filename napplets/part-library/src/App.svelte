@@ -16,6 +16,12 @@
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { buildSlicerBridgeUri, isSlicerOpenableFile } from '@stlstr/napplet-kit/slicers';
+  import Download from '@lucide/svelte/icons/download';
+  import Eye from '@lucide/svelte/icons/eye';
+  import Info from '@lucide/svelte/icons/info';
+  import LinkIcon from '@lucide/svelte/icons/link';
+  import Package from '@lucide/svelte/icons/package';
+  import Printer from '@lucide/svelte/icons/printer';
   import { onMount } from 'svelte';
 
   /**
@@ -271,6 +277,12 @@
     });
   }
 
+  function previewOnKeydown(event: KeyboardEvent, file: LibraryFile): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    preview(file);
+  }
+
   function download(file: LibraryFile): void {
     if (hasLink()) void link.open(file.meta.url, { label: file.meta.name });
   }
@@ -371,7 +383,13 @@
       </p>
     </div>
     {#if canUpload && signedIn}
-      <button type="button" class="btn btn-primary" data-testid="upload-part" onclick={openUpload}>
+      <button
+        type="button"
+        class="btn btn-primary gap-2"
+        data-testid="upload-part"
+        onclick={openUpload}
+      >
+        <Package size={18} aria-hidden="true" />
         Upload a part
       </button>
     {/if}
@@ -420,10 +438,33 @@
         <li class="rounded-box border border-base-300 p-3" data-testid="part-row">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="flex min-w-0 gap-3">
-              <PartThumb file={file.meta} />
+              {#if canPreview && isPreviewable(file.meta)}
+                <span
+                  role="button"
+                  tabindex="0"
+                  class="cursor-pointer rounded-box focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="part-thumbnail-preview"
+                  data-file-id={file.eventId}
+                  onclick={() => preview(file)}
+                  onkeydown={(event) => previewOnKeydown(event, file)}
+                  aria-label={`Preview ${file.meta.name}`}
+                >
+                  <PartThumb file={file.meta} />
+                </span>
+              {:else}
+                <PartThumb file={file.meta} />
+              {/if}
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="truncate font-medium" data-testid="part-name">{file.meta.name}</span>
+                  <button
+                    type="button"
+                    class="link max-w-full truncate text-left font-medium"
+                    data-testid="part-name"
+                    data-file-id={file.eventId}
+                    onclick={() => openPart(file)}
+                  >
+                    {file.meta.name}
+                  </button>
                   {#if duplicates > 1}
                     <!-- Same bytes, several events. Only visible from here, so it is named
                          rather than silently rendered as unrelated rows. -->
@@ -443,58 +484,67 @@
               </div>
             </div>
 
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap justify-end gap-2">
               {#if usageLoaded}
                 <button
                   type="button"
-                  class="btn btn-ghost btn-sm"
+                  class="btn btn-ghost btn-sm gap-2"
                   data-testid="part-usage-toggle"
                   aria-expanded={expanded === file.eventId}
                   onclick={() => toggleUsage(file)}
                 >
-                  {uses.length === 0 ? 'Not used' : `Used in ${uses.length}`}
+                  <LinkIcon size={16} aria-hidden="true" />
+                  {uses.length === 0 ? '0 uses' : `${uses.length} uses`}
                 </button>
               {/if}
               {#if canPreview && isPreviewable(file.meta)}
                 <button
                   type="button"
-                  class="btn btn-outline btn-sm"
+                  class="btn btn-square btn-outline btn-sm"
                   data-testid="preview-part"
                   data-file-id={file.eventId}
                   onclick={() => preview(file)}
+                  aria-label={`Preview ${file.meta.name}`}
+                  title="Preview"
                 >
-                  Preview
+                  <Eye size={16} aria-hidden="true" />
                 </button>
               {/if}
               {#if hasIntentOpen()}
                 <button
                   type="button"
-                  class="btn btn-ghost btn-sm"
+                  class="btn btn-square btn-ghost btn-sm"
                   data-testid="part-details"
                   data-file-id={file.eventId}
                   onclick={() => openPart(file)}
+                  aria-label={`View details for ${file.meta.name}`}
+                  title="Details"
                 >
-                  Details
+                  <Info size={16} aria-hidden="true" />
                 </button>
               {/if}
               {#if hasLink()}
                 {#if isSlicerOpenableFile(file.meta)}
                   <button
                     type="button"
-                    class="btn btn-outline btn-sm"
+                    class="btn btn-square btn-outline btn-sm"
                     data-testid="open-in-slicer"
                     onclick={() => openInSlicer(file)}
+                    aria-label={`Open ${file.meta.name} in slicer`}
+                    title="Open in slicer"
                   >
-                    Open in slicer
+                    <Printer size={16} aria-hidden="true" />
                   </button>
                 {/if}
                 <button
                   type="button"
-                  class="btn btn-outline btn-sm"
+                  class="btn btn-square btn-outline btn-sm"
                   data-testid="download-part"
                   onclick={() => download(file)}
+                  aria-label={`Download ${file.meta.name}`}
+                  title="Download"
                 >
-                  Download
+                  <Download size={16} aria-hidden="true" />
                 </button>
               {/if}
             </div>

@@ -13,6 +13,7 @@
     "test:conformance": "pnpm build && napplet-conformance ./dist"
   },
   "dependencies": {
+    "@lucide/svelte": "^1.26.0",
     "@napplet/sdk": "^0.24.4",
     "@stlstr/napplet-kit": "workspace:*",
     "applesauce-common": "^6.2.0",

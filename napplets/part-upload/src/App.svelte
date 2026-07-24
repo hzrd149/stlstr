@@ -14,8 +14,10 @@
     nip94TagsFromUpload,
     readFileMeta,
   } from '@stlstr/napplet-kit/files';
+  import { looksLikeStl } from '@stlstr/napplet-kit/stl';
+  import { renderStlThumbnail } from '@stlstr/napplet-kit/stl-thumbnail';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
 
   const OPEN_TOPIC = 'part-upload:open';
   const CREATE_TOPIC = 'part-upload:create';
@@ -24,7 +26,14 @@
 
   type UploadResult = Awaited<ReturnType<typeof upload.upload>>;
   type RowStatus =
-    'ready' | 'hashing' | 'duplicate' | 'uploading' | 'publishing' | 'done' | 'error';
+    | 'ready'
+    | 'hashing'
+    | 'duplicate'
+    | 'thumbnailing'
+    | 'uploading'
+    | 'publishing'
+    | 'done'
+    | 'error';
   type SelectedPart = {
     id: string;
     file: File;
@@ -33,6 +42,11 @@
     sha256: string;
     duplicateId: string;
     publishedId: string;
+    thumbnailBlob: Blob | null;
+    thumbnailUrl: string;
+    thumbnailStatus: 'none' | 'rendering' | 'ready' | 'error';
+    thumbnailPitch: number;
+    thumbnailYaw: number;
     status: RowStatus;
     message: string;
   };
@@ -42,6 +56,14 @@
   let rows = $state<SelectedPart[]>([]);
   let status = $state('Select one or more files to publish as reusable parts.');
   let busy = $state(false);
+  let thumbnailDialog = $state<HTMLDialogElement | null>(null);
+  let editorRowId = $state('');
+  let editorPitch = $state(0);
+  let editorYaw = $state(0);
+  let editorBlob = $state<Blob | null>(null);
+  let editorUrl = $state('');
+  let editorStatus = $state('');
+  let editorBusy = $state(false);
 
   const signedIn = $derived(Boolean(viewer));
   const publishableRows = $derived(rows.filter((row) => row.status !== 'done'));
@@ -62,6 +84,8 @@
   }
 
   function removeRow(id: string): void {
+    const removed = rows.find((row) => row.id === id);
+    revokeObjectUrl(removed?.thumbnailUrl ?? '');
     rows = rows.filter((row) => row.id !== id);
   }
 
@@ -71,6 +95,152 @@
 
   function updateDescription(id: string, description: string): void {
     setRow(id, { description });
+  }
+
+  function revokeObjectUrl(url: string): void {
+    if (url) URL.revokeObjectURL(url);
+  }
+
+  function isStlFile(file: File): boolean {
+    const name = file.name.toLowerCase();
+    return file.type === 'model/stl' || file.type === 'application/sla' || name.endsWith('.stl');
+  }
+
+  function thumbnailName(file: File): string {
+    const dot = file.name.lastIndexOf('.');
+    const base = dot > 0 ? file.name.slice(0, dot) : file.name;
+    return `${base}-thumbnail.png`;
+  }
+
+  async function renderThumbnail(rowId: string): Promise<void> {
+    const row = rows.find((candidate) => candidate.id === rowId);
+    if (!row || !isStlFile(row.file)) return;
+
+    setRow(row.id, {
+      thumbnailStatus: 'rendering',
+      message: 'Rendering preview thumbnail...',
+    });
+
+    try {
+      const bytes = new Uint8Array(await row.file.arrayBuffer());
+      if (!looksLikeStl(bytes)) {
+        setRow(row.id, { thumbnailStatus: 'none', message: 'Ready to publish.' });
+        return;
+      }
+
+      const thumbnailBlob = await renderStlThumbnail(bytes, {
+        width: 512,
+        height: 512,
+        rotationX: row.thumbnailPitch,
+        rotationY: row.thumbnailYaw,
+      });
+      const thumbnailUrl = URL.createObjectURL(thumbnailBlob);
+      const current = rows.find((candidate) => candidate.id === row.id);
+      if (!current) {
+        revokeObjectUrl(thumbnailUrl);
+        return;
+      }
+
+      revokeObjectUrl(current.thumbnailUrl);
+      setRow(row.id, {
+        thumbnailBlob,
+        thumbnailUrl,
+        thumbnailStatus: 'ready',
+        message: 'Thumbnail ready. Rotate it if the view needs adjustment.',
+      });
+    } catch (error) {
+      setRow(row.id, {
+        thumbnailBlob: null,
+        thumbnailUrl: '',
+        thumbnailStatus: 'error',
+        message: error instanceof Error ? error.message : 'Could not render a thumbnail.',
+      });
+    }
+  }
+
+  async function renderEditorThumbnail(): Promise<void> {
+    const row = rows.find((candidate) => candidate.id === editorRowId);
+    if (!row) return;
+
+    editorBusy = true;
+    editorStatus = 'Rendering thumbnail...';
+    try {
+      const bytes = new Uint8Array(await row.file.arrayBuffer());
+      if (!looksLikeStl(bytes)) {
+        editorStatus = 'This file is not an STL that can be rendered here.';
+        return;
+      }
+
+      const nextBlob = await renderStlThumbnail(bytes, {
+        width: 512,
+        height: 512,
+        rotationX: editorPitch,
+        rotationY: editorYaw,
+      });
+      const nextUrl = URL.createObjectURL(nextBlob);
+      revokeObjectUrl(editorUrl);
+      editorBlob = nextBlob;
+      editorUrl = nextUrl;
+      editorStatus = 'Rotate until the part reads clearly, then save.';
+    } catch (error) {
+      editorStatus = error instanceof Error ? error.message : 'Could not render the thumbnail.';
+    } finally {
+      editorBusy = false;
+    }
+  }
+
+  function openThumbnailEditor(row: SelectedPart): void {
+    if (!isStlFile(row.file) || row.status === 'done' || busy) return;
+    editorRowId = row.id;
+    editorPitch = row.thumbnailPitch;
+    editorYaw = row.thumbnailYaw;
+    editorBlob = row.thumbnailBlob;
+    revokeObjectUrl(editorUrl);
+    editorUrl = row.thumbnailBlob ? URL.createObjectURL(row.thumbnailBlob) : '';
+    editorStatus = 'Rotate until the part reads clearly, then save.';
+    thumbnailDialog?.showModal();
+    if (!editorUrl) void renderEditorThumbnail();
+  }
+
+  function rotateEditor(pitchDelta: number, yawDelta: number): void {
+    if (editorBusy) return;
+    editorPitch += pitchDelta;
+    editorYaw += yawDelta;
+    void renderEditorThumbnail();
+  }
+
+  function resetEditor(): void {
+    if (editorBusy) return;
+    editorPitch = -Math.PI * 0.15;
+    editorYaw = Math.PI * 0.25;
+    void renderEditorThumbnail();
+  }
+
+  function closeThumbnailEditor(): void {
+    if (thumbnailDialog?.open) thumbnailDialog.close();
+    editorRowId = '';
+    editorBlob = null;
+    revokeObjectUrl(editorUrl);
+    editorUrl = '';
+    editorStatus = '';
+    editorBusy = false;
+  }
+
+  function saveThumbnailEditor(): void {
+    const row = rows.find((candidate) => candidate.id === editorRowId);
+    if (!row || !editorBlob) return;
+
+    const thumbnailUrl = URL.createObjectURL(editorBlob);
+    revokeObjectUrl(row.thumbnailUrl);
+    setRow(row.id, {
+      thumbnailBlob: editorBlob,
+      thumbnailUrl,
+      thumbnailStatus: 'ready',
+      thumbnailPitch: editorPitch,
+      thumbnailYaw: editorYaw,
+      message: 'Thumbnail saved.',
+    });
+    closeThumbnailEditor();
   }
 
   function hex(bytes: ArrayBuffer): string {
@@ -128,6 +298,11 @@
       sha256: '',
       duplicateId: '',
       publishedId: '',
+      thumbnailBlob: null,
+      thumbnailUrl: '',
+      thumbnailStatus: isStlFile(file) ? 'rendering' : 'none',
+      thumbnailPitch: -Math.PI * 0.15,
+      thumbnailYaw: Math.PI * 0.25,
       status: 'ready' as RowStatus,
       message: 'Ready to inspect.',
     }));
@@ -136,6 +311,7 @@
     status = nextRows.length
       ? `${nextRows.length} file${nextRows.length === 1 ? '' : 's'} selected.`
       : 'Choose files to publish.';
+    for (const row of nextRows) void renderThumbnail(row.id);
     void prepareRows(nextRows, viewer);
   }
 
@@ -154,6 +330,50 @@
     return result;
   }
 
+  async function uploadThumbnail(row: SelectedPart, thumbnail: Blob): Promise<UploadResult> {
+    const name = thumbnailName(row.file);
+    const file = new File([thumbnail], name, { type: thumbnail.type || 'image/png' });
+    const result = await upload.upload({
+      data: file,
+      filename: name,
+      mimeType: file.type,
+      caption: `Rendered view of ${row.name.trim() || row.file.name}`,
+    });
+
+    if (!result.ok || result.status === 'failed' || result.status === 'cancelled') {
+      throw new Error(result.error ?? `Thumbnail upload failed for ${row.file.name}`);
+    }
+    if (!result.url) throw new Error(`Thumbnail upload did not return a URL for ${row.file.name}`);
+    return result;
+  }
+
+  async function thumbnailTagsFor(row: SelectedPart): Promise<NostrTag[]> {
+    if (!isStlFile(row.file)) return [];
+
+    let thumbnail = row.thumbnailBlob;
+    if (!thumbnail) {
+      setRow(row.id, { status: 'thumbnailing', message: 'Rendering preview thumbnail...' });
+      const bytes = new Uint8Array(await row.file.arrayBuffer());
+      if (!looksLikeStl(bytes)) return [];
+      thumbnail = await renderStlThumbnail(bytes, {
+        width: 512,
+        height: 512,
+        rotationX: row.thumbnailPitch,
+        rotationY: row.thumbnailYaw,
+      });
+    }
+
+    setRow(row.id, { status: 'thumbnailing', message: 'Uploading preview thumbnail...' });
+    const result = await uploadThumbnail(row, thumbnail);
+
+    const tags: NostrTag[] = [];
+    tags.push(result.sha256 ? ['thumb', result.url, result.sha256] : ['thumb', result.url]);
+    tags.push(result.sha256 ? ['image', result.url, result.sha256] : ['image', result.url]);
+    tags.push(['alt', `Rendered view of ${row.name.trim() || row.file.name}`]);
+    if (result.blurhash) tags.push(['blurhash', result.blurhash]);
+    return tags;
+  }
+
   async function publishRow(row: SelectedPart): Promise<void> {
     if (row.status === 'done') return;
 
@@ -166,6 +386,8 @@
       return;
     }
 
+    const thumbnailTags = await thumbnailTagsFor(row);
+
     setRow(row.id, { status: 'uploading', message: 'Uploading file...' });
     const result = await uploadFile(row);
     if (row.sha256 && result.sha256 && row.sha256 !== result.sha256) {
@@ -173,11 +395,10 @@
     }
 
     setRow(row.id, { status: 'publishing', message: 'Publishing file metadata...' });
-    const tags: NostrTag[] = nip94TagsFromUpload(
-      result,
-      row.name.trim() || row.file.name,
-      row.file.type,
-    );
+    const tags: NostrTag[] = [
+      ...nip94TagsFromUpload(result, row.name.trim() || row.file.name, row.file.type),
+      ...thumbnailTags,
+    ];
     const published = await outbox.publish({
       kind: FILE_KIND,
       content: row.description.trim(),
@@ -268,6 +489,10 @@
       identitySubscription?.unsubscribe();
     };
   });
+
+  onDestroy(() => {
+    for (const row of rows) revokeObjectUrl(row.thumbnailUrl);
+  });
 </script>
 
 <main class="min-h-screen bg-base-100 p-4">
@@ -301,9 +526,41 @@
       <div class="divide-y divide-base-300" data-testid="upload-parts-list">
         {#each rows as row (row.id)}
           <article
-            class="grid gap-3 py-3 md:grid-cols-[minmax(0,1fr)_11rem_auto]"
+            class="grid gap-3 py-3 md:grid-cols-[8rem_minmax(0,1fr)_11rem_auto]"
             data-testid="upload-part-row"
           >
+            <div class="grid gap-2">
+              <button
+                type="button"
+                class="grid aspect-square place-items-center overflow-hidden rounded-box bg-base-200 text-left"
+                onclick={() => openThumbnailEditor(row)}
+                disabled={!isStlFile(row.file) || row.status === 'done' || busy}
+                aria-label={`Edit thumbnail for ${row.name || row.file.name}`}
+                data-testid="edit-upload-thumbnail"
+              >
+                {#if row.thumbnailUrl}
+                  <img
+                    src={row.thumbnailUrl}
+                    alt={`Thumbnail preview for ${row.name || row.file.name}`}
+                    class="h-full w-full object-contain"
+                    data-testid="upload-part-thumbnail"
+                  />
+                {:else if row.thumbnailStatus === 'rendering'}
+                  <span class="loading loading-spinner loading-sm" aria-label="Rendering thumbnail"
+                  ></span>
+                {:else}
+                  <span class="text-xs font-medium text-base-content/50">
+                    {isStlFile(row.file)
+                      ? '3D'
+                      : row.file.name.split('.').pop()?.toUpperCase().slice(0, 4) || 'FILE'}
+                  </span>
+                {/if}
+              </button>
+              {#if isStlFile(row.file) && row.thumbnailStatus !== 'none'}
+                <p class="text-center text-xs text-base-content/60">Click to rotate</p>
+              {/if}
+            </div>
+
             <div class="min-w-0">
               <label class="fieldset py-0">
                 <span class="fieldset-legend">Display name</span>
@@ -383,4 +640,89 @@
       </button>
     </footer>
   </section>
+
+  <dialog class="modal" bind:this={thumbnailDialog} onclose={closeThumbnailEditor}>
+    <div class="modal-box max-w-2xl">
+      <h2 class="text-lg font-bold">Set thumbnail view</h2>
+      <p class="mt-1 text-sm text-base-content/70">
+        This thumbnail is saved on the part event so lists can preview the part without loading the
+        full model.
+      </p>
+
+      <div class="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_11rem]">
+        <div class="grid aspect-square place-items-center overflow-hidden rounded-box bg-base-200">
+          {#if editorUrl}
+            <img
+              src={editorUrl}
+              alt="Current part thumbnail orientation"
+              class="h-full w-full object-contain"
+              data-testid="thumbnail-editor-preview"
+            />
+          {:else if editorBusy}
+            <span class="loading loading-spinner loading-lg" aria-label="Rendering thumbnail"
+            ></span>
+          {:else}
+            <span class="text-sm text-base-content/60">No thumbnail rendered yet.</span>
+          {/if}
+        </div>
+
+        <div class="grid content-start gap-2">
+          <button
+            type="button"
+            class="btn btn-outline"
+            onclick={() => rotateEditor(-Math.PI / 12, 0)}
+            disabled={editorBusy}
+          >
+            Tilt up
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline"
+            onclick={() => rotateEditor(Math.PI / 12, 0)}
+            disabled={editorBusy}
+          >
+            Tilt down
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline"
+            onclick={() => rotateEditor(0, -Math.PI / 12)}
+            disabled={editorBusy}
+          >
+            Rotate left
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline"
+            onclick={() => rotateEditor(0, Math.PI / 12)}
+            disabled={editorBusy}
+          >
+            Rotate right
+          </button>
+          <button type="button" class="btn btn-ghost" onclick={resetEditor} disabled={editorBusy}>
+            Reset view
+          </button>
+        </div>
+      </div>
+
+      {#if editorStatus}
+        <p class="mt-3 text-sm text-base-content/70" aria-live="polite">{editorStatus}</p>
+      {/if}
+
+      <div class="modal-action">
+        <button type="button" class="btn btn-ghost" onclick={closeThumbnailEditor}>Cancel</button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          onclick={saveThumbnailEditor}
+          disabled={!editorBlob || editorBusy}
+        >
+          Save thumbnail
+        </button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button>Close</button>
+    </form>
+  </dialog>
 </main>

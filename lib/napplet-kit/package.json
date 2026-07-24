@@ -12,6 +12,7 @@
     "./images": "./src/images.ts",
     "./markdown": "./src/markdown.ts",
     "./stl": "./src/stl.ts",
+    "./stl-webgl": "./src/stl-webgl.ts",
     "./stl-thumbnail": "./src/stl-thumbnail.ts",
     "./stl-viewer": "./src/stl-viewer.ts",
     "./components/Comments.svelte": "./src/components/Comments.svelte",

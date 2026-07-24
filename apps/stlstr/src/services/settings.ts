@@ -21,6 +21,9 @@ export const NETWORK_SETTINGS_LOCKED = STLSTR_DEV_MODE;
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type NappletUpdateBehavior = 'banner' | 'auto-grant' | 'silent-reprompt';
 
+const LIGHT_THEME = 'silk';
+const DARK_THEME = 'abyss';
+
 export type NappletOverride = {
   naddr: string;
   pubkey: string;
@@ -254,7 +257,14 @@ const darkMediaQuery =
 
 export function applyTheme(theme: ThemePreference = settings.theme): void {
   if (typeof document === 'undefined') return;
-  const resolved = theme === 'system' ? (darkMediaQuery?.matches ? 'dark' : 'light') : theme;
+  const resolved =
+    theme === 'system'
+      ? darkMediaQuery?.matches
+        ? DARK_THEME
+        : LIGHT_THEME
+      : theme === 'dark'
+        ? DARK_THEME
+        : LIGHT_THEME;
   document.documentElement.setAttribute('data-theme', resolved);
 }
 

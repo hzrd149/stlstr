@@ -1,4 +1,15 @@
 import type { Mesh } from './stl';
+import {
+  canvasToBlob,
+  createWebglContext,
+  linkProgram,
+  meshFrame,
+  multiply,
+  perspective,
+  rotationX,
+  rotationY,
+  translation,
+} from './stl-webgl';
 
 /**
  * A minimal WebGL turntable viewer.
@@ -68,107 +79,26 @@ const LIGHT_DIRECTION: [number, number, number] = [-5, 15, 10];
 const DEFAULT_YAW = -Math.PI * 0.22;
 const DEFAULT_PITCH = -Math.PI * 0.22;
 
-type Matrix = Float32Array;
-
-function perspective(fovY: number, aspect: number, near: number, far: number): Matrix {
-  const f = 1 / Math.tan(fovY / 2);
-  const range = 1 / (near - far);
-
-  return new Float32Array([
-    f / aspect,
-    0,
-    0,
-    0,
-    0,
-    f,
-    0,
-    0,
-    0,
-    0,
-    (near + far) * range,
-    -1,
-    0,
-    0,
-    2 * near * far * range,
-    0,
-  ]);
-}
-
-function multiply(a: Matrix, b: Matrix): Matrix {
-  const out = new Float32Array(16);
-  for (let row = 0; row < 4; row += 1) {
-    for (let column = 0; column < 4; column += 1) {
-      let sum = 0;
-      for (let k = 0; k < 4; k += 1) sum += a[k * 4 + column] * b[row * 4 + k];
-      out[row * 4 + column] = sum;
-    }
-  }
-  return out;
-}
-
-function translation(x: number, y: number, z: number): Matrix {
-  return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
-}
-
-function rotationX(angle: number): Matrix {
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
-  return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]);
-}
-
-function rotationY(angle: number): Matrix {
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
-  return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
-}
-
-function compile(gl: WebGLRenderingContext, type: number, source: string): WebGLShader {
-  const shader = gl.createShader(type);
-  if (!shader) throw new Error('Could not create a WebGL shader.');
-
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(shader);
-    gl.deleteShader(shader);
-    throw new Error(`Shader failed to compile: ${log ?? 'unknown error'}`);
-  }
-
-  return shader;
-}
-
 export function createViewer(
   canvas: HTMLCanvasElement,
   options: ViewerOptions = {},
 ): Viewer | null {
-  const context =
-    (canvas.getContext('webgl', {
-      alpha: true,
-      antialias: true,
-      preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
-    }) as WebGLRenderingContext | null) ??
-    (canvas.getContext('experimental-webgl', {
-      preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
-    }) as WebGLRenderingContext | null);
+  const context = createWebglContext(canvas, {
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
+  });
   if (!context) return null;
 
   const gl = context;
 
-  function link(): WebGLProgram | null {
+  const program = (() => {
     try {
-      const created = gl.createProgram();
-      if (!created) return null;
-      gl.attachShader(created, compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER));
-      gl.attachShader(created, compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER));
-      gl.linkProgram(created);
-      if (!gl.getProgramParameter(created, gl.LINK_STATUS)) return null;
-      return created;
+      return linkProgram(gl, VERTEX_SHADER, FRAGMENT_SHADER);
     } catch {
       return null;
     }
-  }
-
-  const program = link();
+  })();
   if (!program) return null;
 
   gl.useProgram(program);
@@ -235,19 +165,6 @@ export function createViewer(
     gl.uniform3f(lightDirectionLocation, ...LIGHT_DIRECTION);
 
     gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
-  }
-
-  function canvasToBlob(mimeType: string, quality?: number): Promise<Blob> {
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('The STL preview image could not be encoded.'));
-        },
-        mimeType,
-        quality,
-      );
-    });
   }
 
   function schedule() {
@@ -321,20 +238,9 @@ export function createViewer(
 
   return {
     setMesh(mesh) {
-      center = [
-        (mesh.min[0] + mesh.max[0]) / 2,
-        (mesh.min[1] + mesh.max[1]) / 2,
-        (mesh.min[2] + mesh.max[2]) / 2,
-      ];
-      radius =
-        Math.max(
-          Math.hypot(
-            mesh.max[0] - mesh.min[0],
-            mesh.max[1] - mesh.min[1],
-            mesh.max[2] - mesh.min[2],
-          ) / 2,
-          1e-6,
-        ) || 1;
+      const frame = meshFrame(mesh);
+      center = frame.center;
+      radius = frame.radius;
 
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, mesh.positions, gl.STATIC_DRAW);
@@ -361,7 +267,7 @@ export function createViewer(
         frame = 0;
       }
       draw();
-      return canvasToBlob(captureOptions.mimeType ?? 'image/png', captureOptions.quality);
+      return canvasToBlob(canvas, captureOptions.mimeType ?? 'image/png', captureOptions.quality);
     },
 
     dispose() {

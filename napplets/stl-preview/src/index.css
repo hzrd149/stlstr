@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 @plugin "daisyui" {
   themes:
-    light --default,
-    dark --prefersdark;
+    silk --default,
+    abyss --prefersdark;
 }
 
 /* The napplet fills the shell's dialog box rather than a page. */

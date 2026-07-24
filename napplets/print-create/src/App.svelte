@@ -24,6 +24,11 @@
   import { createViewer, type Viewer } from '@stlstr/napplet-kit/stl-viewer';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import ImagePlus from '@lucide/svelte/icons/image-plus';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { onDestroy, onMount, tick } from 'svelte';
 
   type StepId = 'basics' | 'files' | 'images' | 'review';
@@ -40,6 +45,11 @@
     thumbnailBlob: Blob | null;
     thumbnailUrl: string;
     thumbnailStatus: ThumbnailStatus;
+  };
+  type GalleryImage = {
+    id: string;
+    file: File;
+    previewUrl: string;
   };
   type ExistingPart = { eventId: string; createdAt: number; meta: FileMeta; description: string };
   type CoverCandidate = {
@@ -87,7 +97,7 @@
   let customLicense = $state(false);
   let tagsText = $state('');
   let sourceUrl = $state('');
-  let imageFiles = $state<File[]>([]);
+  let galleryImages = $state<GalleryImage[]>([]);
   let resources = $state<SelectedResource[]>([]);
   let selectedCoverCandidateId = $state('');
   let capturedCoverCandidateId = $state('');
@@ -171,7 +181,7 @@
   function stepComplete(step: StepId): boolean {
     if (step === 'basics') return Boolean(title.trim() && objectSlug && description.trim());
     if (step === 'files') return resources.length + selectedExistingPartIds.length > 0;
-    if (step === 'images') return imageFiles.length > 0 || Boolean(capturedCoverBlob);
+    if (step === 'images') return galleryImages.length > 0 || Boolean(capturedCoverBlob);
     return stepComplete('basics') && stepComplete('images') && stepComplete('files');
   }
 
@@ -204,23 +214,33 @@
 
   function onImageChange(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
-    imageFiles = Array.from(input.files ?? []).filter((file) => file.type.startsWith('image/'));
-    status = imageFiles.length
-      ? `${imageFiles.length} image${imageFiles.length === 1 ? '' : 's'} selected.`
+    const nextImages = Array.from(input.files ?? [])
+      .filter((file) => file.type.startsWith('image/'))
+      .map((file, index) => ({
+        id: `${file.name}:${file.size}:${file.lastModified}:${Date.now()}:${index}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }));
+    galleryImages = [...galleryImages, ...nextImages];
+    input.value = '';
+    status = galleryImages.length
+      ? `${galleryImages.length} image${galleryImages.length === 1 ? '' : 's'} selected.`
       : stepMessage('images');
   }
 
   function moveImage(index: number, direction: -1 | 1): void {
     const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= imageFiles.length) return;
-    const next = [...imageFiles];
+    if (nextIndex < 0 || nextIndex >= galleryImages.length) return;
+    const next = [...galleryImages];
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-    imageFiles = next;
+    galleryImages = next;
   }
 
   function removeImage(index: number): void {
-    imageFiles = imageFiles.filter((_, itemIndex) => itemIndex !== index);
-    if (imageFiles.length === 0 && !capturedCoverBlob) status = stepMessage('images');
+    const removed = galleryImages[index];
+    revokeObjectUrl(removed?.previewUrl ?? '');
+    galleryImages = galleryImages.filter((_, itemIndex) => itemIndex !== index);
+    if (galleryImages.length === 0 && !capturedCoverBlob) status = stepMessage('images');
   }
 
   function onResourceChange(event: Event): void {
@@ -641,8 +661,8 @@
           ),
         );
       }
-      for (const file of imageFiles) {
-        imageTags.push(uploadResultToImeta(await uploadFile(file), file));
+      for (const image of galleryImages) {
+        imageTags.push(uploadResultToImeta(await uploadFile(image.file), image.file));
       }
 
       const tags: NostrTag[] = [
@@ -751,6 +771,7 @@
 
   onDestroy(() => {
     for (const resource of resources) revokeObjectUrl(resource.thumbnailUrl);
+    for (const image of galleryImages) revokeObjectUrl(image.previewUrl);
     revokeObjectUrl(capturedCoverUrl);
     coverViewer?.dispose();
   });
@@ -881,7 +902,7 @@
           </span>
         </label>
 
-        {#if capturedCoverUrl || imageFiles.length > 0}
+        {#if capturedCoverUrl || galleryImages.length > 0}
           <ol class="list bg-base-200 rounded-box">
             {#if capturedCoverUrl}
               <li class="list-row">
@@ -895,14 +916,21 @@
                   </span>
                 </div>
                 <button type="button" class="btn btn-outline btn-xs" onclick={clearCapturedCover}>
-                  Remove cover
+                  <Trash2 size={14} aria-hidden="true" />
+                  Cover
                 </button>
               </li>
             {/if}
-            {#each imageFiles as file, index}
+            {#each galleryImages as image, index (image.id)}
               {@const galleryIndex = index + (capturedCoverUrl ? 2 : 1)}
               <li class="list-row">
                 <div class="badge badge-primary">{galleryIndex}</div>
+                <img
+                  src={image.previewUrl}
+                  alt={image.file.name}
+                  class="h-16 w-16 rounded-box bg-base-100 object-cover"
+                  data-testid="gallery-image-preview"
+                />
                 <div class="grid min-w-0">
                   <span class="truncate">
                     {!capturedCoverUrl && index === 0
@@ -910,34 +938,38 @@
                       : `Gallery image ${galleryIndex - 1}`}
                   </span>
                   <span class="truncate text-xs text-base-content/60">
-                    {file.name} · {Math.round(file.size / 1024)} KB
+                    {image.file.name} · {Math.round(image.file.size / 1024)} KB
                   </span>
                 </div>
                 <div class="flex flex-wrap justify-end gap-1">
                   <button
                     type="button"
-                    class="btn btn-ghost btn-xs"
+                    class="btn btn-square btn-ghost btn-xs"
                     onclick={() => moveImage(index, -1)}
                     disabled={index === 0}
-                    aria-label={`Move ${file.name} earlier`}
+                    aria-label={`Move ${image.file.name} earlier`}
+                    title="Move earlier"
                   >
-                    Up
+                    <ArrowUp size={14} aria-hidden="true" />
                   </button>
                   <button
                     type="button"
-                    class="btn btn-ghost btn-xs"
+                    class="btn btn-square btn-ghost btn-xs"
                     onclick={() => moveImage(index, 1)}
-                    disabled={index === imageFiles.length - 1}
-                    aria-label={`Move ${file.name} later`}
+                    disabled={index === galleryImages.length - 1}
+                    aria-label={`Move ${image.file.name} later`}
+                    title="Move later"
                   >
-                    Down
+                    <ArrowDown size={14} aria-hidden="true" />
                   </button>
                   <button
                     type="button"
-                    class="btn btn-error btn-outline btn-xs"
+                    class="btn btn-square btn-error btn-outline btn-xs"
                     onclick={() => removeImage(index)}
+                    aria-label={`Remove ${image.file.name}`}
+                    title="Remove"
                   >
-                    Remove
+                    <Trash2 size={14} aria-hidden="true" />
                   </button>
                 </div>
               </li>
@@ -1008,20 +1040,22 @@
                 <div class="grid content-start gap-3">
                   <button
                     type="button"
-                    class="btn btn-outline btn-sm"
+                    class="btn btn-outline btn-sm gap-2"
                     onclick={() => coverViewer?.resetView()}
                     disabled={coverPreviewPhase !== 'ready'}
                   >
+                    <RotateCcw size={16} aria-hidden="true" />
                     Reset view
                   </button>
                   <button
                     type="button"
-                    class="btn btn-primary btn-sm"
+                    class="btn btn-primary btn-sm gap-2"
                     onclick={capturePartCover}
                     disabled={coverPreviewPhase !== 'ready'}
                     data-testid="capture-part-cover"
                   >
-                    Set cover from view
+                    <ImagePlus size={16} aria-hidden="true" />
+                    Set cover
                   </button>
                   {#if capturedCoverUrl}
                     <div class="grid gap-2">
@@ -1244,7 +1278,7 @@
           <div class="grid gap-1 md:grid-cols-[8rem_1fr]">
             <dt>Images</dt>
             <dd>
-              {imageFiles.length + (capturedCoverBlob ? 1 : 0)} inline imeta tag{imageFiles.length +
+              {galleryImages.length + (capturedCoverBlob ? 1 : 0)} inline imeta tag{galleryImages.length +
                 (capturedCoverBlob ? 1 : 0) ===
               1
                 ? ''

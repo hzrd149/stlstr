@@ -4,15 +4,21 @@
   import Comments from '@stlstr/napplet-kit/components/Comments.svelte';
   import GalleryImage from '@stlstr/napplet-kit/components/GalleryImage.svelte';
   import Markdown from '@stlstr/napplet-kit/components/Markdown.svelte';
+  import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { threadFilter } from '@stlstr/napplet-kit/comments';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
+  import { formatBytes, isPreviewable, readFileMeta, type FileMeta } from '@stlstr/napplet-kit/files';
   import { parseImages, type ObjectImage } from '@stlstr/napplet-kit/images';
   import {
     buildSlicerBridgeUri,
     isSlicerOpenableFile,
     slicerCompatibilityInfo,
   } from '@stlstr/napplet-kit/slicers';
+  import Download from '@lucide/svelte/icons/download';
+  import Eye from '@lucide/svelte/icons/eye';
+  import Info from '@lucide/svelte/icons/info';
+  import Printer from '@lucide/svelte/icons/printer';
 
   /**
    * The object detail page.
@@ -41,10 +47,7 @@
 
   type PartFile = {
     id: string;
-    url: string;
-    name: string;
-    mime: string;
-    sizeBytes: number;
+    meta: FileMeta;
   };
 
   let title = $state('');
@@ -74,7 +77,7 @@
   let viewer = $state('');
 
   const cover = $derived(images[activeImage] ?? images[0] ?? null);
-  const slicerOpenableParts = $derived(parts.filter(isSlicerOpenableFile));
+  const slicerOpenableParts = $derived(parts.map((part) => part.meta).filter(isSlicerOpenableFile));
   const slicerCompatibility = $derived(slicerCompatibilityInfo(slicerOpenableParts));
 
   /** The object's Markdown body, per NIP.md. */
@@ -110,14 +113,13 @@
       const event = byId.get(id);
       if (!event) return [];
 
-      const size = Number(tagValue(event.tags, 'size'));
+      const meta = readFileMeta(event.tags);
+      if (!meta) return [];
+
       return [
         {
           id,
-          url: tagValue(event.tags, 'url'),
-          name: tagValue(event.tags, 'name') || 'Part file',
-          mime: tagValue(event.tags, 'm'),
-          sizeBytes: Number.isFinite(size) && size > 0 ? size : 0,
+          meta,
         },
       ];
     });
@@ -212,11 +214,17 @@
     // Dispatched by archetype: this napplet never learns that the shell renders the
     // preview in a dialog, or which napplet handles it.
     void intent.open(STL_PREVIEW_ARCHETYPE, {
-      url: part.url,
-      name: part.name,
-      mime: part.mime,
-      size: part.sizeBytes ? String(part.sizeBytes) : '',
+      url: part.meta.url,
+      name: part.meta.name,
+      mime: part.meta.mime,
+      size: part.meta.sizeBytes ? String(part.meta.sizeBytes) : '',
     });
+  }
+
+  function previewOnKeydown(event: KeyboardEvent, part: PartFile): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    preview(part);
   }
 
   function openPart(part: PartFile): void {
@@ -225,13 +233,13 @@
 
   function openInSlicer(part: PartFile): void {
     if (!hasLink()) return;
-    const uri = buildSlicerBridgeUri([part]);
-    if (uri) void link.open(uri, { label: `Open ${part.name} in slicer` });
+    const uri = buildSlicerBridgeUri([part.meta]);
+    if (uri) void link.open(uri, { label: `Open ${part.meta.name} in slicer` });
   }
 
   function downloadPart(part: PartFile): void {
     if (!hasLink()) return;
-    void link.open(part.url, { label: part.name });
+    void link.open(part.meta.url, { label: part.meta.name });
   }
 
   function openAllInSlicer(): void {
@@ -255,12 +263,6 @@
     }
 
     void loadObject(address);
-  }
-
-  function formatBytes(bytes: number): string {
-    if (!bytes) return '';
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   onMount(() => {
@@ -368,13 +370,14 @@
         {#if hasLink() && slicerOpenableParts.length > 1}
           <button
             type="button"
-            class="btn btn-outline btn-sm justify-self-start"
+            class="btn btn-outline btn-sm justify-self-start gap-2"
             disabled={!slicerCompatibility.ok}
             title={'reason' in slicerCompatibility ? slicerCompatibility.reason : ''}
             data-testid="open-all-in-slicer"
             onclick={openAllInSlicer}
           >
-            Open all in slicer
+            <Printer size={16} aria-hidden="true" />
+            Open all
           </button>
         {/if}
         <ul class="grid gap-2" data-testid="object-parts">
@@ -382,47 +385,81 @@
             <li
               class="flex items-center justify-between gap-2 rounded-box border border-base-300 p-2"
             >
-              <span class="min-w-0">
-                <span class="block truncate text-sm font-medium">{part.name}</span>
-                <span class="text-xs text-base-content/60">{formatBytes(part.sizeBytes)}</span>
+              <span class="flex min-w-0 items-center gap-3">
+                {#if canPreview && isPreviewable(part.meta)}
+                  <span
+                    role="button"
+                    tabindex="0"
+                    class="cursor-pointer rounded-box focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="part-thumbnail-preview"
+                    data-file-id={part.id}
+                    onclick={() => preview(part)}
+                    onkeydown={(event) => previewOnKeydown(event, part)}
+                    aria-label={`Preview ${part.meta.name}`}
+                  >
+                    <PartThumb file={part.meta} size="h-12 w-12" />
+                  </span>
+                {:else}
+                  <PartThumb file={part.meta} size="h-12 w-12" />
+                {/if}
+                <span class="min-w-0">
+                  <button
+                    type="button"
+                    class="link block max-w-full truncate text-left text-sm font-medium"
+                    data-testid="part-title"
+                    data-file-id={part.id}
+                    onclick={() => openPart(part)}
+                  >
+                    {part.meta.name}
+                  </button>
+                  <span class="text-xs text-base-content/60">{formatBytes(part.meta.sizeBytes)}</span>
+                </span>
               </span>
               <div class="flex shrink-0 flex-wrap justify-end gap-2">
                 <button
-                  class="btn btn-ghost btn-sm"
+                  class="btn btn-square btn-ghost btn-sm"
                   data-testid="part-details"
                   data-file-id={part.id}
                   onclick={() => openPart(part)}
+                  aria-label={`View details for ${part.meta.name}`}
+                  title="Details"
                 >
-                  Details
+                  <Info size={16} aria-hidden="true" />
                 </button>
-                {#if canPreview && part.url}
+                {#if canPreview && isPreviewable(part.meta)}
                   <button
-                    class="btn btn-primary btn-sm"
+                    class="btn btn-square btn-primary btn-sm"
                     data-testid="preview-part"
                     data-file-id={part.id}
                     onclick={() => preview(part)}
+                    aria-label={`Preview ${part.meta.name}`}
+                    title="Preview"
                   >
-                    Preview
+                    <Eye size={16} aria-hidden="true" />
                   </button>
                 {/if}
-                {#if hasLink() && isSlicerOpenableFile(part)}
+                {#if hasLink() && isSlicerOpenableFile(part.meta)}
                   <button
-                    class="btn btn-outline btn-sm"
+                    class="btn btn-square btn-outline btn-sm"
                     data-testid="open-in-slicer"
                     data-file-id={part.id}
                     onclick={() => openInSlicer(part)}
+                    aria-label={`Open ${part.meta.name} in slicer`}
+                    title="Open in slicer"
                   >
-                    Open in slicer
+                    <Printer size={16} aria-hidden="true" />
                   </button>
                 {/if}
-                {#if hasLink() && part.url}
+                {#if hasLink() && part.meta.url}
                   <button
-                    class="btn btn-outline btn-sm"
+                    class="btn btn-square btn-outline btn-sm"
                     data-testid="download-part"
                     data-file-id={part.id}
                     onclick={() => downloadPart(part)}
+                    aria-label={`Download ${part.meta.name}`}
+                    title="Download"
                   >
-                    Download
+                    <Download size={16} aria-hidden="true" />
                   </button>
                 {/if}
               </div>

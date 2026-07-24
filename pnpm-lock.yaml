@@ -282,6 +282,9 @@ importers:
       blossom-client-sdk:
         specifier: ^5.0.0
         version: 5.0.0
+      lucide-react:
+        specifier: ^1.26.0
+        version: 1.26.0(react@19.2.8)
       nostr-tools:
         specifier: ^2.24.1
         version: 2.24.1(typescript@6.0.3)
@@ -371,6 +374,9 @@ importers:
 
   napplets/make-detail:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -408,6 +414,9 @@ importers:
 
   napplets/part-detail:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -445,6 +454,9 @@ importers:
 
   napplets/part-library:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -482,6 +494,9 @@ importers:
 
   napplets/part-upload:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -519,6 +534,9 @@ importers:
 
   napplets/print-browse:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -556,6 +574,9 @@ importers:
 
   napplets/print-create:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -593,6 +614,9 @@ importers:
 
   napplets/print-detail:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -636,6 +660,9 @@ importers:
 
   napplets/print-discover:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -673,6 +700,9 @@ importers:
 
   napplets/print-edit:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -710,6 +740,9 @@ importers:
 
   napplets/stl-preview:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -747,6 +780,9 @@ importers:
 
   napplets/user-profile:
     dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
         specifier: ^0.24.4
         version: 0.24.4
@@ -1021,6 +1057,11 @@ packages:
 
   '@kehto/wm@0.0.2':
     resolution: {integrity: sha512-8cjneY8paT9jcBRE/XX1oEA0pWtojkO9BESQ7UMTL9gIc+2zClXGLmY0HwdHMHMeZ3+c1sIcxsF08IHVwI3pDQ==}
+
+  '@lucide/svelte@1.26.0':
+    resolution: {integrity: sha512-KUfLTlNRVrHZ460Um7jdrvh46hI/8Sw4+1k/Ttj4g6JI9bCrjD7HZVG4cqhh7LasjfDz5b+CuKrjd/k/3obYcA==}
+    peerDependencies:
+      svelte: ^5
 
   '@napi-rs/wasm-runtime@1.1.6':
     resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
@@ -2244,6 +2285,11 @@ packages:
     resolution: {integrity: sha512-jumlc0BIUrS3qJGgIkWZsyfAM7NCWiBcCDhnd+3NNM5KbBmLTgHVfWBcg6W+rLUsIpzpERPsvwUP7CckAQSOoA==}
     engines: {node: '>=12'}
 
+  lucide-react@1.26.0:
+    resolution: {integrity: sha512-raglYVR2+VkMfJL158krjVmE+rV5ST2lzA/KQm1FRSjMHT4MnWaegHxoVEpmc2So3nOEhp9oGejJwAPX8MoAjg==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
@@ -3146,6 +3192,10 @@ snapshots:
       nostr-tools: 2.24.1(typescript@6.0.3)
 
   '@kehto/wm@0.0.2': {}
+
+  '@lucide/svelte@1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))':
+    dependencies:
+      svelte: 5.56.7(@typescript-eslint/types@8.65.0)
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
@@ -4351,6 +4401,10 @@ snapshots:
       yallist: 3.1.1
 
   lru-cache@7.18.3: {}
+
+  lucide-react@1.26.0(react@19.2.8):
+    dependencies:
+      react: 19.2.8
 
   magic-string@0.30.21:
     dependencies:

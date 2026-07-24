@@ -1,4 +1,15 @@
 import { parseStl, type Mesh } from './stl';
+import {
+  canvasToBlob,
+  createWebglContext,
+  linkProgram,
+  meshFrame,
+  multiply,
+  perspective,
+  rotationX,
+  rotationY,
+  translation,
+} from './stl-webgl';
 
 const VERTEX_SHADER = `
 attribute vec3 aPosition;
@@ -27,113 +38,16 @@ void main() {
 }
 `;
 
-type Matrix = Float32Array;
-
 export type StlThumbnailOptions = {
   width?: number;
   height?: number;
   mimeType?: 'image/png' | 'image/webp';
+  rotationX?: number;
+  rotationY?: number;
 };
 
-function perspective(fovY: number, aspect: number, near: number, far: number): Matrix {
-  const f = 1 / Math.tan(fovY / 2);
-  const range = 1 / (near - far);
-
-  return new Float32Array([
-    f / aspect,
-    0,
-    0,
-    0,
-    0,
-    f,
-    0,
-    0,
-    0,
-    0,
-    (near + far) * range,
-    -1,
-    0,
-    0,
-    2 * near * far * range,
-    0,
-  ]);
-}
-
-function multiply(a: Matrix, b: Matrix): Matrix {
-  const out = new Float32Array(16);
-  for (let row = 0; row < 4; row += 1) {
-    for (let column = 0; column < 4; column += 1) {
-      let sum = 0;
-      for (let k = 0; k < 4; k += 1) sum += a[k * 4 + column] * b[row * 4 + k];
-      out[row * 4 + column] = sum;
-    }
-  }
-  return out;
-}
-
-function translation(x: number, y: number, z: number): Matrix {
-  return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
-}
-
-function rotationX(angle: number): Matrix {
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
-  return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]);
-}
-
-function rotationY(angle: number): Matrix {
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
-  return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
-}
-
-function compile(gl: WebGLRenderingContext, type: number, source: string): WebGLShader {
-  const shader = gl.createShader(type);
-  if (!shader) throw new Error('Could not create a WebGL shader.');
-
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(shader);
-    gl.deleteShader(shader);
-    throw new Error(`Shader failed to compile: ${log ?? 'unknown error'}`);
-  }
-
-  return shader;
-}
-
-function link(gl: WebGLRenderingContext): WebGLProgram {
-  const program = gl.createProgram();
-  if (!program) throw new Error('Could not create a WebGL program.');
-
-  const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-  const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
-  gl.attachShader(program, vertex);
-  gl.attachShader(program, fragment);
-  gl.linkProgram(program);
-  gl.deleteShader(vertex);
-  gl.deleteShader(fragment);
-
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const log = gl.getProgramInfoLog(program);
-    gl.deleteProgram(program);
-    throw new Error(`Shader program failed to link: ${log ?? 'unknown error'}`);
-  }
-
-  return program;
-}
-
-function canvasToBlob(canvas: HTMLCanvasElement, mimeType: string): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error('The STL thumbnail could not be encoded.'));
-    }, mimeType);
-  });
-}
-
-function renderMesh(gl: WebGLRenderingContext, mesh: Mesh): void {
-  const program = link(gl);
+function renderMesh(gl: WebGLRenderingContext, mesh: Mesh, options: StlThumbnailOptions): void {
+  const program = linkProgram(gl, VERTEX_SHADER, FRAGMENT_SHADER);
   gl.useProgram(program);
   gl.enable(gl.DEPTH_TEST);
   gl.clearColor(0, 0, 0, 0);
@@ -155,25 +69,17 @@ function renderMesh(gl: WebGLRenderingContext, mesh: Mesh): void {
     throw new Error('Could not allocate STL thumbnail buffers.');
   }
 
-  const center: [number, number, number] = [
-    (mesh.min[0] + mesh.max[0]) / 2,
-    (mesh.min[1] + mesh.max[1]) / 2,
-    (mesh.min[2] + mesh.max[2]) / 2,
-  ];
-  const radius =
-    Math.max(
-      Math.hypot(mesh.max[0] - mesh.min[0], mesh.max[1] - mesh.min[1], mesh.max[2] - mesh.min[2]) /
-        2,
-      1e-6,
-    ) || 1;
+  const { center, radius } = meshFrame(mesh);
   const distance = radius * 3.2;
   const near = Math.max(radius * 0.01, 0.01);
   const far = distance + radius * 4;
   const aspect = gl.drawingBufferWidth / gl.drawingBufferHeight || 1;
+  const rotationXPreset = options.rotationX ?? -Math.PI * 0.15;
+  const rotationYPreset = options.rotationY ?? Math.PI * 0.25;
   const modelView = multiply(
     multiply(
-      multiply(translation(0, 0, -distance), rotationX(-Math.PI * 0.15)),
-      rotationY(Math.PI * 0.25),
+      multiply(translation(0, 0, -distance), rotationX(rotationXPreset)),
+      rotationY(rotationYPreset),
     ),
     translation(-center[0], -center[1], -center[2]),
   );
@@ -211,17 +117,13 @@ export async function renderStlThumbnail(
   canvas.width = options.width ?? 512;
   canvas.height = options.height ?? 512;
 
-  const gl =
-    (canvas.getContext('webgl', {
-      alpha: true,
-      antialias: true,
-      preserveDrawingBuffer: true,
-    }) as WebGLRenderingContext | null) ??
-    (canvas.getContext('experimental-webgl', {
-      preserveDrawingBuffer: true,
-    }) as WebGLRenderingContext | null);
+  const gl = createWebglContext(canvas, {
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: true,
+  });
   if (!gl) throw new Error('This browser could not start WebGL for the STL thumbnail.');
 
-  renderMesh(gl, mesh);
+  renderMesh(gl, mesh, options);
   return canvasToBlob(canvas, options.mimeType ?? 'image/png');
 }
