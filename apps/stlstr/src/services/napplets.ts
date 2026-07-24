@@ -133,6 +133,8 @@ export type LoadedNapplet = ResolvedNapplet & {
   domains: string[];
 };
 
+const defaultArtifactCache = new Map<string, Promise<LoadedNapplet>>();
+
 function tagValue(event: NostrEvent, name: string): string | undefined {
   return event.tags.find((tag) => tag[0] === name && tag[1])?.[1]?.trim() || undefined;
 }
@@ -363,6 +365,27 @@ export async function loadNappletArtifact(napplet: ResolvedNapplet): Promise<Loa
       : napplet.artifactUrl;
   if (!url) throw new Error(`${napplet.title} does not have a loadable artifact URL.`);
 
+  const cacheKey = `${napplet.dTag}:${napplet.aggregateHash}:${url}`;
+  const shouldCache = napplet.source === 'default' && !STLSTR_DEV_MODE;
+  if (shouldCache) {
+    const cached = defaultArtifactCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  const loaded = fetchNappletArtifact(napplet, url);
+  if (shouldCache) defaultArtifactCache.set(cacheKey, loaded);
+
+  try {
+    return await loaded;
+  } catch (error) {
+    if (shouldCache && defaultArtifactCache.get(cacheKey) === loaded) {
+      defaultArtifactCache.delete(cacheKey);
+    }
+    throw error;
+  }
+}
+
+async function fetchNappletArtifact(napplet: ResolvedNapplet, url: string): Promise<LoadedNapplet> {
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(
