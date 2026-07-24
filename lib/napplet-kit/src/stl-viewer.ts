@@ -12,7 +12,18 @@ export type Viewer = {
   setMesh(mesh: Mesh): void;
   /** Re-frames the camera on the mesh. */
   resetView(): void;
+  /** Encodes the current view of the canvas. Requires `preserveDrawingBuffer`. */
+  captureImage(options?: CaptureImageOptions): Promise<Blob>;
   dispose(): void;
+};
+
+export type ViewerOptions = {
+  preserveDrawingBuffer?: boolean;
+};
+
+export type CaptureImageOptions = {
+  mimeType?: 'image/png' | 'image/webp';
+  quality?: number;
 };
 
 const VERTEX_SHADER = `
@@ -126,10 +137,19 @@ function compile(gl: WebGLRenderingContext, type: number, source: string): WebGL
   return shader;
 }
 
-export function createViewer(canvas: HTMLCanvasElement): Viewer | null {
+export function createViewer(
+  canvas: HTMLCanvasElement,
+  options: ViewerOptions = {},
+): Viewer | null {
   const context =
-    (canvas.getContext('webgl', { alpha: true, antialias: true }) as WebGLRenderingContext | null) ??
-    (canvas.getContext('experimental-webgl') as WebGLRenderingContext | null);
+    (canvas.getContext('webgl', {
+      alpha: true,
+      antialias: true,
+      preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
+    }) as WebGLRenderingContext | null) ??
+    (canvas.getContext('experimental-webgl', {
+      preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
+    }) as WebGLRenderingContext | null);
   if (!context) return null;
 
   const gl = context;
@@ -215,6 +235,19 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer | null {
     gl.uniform3f(lightDirectionLocation, ...LIGHT_DIRECTION);
 
     gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+  }
+
+  function canvasToBlob(mimeType: string, quality?: number): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('The STL preview image could not be encoded.'));
+        },
+        mimeType,
+        quality,
+      );
+    });
   }
 
   function schedule() {
@@ -318,6 +351,18 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer | null {
     },
 
     resetView: frameCamera,
+
+    async captureImage(captureOptions = {}) {
+      if (!options.preserveDrawingBuffer) {
+        throw new Error('This STL viewer was not created with image capture enabled.');
+      }
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+      draw();
+      return canvasToBlob(captureOptions.mimeType ?? 'image/png', captureOptions.quality);
+    },
 
     dispose() {
       if (frame) cancelAnimationFrame(frame);

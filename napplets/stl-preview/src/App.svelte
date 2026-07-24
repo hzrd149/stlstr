@@ -1,10 +1,10 @@
 <script lang="ts">
   import { inc, link, resource } from '@napplet/sdk';
   import { looksLikeStl, parseStl } from '@stlstr/napplet-kit/stl';
+  import { createViewer, type Viewer } from '@stlstr/napplet-kit/stl-viewer';
   import { hasDomain } from '@stlstr/napplet-kit/capabilities';
   import { buildSlicerBridgeUri, isSlicerOpenableFile } from '@stlstr/napplet-kit/slicers';
   import { onMount, tick } from 'svelte';
-  import { createViewer, type Viewer } from './viewer';
 
   /**
    * Renders one STL file in 3D.

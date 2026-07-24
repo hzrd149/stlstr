@@ -3,6 +3,7 @@
     identity,
     intent,
     outbox,
+    resource as resourceApi,
     storage,
     upload,
     type NostrEvent,
@@ -13,21 +14,24 @@
     formatBytes,
     imetaFromNip94,
     isModelFile,
+    isPreviewable,
     nip94TagsFromUpload,
     readFileMeta,
     type FileMeta,
   } from '@stlstr/napplet-kit/files';
-  import { looksLikeStl } from '@stlstr/napplet-kit/stl';
+  import { looksLikeStl, parseStl } from '@stlstr/napplet-kit/stl';
   import { renderStlThumbnail } from '@stlstr/napplet-kit/stl-thumbnail';
+  import { createViewer, type Viewer } from '@stlstr/napplet-kit/stl-viewer';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
 
-  type StepId = 'basics' | 'images' | 'files' | 'review';
+  type StepId = 'basics' | 'files' | 'images' | 'review';
   type FileRole = 'part' | 'instructions' | 'video' | 'preview' | 'aux';
   type UploadResult = Awaited<ReturnType<typeof upload.upload>>;
   type PublishedFile = { id: string; role: FileRole; filename: string };
   type ThumbnailStatus = 'none' | 'rendering' | 'ready' | 'error';
+  type CoverPreviewPhase = 'idle' | 'loading' | 'ready' | 'unsupported' | 'error';
   type SelectedResource = {
     id: string;
     file: File;
@@ -38,13 +42,19 @@
     thumbnailStatus: ThumbnailStatus;
   };
   type ExistingPart = { eventId: string; createdAt: number; meta: FileMeta; description: string };
+  type CoverCandidate = {
+    id: string;
+    source: 'local' | 'existing';
+    name: string;
+    sizeBytes: number;
+  };
 
   const DRAFT_KEY = 'printable-create:draft:v1';
   const EXISTING_PART_LIMIT = 200;
   const STEPS: Array<{ id: StepId; title: string; helper: string }> = [
     { id: 'basics', title: 'Basics', helper: 'Name and describe the print.' },
-    { id: 'images', title: 'Images', helper: 'Add cover and gallery images.' },
     { id: 'files', title: 'Files', helper: 'Attach printable resources.' },
+    { id: 'images', title: 'Images', helper: 'Choose a part cover or add gallery images.' },
     { id: 'review', title: 'Review', helper: 'Publish the Nostr events.' },
   ];
   const CUSTOM_LICENSE = '__custom';
@@ -79,6 +89,14 @@
   let sourceUrl = $state('');
   let imageFiles = $state<File[]>([]);
   let resources = $state<SelectedResource[]>([]);
+  let selectedCoverCandidateId = $state('');
+  let capturedCoverCandidateId = $state('');
+  let capturedCoverBlob = $state<Blob | null>(null);
+  let capturedCoverUrl = $state('');
+  let capturedCoverName = $state('');
+  let coverCanvas = $state<HTMLCanvasElement | null>(null);
+  let coverPreviewPhase = $state<CoverPreviewPhase>('idle');
+  let coverPreviewStatus = $state('Select a part from this print to render a cover image.');
   let existingParts = $state<ExistingPart[]>([]);
   let selectedExistingPartIds = $state<string[]>([]);
   let existingPartsLoading = $state(false);
@@ -94,11 +112,33 @@
   let status = $state('Start with the basics. Files are uploaded only when you publish.');
   let busy = $state(false);
   let publishedAddress = $state('');
+  let coverViewer: Viewer | null = null;
+  let coverLoadToken = 0;
 
   const currentIndex = $derived(STEPS.findIndex((step) => step.id === currentStep));
   const objectSlug = $derived(slugify(slug || title));
   const selectedExistingParts = $derived(
     existingParts.filter((part) => selectedExistingPartIds.includes(part.eventId)),
+  );
+  const selectedLocalPartResources = $derived(
+    resources.filter((resource) => resource.role === 'part' && isStlFile(resource.file)),
+  );
+  const coverCandidates = $derived([
+    ...selectedLocalPartResources.map((resource) => ({
+      id: `local:${resource.id}`,
+      source: 'local' as const,
+      name: resource.file.name,
+      sizeBytes: resource.file.size,
+    })),
+    ...selectedExistingParts.filter(isStlExistingPart).map((part) => ({
+      id: `existing:${part.eventId}`,
+      source: 'existing' as const,
+      name: part.meta.name,
+      sizeBytes: part.meta.sizeBytes,
+    })),
+  ]);
+  const selectedCoverCandidate = $derived(
+    coverCandidates.find((candidate) => candidate.id === selectedCoverCandidateId) ?? null,
   );
   const visibleExistingParts = $derived(
     existingParts.filter((part) => {
@@ -111,6 +151,7 @@
   const hasIdentity = () => hasMethods('identity', 'getPublicKey');
   const hasIntent = () => hasMethods('intent', 'open');
   const hasOutbox = () => hasMethods('outbox', 'query', 'publish');
+  const hasResource = () => hasMethods('resource', 'bytes');
 
   function slugify(value: string): string {
     return value
@@ -129,16 +170,16 @@
 
   function stepComplete(step: StepId): boolean {
     if (step === 'basics') return Boolean(title.trim() && objectSlug && description.trim());
-    if (step === 'images') return imageFiles.length > 0;
     if (step === 'files') return resources.length + selectedExistingPartIds.length > 0;
+    if (step === 'images') return imageFiles.length > 0 || Boolean(capturedCoverBlob);
     return stepComplete('basics') && stepComplete('images') && stepComplete('files');
   }
 
   function stepMessage(step: StepId): string {
     if (step === 'basics') return 'Add a title and description before continuing.';
-    if (step === 'images') return 'Add at least one image. The first image is the cover.';
     if (step === 'files')
       return 'Add at least one printable part, instruction, video, or auxiliary file.';
+    if (step === 'images') return 'Capture a selected part as the cover or add at least one image.';
     return 'Complete the previous steps before publishing.';
   }
 
@@ -167,6 +208,19 @@
     status = imageFiles.length
       ? `${imageFiles.length} image${imageFiles.length === 1 ? '' : 's'} selected.`
       : stepMessage('images');
+  }
+
+  function moveImage(index: number, direction: -1 | 1): void {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= imageFiles.length) return;
+    const next = [...imageFiles];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    imageFiles = next;
+  }
+
+  function removeImage(index: number): void {
+    imageFiles = imageFiles.filter((_, itemIndex) => itemIndex !== index);
+    if (imageFiles.length === 0 && !capturedCoverBlob) status = stepMessage('images');
   }
 
   function onResourceChange(event: Event): void {
@@ -206,6 +260,16 @@
   function isStlFile(file: File): boolean {
     const name = file.name.toLowerCase();
     return file.type === 'model/stl' || file.type === 'application/sla' || name.endsWith('.stl');
+  }
+
+  function isStlExistingPart(part: ExistingPart): boolean {
+    const name = part.meta.name.toLowerCase();
+    return (
+      isPreviewable(part.meta) &&
+      (part.meta.mime === 'model/stl' ||
+        part.meta.mime === 'application/sla' ||
+        name.endsWith('.stl'))
+    );
   }
 
   function toExistingPart(event: NostrEvent): ExistingPart | null {
@@ -279,6 +343,119 @@
     if (url) URL.revokeObjectURL(url);
   }
 
+  function resetCoverPreview(
+    message = 'Select a part from this print to render a cover image.',
+  ): void {
+    coverLoadToken += 1;
+    coverViewer?.dispose();
+    coverViewer = null;
+    selectedCoverCandidateId = '';
+    coverPreviewPhase = 'idle';
+    coverPreviewStatus = message;
+  }
+
+  function clearCapturedCover(): void {
+    revokeObjectUrl(capturedCoverUrl);
+    capturedCoverBlob = null;
+    capturedCoverUrl = '';
+    capturedCoverName = '';
+    capturedCoverCandidateId = '';
+  }
+
+  function localResourceFromCandidate(id: string): SelectedResource | null {
+    if (!id.startsWith('local:')) return null;
+    const resourceId = id.slice('local:'.length);
+    return resources.find((resource) => resource.id === resourceId) ?? null;
+  }
+
+  function existingPartFromCandidate(id: string): ExistingPart | null {
+    if (!id.startsWith('existing:')) return null;
+    const eventId = id.slice('existing:'.length);
+    return selectedExistingParts.find((part) => part.eventId === eventId) ?? null;
+  }
+
+  async function bytesForCoverCandidate(candidate: CoverCandidate): Promise<Uint8Array> {
+    if (candidate.source === 'local') {
+      const resource = localResourceFromCandidate(candidate.id);
+      if (!resource || resource.role !== 'part' || !isStlFile(resource.file)) {
+        throw new Error('That part is no longer selected for this print.');
+      }
+      return new Uint8Array(await resource.file.arrayBuffer());
+    }
+
+    const part = existingPartFromCandidate(candidate.id);
+    if (!part || !isStlExistingPart(part)) {
+      throw new Error('That existing part is no longer selected for this print.');
+    }
+    if (!hasResource()) {
+      throw new Error('This shell cannot fetch existing part bytes for cover rendering.');
+    }
+    const blob = await resourceApi.bytes(part.meta.url);
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
+  async function loadCoverCandidate(id: string): Promise<void> {
+    const candidate = coverCandidates.find((item) => item.id === id);
+    if (!candidate) {
+      resetCoverPreview('Select a part from this print to render a cover image.');
+      return;
+    }
+
+    const token = (coverLoadToken += 1);
+    const stale = () => token !== coverLoadToken;
+
+    selectedCoverCandidateId = id;
+    coverPreviewPhase = 'loading';
+    coverPreviewStatus = 'Preparing the part preview...';
+    coverViewer?.dispose();
+    coverViewer = null;
+
+    try {
+      const bytes = await bytesForCoverCandidate(candidate);
+      if (stale()) return;
+
+      if (!looksLikeStl(bytes)) {
+        coverPreviewPhase = 'unsupported';
+        coverPreviewStatus = 'That selected part is not an STL that can be rendered here.';
+        return;
+      }
+
+      const mesh = parseStl(bytes);
+      coverPreviewPhase = 'ready';
+      coverPreviewStatus = 'Rotate the part, then capture this view as the cover.';
+      await tick();
+      if (stale()) return;
+
+      if (!coverCanvas) throw new Error('The cover preview surface is unavailable.');
+      coverViewer = createViewer(coverCanvas, { preserveDrawingBuffer: true });
+      if (!coverViewer) throw new Error('This browser could not start WebGL for cover capture.');
+      coverViewer.setMesh(mesh);
+    } catch (error) {
+      if (stale()) return;
+      coverPreviewPhase = 'error';
+      coverPreviewStatus =
+        error instanceof Error ? error.message : 'That part could not be rendered.';
+    }
+  }
+
+  async function capturePartCover(): Promise<void> {
+    if (!coverViewer || !selectedCoverCandidate || coverPreviewPhase !== 'ready') return;
+
+    try {
+      const blob = await coverViewer.captureImage({ mimeType: 'image/png' });
+      const url = URL.createObjectURL(blob);
+      revokeObjectUrl(capturedCoverUrl);
+      capturedCoverBlob = blob;
+      capturedCoverUrl = url;
+      capturedCoverCandidateId = selectedCoverCandidate.id;
+      capturedCoverName = `${slugify(selectedCoverCandidate.name) || 'part'}-cover.png`;
+      status = `Captured ${selectedCoverCandidate.name} as the cover image.`;
+    } catch (error) {
+      coverPreviewStatus =
+        error instanceof Error ? error.message : 'The cover image could not be captured.';
+    }
+  }
+
   function updateResource(id: string, update: Partial<SelectedResource>): void {
     resources = resources.map((resource) =>
       resource.id === id ? { ...resource, ...update } : resource,
@@ -350,6 +527,10 @@
 
   function uploadResultToImeta(result: UploadResult, file: File): NostrTag {
     return imetaFromNip94(uploadResultToNip94(result, file), file.name, result.blurhash);
+  }
+
+  function uploadResultToImetaWithAlt(result: UploadResult, file: File, alt: string): NostrTag {
+    return imetaFromNip94(uploadResultToNip94(result, file), alt, result.blurhash);
   }
 
   async function uploadFile(file: File): Promise<UploadResult> {
@@ -435,16 +616,33 @@
     try {
       if (!stepComplete('review')) throw new Error(stepMessage('review'));
 
-      status = 'Uploading images...';
-      const imageTags: NostrTag[] = [];
-      for (const file of imageFiles) {
-        imageTags.push(uploadResultToImeta(await uploadFile(file), file));
-      }
-
       const publishedFiles: PublishedFile[] = [];
       for (const resource of resources) publishedFiles.push(await publishResource(resource));
       for (const part of selectedExistingParts) {
         publishedFiles.push({ id: part.eventId, role: 'part', filename: part.meta.name });
+      }
+
+      status = 'Uploading images...';
+      const imageTags: NostrTag[] = [];
+      if (capturedCoverBlob) {
+        const coverSource = coverCandidates.find(
+          (candidate) => candidate.id === capturedCoverCandidateId,
+        );
+        if (!coverSource)
+          throw new Error('The selected cover part is no longer attached to this print.');
+        const coverFile = new File([capturedCoverBlob], capturedCoverName || 'part-cover.png', {
+          type: capturedCoverBlob.type || 'image/png',
+        });
+        imageTags.push(
+          uploadResultToImetaWithAlt(
+            await uploadFile(coverFile),
+            coverFile,
+            `Rendered cover view of ${coverSource.name}`,
+          ),
+        );
+      }
+      for (const file of imageFiles) {
+        imageTags.push(uploadResultToImeta(await uploadFile(file), file));
       }
 
       const tags: NostrTag[] = [
@@ -515,6 +713,15 @@
     await intent.open('printable-detail', { address: publishedAddress });
   }
 
+  $effect(() => {
+    const candidateIds = new Set(coverCandidates.map((candidate) => candidate.id));
+    if (selectedCoverCandidateId && !candidateIds.has(selectedCoverCandidateId)) {
+      resetCoverPreview('That part is no longer selected for this print.');
+    }
+    if (capturedCoverCandidateId && !candidateIds.has(capturedCoverCandidateId))
+      clearCapturedCover();
+  });
+
   onMount(() => {
     // NAP-IDENTITY is the only source for who the user is, and it has two halves: the
     // question answered at mount, and the push that keeps it current. Without the
@@ -544,6 +751,8 @@
 
   onDestroy(() => {
     for (const resource of resources) revokeObjectUrl(resource.thumbnailUrl);
+    revokeObjectUrl(capturedCoverUrl);
+    coverViewer?.dispose();
   });
 </script>
 
@@ -654,11 +863,11 @@
     {:else if currentStep === 'images'}
       <section class="grid gap-4" aria-label="Print images">
         <p class="text-sm text-base-content/70">
-          Images stay inline as ordered imeta tags. The first image is the cover.
+          Add and organize gallery images for this print. The first published image is the cover.
         </p>
 
         <label class="fieldset">
-          <span class="fieldset-legend">Select images</span>
+          <span class="fieldset-legend">Add gallery images</span>
           <input
             class="file-input w-full"
             type="file"
@@ -666,21 +875,70 @@
             multiple
             onchange={onImageChange}
           />
-          <span class="fieldset-label"
-            >Use the file picker order for cover and gallery sequencing.</span
-          >
+          <span class="fieldset-label">
+            Reorder images below before publishing. If no part cover is set, the first gallery image
+            becomes the cover.
+          </span>
         </label>
 
-        {#if imageFiles.length > 0}
+        {#if capturedCoverUrl || imageFiles.length > 0}
           <ol class="list bg-base-200 rounded-box">
-            {#each imageFiles as file, index}
+            {#if capturedCoverUrl}
               <li class="list-row">
-                <div class="badge badge-primary">{index + 1}</div>
+                <div class="badge badge-primary">1</div>
                 <div class="grid">
-                  <span>{index === 0 ? 'Cover image' : `Gallery image ${index}`}</span>
-                  <span class="text-xs text-base-content/60"
-                    >{file.name} · {Math.round(file.size / 1024)} KB</span
+                  <span>Cover image</span>
+                  <span class="text-xs text-base-content/60">
+                    Captured from {coverCandidates.find(
+                      (candidate) => candidate.id === capturedCoverCandidateId,
+                    )?.name ?? 'selected part'}
+                  </span>
+                </div>
+                <button type="button" class="btn btn-outline btn-xs" onclick={clearCapturedCover}>
+                  Remove cover
+                </button>
+              </li>
+            {/if}
+            {#each imageFiles as file, index}
+              {@const galleryIndex = index + (capturedCoverUrl ? 2 : 1)}
+              <li class="list-row">
+                <div class="badge badge-primary">{galleryIndex}</div>
+                <div class="grid min-w-0">
+                  <span class="truncate">
+                    {!capturedCoverUrl && index === 0
+                      ? 'Cover image'
+                      : `Gallery image ${galleryIndex - 1}`}
+                  </span>
+                  <span class="truncate text-xs text-base-content/60">
+                    {file.name} · {Math.round(file.size / 1024)} KB
+                  </span>
+                </div>
+                <div class="flex flex-wrap justify-end gap-1">
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    onclick={() => moveImage(index, -1)}
+                    disabled={index === 0}
+                    aria-label={`Move ${file.name} earlier`}
                   >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    onclick={() => moveImage(index, 1)}
+                    disabled={index === imageFiles.length - 1}
+                    aria-label={`Move ${file.name} later`}
+                  >
+                    Down
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-error btn-outline btn-xs"
+                    onclick={() => removeImage(index)}
+                  >
+                    Remove
+                  </button>
                 </div>
               </li>
             {/each}
@@ -688,6 +946,103 @@
         {:else}
           <div class="alert">No images selected yet.</div>
         {/if}
+
+        <details class="collapse-arrow collapse bg-base-200">
+          <summary class="collapse-title text-sm font-medium">
+            Optional: create the cover from a selected part
+          </summary>
+          <section class="collapse-content grid gap-3" aria-label="Part cover image">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <p class="text-sm text-base-content/70">
+                Only parts selected for this print can be used for the cover photo.
+              </p>
+              {#if capturedCoverUrl}
+                <button type="button" class="btn btn-outline btn-sm" onclick={clearCapturedCover}>
+                  Clear part cover
+                </button>
+              {/if}
+            </div>
+
+            {#if coverCandidates.length > 0}
+              <label class="fieldset">
+                <span class="fieldset-legend">Selected part</span>
+                <select
+                  class="select w-full"
+                  value={selectedCoverCandidateId}
+                  onchange={(event) =>
+                    loadCoverCandidate((event.currentTarget as HTMLSelectElement).value)}
+                >
+                  <option value="">Choose a selected STL part</option>
+                  {#each coverCandidates as candidate}
+                    <option value={candidate.id}>
+                      {candidate.name}{candidate.sizeBytes
+                        ? ` · ${formatBytes(candidate.sizeBytes)}`
+                        : ''}
+                    </option>
+                  {/each}
+                </select>
+              </label>
+
+              <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem]">
+                <div class="grid min-h-64 overflow-hidden rounded-box bg-base-100">
+                  <canvas
+                    bind:this={coverCanvas}
+                    class="h-64 w-full cursor-grab touch-none active:cursor-grabbing"
+                    class:hidden={coverPreviewPhase !== 'ready'}
+                    data-testid="cover-preview-canvas"
+                    aria-label={selectedCoverCandidate
+                      ? `3D cover preview of ${selectedCoverCandidate.name}`
+                      : '3D cover preview'}
+                  ></canvas>
+
+                  {#if coverPreviewPhase !== 'ready'}
+                    <div class="grid place-content-center gap-3 p-4 text-center">
+                      {#if coverPreviewPhase === 'loading'}
+                        <span class="loading loading-spinner loading-lg justify-self-center"></span>
+                      {/if}
+                      <p class="text-sm text-base-content/70">{coverPreviewStatus}</p>
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="grid content-start gap-3">
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    onclick={() => coverViewer?.resetView()}
+                    disabled={coverPreviewPhase !== 'ready'}
+                  >
+                    Reset view
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    onclick={capturePartCover}
+                    disabled={coverPreviewPhase !== 'ready'}
+                    data-testid="capture-part-cover"
+                  >
+                    Set cover from view
+                  </button>
+                  {#if capturedCoverUrl}
+                    <div class="grid gap-2">
+                      <img
+                        src={capturedCoverUrl}
+                        alt="Captured part cover"
+                        class="aspect-square w-full rounded-box bg-base-100 object-cover"
+                        data-testid="captured-part-cover"
+                      />
+                      <span class="text-xs text-base-content/60">Current cover</span>
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            {:else}
+              <div class="alert">
+                Select an STL part in the Files step to create a rotatable part cover.
+              </div>
+            {/if}
+          </section>
+        </details>
       </section>
     {:else if currentStep === 'files'}
       <section class="grid gap-4" aria-label="Printable files and resources">
@@ -888,7 +1243,16 @@
           </div>
           <div class="grid gap-1 md:grid-cols-[8rem_1fr]">
             <dt>Images</dt>
-            <dd>{imageFiles.length} inline imeta tag{imageFiles.length === 1 ? '' : 's'}</dd>
+            <dd>
+              {imageFiles.length + (capturedCoverBlob ? 1 : 0)} inline imeta tag{imageFiles.length +
+                (capturedCoverBlob ? 1 : 0) ===
+              1
+                ? ''
+                : 's'}
+              {#if capturedCoverBlob}
+                · part preview cover first
+              {/if}
+            </dd>
           </div>
           <div class="grid gap-1 md:grid-cols-[8rem_1fr]">
             <dt>Resources</dt>

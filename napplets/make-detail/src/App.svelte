@@ -164,7 +164,8 @@
       void loadMaker(event.pubkey);
       void loadCommentCount(event);
     } catch (error) {
-      if (eventId === id) status = error instanceof Error ? error.message : 'Could not load this make.';
+      if (eventId === id)
+        status = error instanceof Error ? error.message : 'Could not load this make.';
     }
   }
 
