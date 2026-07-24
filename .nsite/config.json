@@ -14,5 +14,6 @@
   ],
   "id": "stlstr",
   "title": "STLstr",
-  "description": "The worst named nostr app for printable things"
+  "description": "The worst named nostr app for printable things",
+  "fallback": "index.html"
 }
