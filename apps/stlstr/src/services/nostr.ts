@@ -6,13 +6,25 @@ import { createEventLoaderForStore } from 'applesauce-loaders/loaders';
 import { RelayPool } from 'applesauce-relay';
 import type { NostrEvent } from 'nostr-tools';
 
+/** True for any dev-server build: enables the live napplet registry, no artifact caching, etc. */
 export const STLSTR_DEV_MODE = import.meta.env.DEV;
+
 /**
- * The local relay dev builds read from. Overridable so the browser tests can stand up their
+ * True only for `pnpm local`, which pins the shell to the local relay and Blossom server
+ * instead of the production ones. `pnpm dev` is a dev build that talks to production.
+ *
+ * Gated on `DEV` as well so a production build can never be pointed at localhost by a
+ * stray environment variable.
+ */
+export const STLSTR_LOCAL_MODE = STLSTR_DEV_MODE && import.meta.env.VITE_STLSTR_LOCAL === '1';
+
+/**
+ * The local relay `pnpm local` reads from. Overridable so the browser tests can stand up their
  * own fixture relay on a free port instead of fighting a running dev relay for 4869.
  */
-export const STLSTR_DEV_RELAY = import.meta.env.VITE_STLSTR_DEV_RELAY || 'ws://localhost:4869';
-export const STLSTR_DEV_BLOSSOM_SERVER = 'http://localhost:24242';
+export const STLSTR_LOCAL_RELAY = import.meta.env.VITE_STLSTR_LOCAL_RELAY || 'ws://localhost:4869';
+export const STLSTR_LOCAL_BLOSSOM_SERVER =
+  import.meta.env.VITE_STLSTR_LOCAL_BLOSSOM_SERVER || 'http://localhost:24242';
 
 export const PRODUCTION_LOOKUP_RELAYS = ['wss://purplepag.es', 'wss://index.hzrd149.com'];
 export const PRODUCTION_EXTRA_RELAYS = [
@@ -22,8 +34,12 @@ export const PRODUCTION_EXTRA_RELAYS = [
 ];
 export const PRODUCTION_BLOSSOM_SERVERS = ['https://blossom.primal.net'];
 
-export const NOSTR_LOOKUP_RELAYS = STLSTR_DEV_MODE ? [STLSTR_DEV_RELAY] : PRODUCTION_LOOKUP_RELAYS;
-export const NOSTR_EXTRA_RELAYS = STLSTR_DEV_MODE ? [STLSTR_DEV_RELAY] : PRODUCTION_EXTRA_RELAYS;
+export const NOSTR_LOOKUP_RELAYS = STLSTR_LOCAL_MODE
+  ? [STLSTR_LOCAL_RELAY]
+  : PRODUCTION_LOOKUP_RELAYS;
+export const NOSTR_EXTRA_RELAYS = STLSTR_LOCAL_MODE
+  ? [STLSTR_LOCAL_RELAY]
+  : PRODUCTION_EXTRA_RELAYS;
 
 export const eventStore = new EventStore();
 export const relayPool = new RelayPool();

@@ -4,6 +4,10 @@
 //   - every napplet workspace package as `vite build --watch` into dist/
 //   - Kehto Paja on its own port (5197), targeting the stlstr app
 //
+// By default the app talks to the production relays and Blossom servers. `--local`
+// (i.e. `pnpm local`) pins it to the local relay and Blossom server instead, which are
+// expected to already be running on this machine.
+//
 // The script writes apps/stlstr/public/napplets.dev.json before startup. Vite
 // serves that file from the app origin, so the stlstr app can discover every
 // local napplet's built single-file HTML during development without hard-coded
@@ -23,12 +27,15 @@ const registryPath = join(stlstrDir, 'public', 'napplets.dev.json');
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_APP_PORT = 5173;
 const DEFAULT_PAJA_PORT = 5197;
+const DEFAULT_LOCAL_RELAY = 'ws://localhost:4869';
+const DEFAULT_LOCAL_BLOSSOM_SERVER = 'http://localhost:24242';
 
 const argv = process.argv.slice(2);
 let host = process.env.STLSTR_DEV_HOST || DEFAULT_HOST;
 let appPort = Number(process.env.STLSTR_APP_PORT) || DEFAULT_APP_PORT;
 let pajaPort = Number(process.env.STLSTR_PAJA_PORT) || DEFAULT_PAJA_PORT;
 let runPaja = process.env.STLSTR_NO_PAJA !== '1';
+let local = process.env.STLSTR_LOCAL === '1';
 const pajaArgs = [];
 
 for (let i = 0; i < argv.length; i++) {
@@ -41,6 +48,8 @@ for (let i = 0; i < argv.length; i++) {
   else if (arg.startsWith('--paja-port=')) pajaPort = Number(arg.slice('--paja-port='.length));
   else if (arg === '--no-paja') {
     runPaja = false;
+  } else if (arg === '--local') {
+    local = true;
   } else {
     pajaArgs.push(arg);
   }
@@ -146,10 +155,10 @@ function prefixLines(label, stream) {
   });
 }
 
-function start(label, command, args) {
+function start(label, command, args, env = {}) {
   const child = spawn(command, args, {
     cwd: root,
-    env: { ...process.env },
+    env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -194,10 +203,20 @@ function shutdown(exitCode = 0) {
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
-console.error('Starting stlstr dev environment');
+const localRelay = process.env.VITE_STLSTR_LOCAL_RELAY || DEFAULT_LOCAL_RELAY;
+const localBlossomServer =
+  process.env.VITE_STLSTR_LOCAL_BLOSSOM_SERVER || DEFAULT_LOCAL_BLOSSOM_SERVER;
+
+console.error(`Starting stlstr dev environment (${local ? 'local' : 'production'} network)`);
 console.error(`  app:      ${appUrl}`);
 console.error(`  registry: ${appUrl}/napplets.dev.json`);
 if (runPaja) console.error(`  paja:     ${pajaUrl} -> ${appUrl}`);
+if (local) {
+  console.error(`  relay:    ${localRelay} (expected to already be running)`);
+  console.error(`  blossom:  ${localBlossomServer} (expected to already be running)`);
+} else {
+  console.error('  network:  production relays and Blossom servers (`pnpm local` for local ones)');
+}
 if (napplets.length === 0) {
   console.error('  napplets: none (scaffold one with `pnpm napplet:new <name>`)');
 } else {
@@ -207,17 +226,28 @@ if (napplets.length === 0) {
   }
 }
 
-start('app', 'pnpm', [
-  '--filter',
-  '@apps/stlstr',
-  'exec',
-  'vite',
-  '--host',
-  host,
-  '--port',
-  String(appPort),
-  '--strictPort',
-]);
+start(
+  'app',
+  'pnpm',
+  [
+    '--filter',
+    '@apps/stlstr',
+    'exec',
+    'vite',
+    '--host',
+    host,
+    '--port',
+    String(appPort),
+    '--strictPort',
+  ],
+  local
+    ? {
+        VITE_STLSTR_LOCAL: '1',
+        VITE_STLSTR_LOCAL_RELAY: localRelay,
+        VITE_STLSTR_LOCAL_BLOSSOM_SERVER: localBlossomServer,
+      }
+    : {},
+);
 
 for (const napplet of napplets) {
   start(`napplet:${napplet.folder}`, 'pnpm', [

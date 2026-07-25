@@ -3,7 +3,7 @@ import type { ServiceHandler } from '@kehto/runtime';
 import type { User } from 'applesauce-common/casts';
 import { mergeBlossomServers } from 'applesauce-common/helpers/blossom';
 import { Actions, buildBlossomURI, parseBlossomURI } from 'blossom-client-sdk';
-import { STLSTR_DEV_MODE } from './nostr';
+import { STLSTR_LOCAL_MODE } from './nostr';
 import { firstDefinedValue } from './observable';
 import { getFallbackBlossomServers } from './settings';
 
@@ -33,7 +33,7 @@ type PolicyFailure = string | null;
 
 async function getBlossomServers(user: User | null): Promise<string[]> {
   const fallback = mergeBlossomServers(getFallbackBlossomServers()).map((server) => server.toString());
-  if (!user || STLSTR_DEV_MODE) return fallback;
+  if (!user || STLSTR_LOCAL_MODE) return fallback;
 
   const listed = mergeBlossomServers(await firstDefinedValue(user.blossomServers$)).map((server) =>
     server.toString(),
@@ -93,8 +93,8 @@ function checkUrlPolicy(rawUrl: string): PolicyFailure {
 
   if (url.protocol === 'blossom:') return null;
 
-  // Dev builds run against a local Blossom server over plain http.
-  if (url.protocol === 'http:' && STLSTR_DEV_MODE && isPrivateHostname(url.hostname)) return null;
+  // `pnpm local` builds run against a local Blossom server over plain http.
+  if (url.protocol === 'http:' && STLSTR_LOCAL_MODE && isPrivateHostname(url.hostname)) return null;
 
   return `unsupported scheme: ${url.protocol}`;
 }
@@ -254,7 +254,7 @@ export function createStlstrResourceService({
   const resourceInfo: ResourceInfo = {
     schemes: [
       { scheme: 'https', enabled: true },
-      { scheme: 'http', enabled: STLSTR_DEV_MODE },
+      { scheme: 'http', enabled: STLSTR_LOCAL_MODE },
       { scheme: 'data', enabled: true },
       { scheme: 'blossom', enabled: true },
       { scheme: 'htree', enabled: false },

@@ -1,6 +1,6 @@
 import { createLinkService } from '@kehto/services';
 import type { ServiceHandler } from '@kehto/runtime';
-import { STLSTR_DEV_MODE } from './nostr';
+import { STLSTR_LOCAL_MODE } from './nostr';
 
 function isAllowedSlicerBridgeUrl(url: URL): boolean {
   if (url.protocol !== 'slicerbridge:' || url.hostname !== 'multi') return false;
@@ -36,8 +36,8 @@ function isAllowedExternalLink(url: URL): boolean {
  */
 export function createStlstrLinkService(): ServiceHandler {
   return createLinkService({
-    // Dev builds serve files from a local Blossom server over plain http.
-    allowedProtocols: STLSTR_DEV_MODE
+    // `pnpm local` builds serve files from a local Blossom server over plain http.
+    allowedProtocols: STLSTR_LOCAL_MODE
       ? ['https:', 'http:', 'slicerbridge:']
       : ['https:', 'slicerbridge:'],
     open: ({ url }) => {

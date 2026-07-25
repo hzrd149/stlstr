@@ -3,8 +3,8 @@ import { WebSocket } from 'ws';
 /**
  * Seeds fixture events into the local dev relay for browser tests.
  *
- * Browser tests run against `STLSTR_DEV_MODE`, which pins every read to the local dev relay
- * — the same one that is expected to be running for `pnpm dev`. Rather than stand up a
+ * Browser tests run against `STLSTR_LOCAL_MODE`, which pins every read to the local dev relay
+ * — the same one that is expected to be running for `pnpm local`. Rather than stand up a
  * second relay, the fixtures are published into that one, so tests and manual development
  * see the same printables.
  *

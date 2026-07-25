@@ -4,7 +4,7 @@ import type { NostrEvent } from 'nostr-tools';
 import { nip19 } from 'nostr-tools';
 import { accountManager } from './accounts';
 import { ARCHETYPES, conventionsFor } from './intent-map';
-import { getUser, STLSTR_DEV_MODE } from './nostr';
+import { getUser, STLSTR_DEV_MODE, STLSTR_LOCAL_MODE } from './nostr';
 import { firstDefinedValue } from './observable';
 import { collectRequest } from './relay-query';
 import { getLookupRelays, getSettings, type NappletOverride } from './settings';
@@ -64,11 +64,11 @@ const OUTBOX_RESOLVE_TIMEOUT_MS = 2_000;
  * user's own outboxes are the authoritative place to look for the napplets they
  * publish and use — following the same OUTBOX-first model the shell uses for all
  * other reads. Fall back to the configured lookup relays when nobody is signed
- * in, the user's relay list has not loaded yet, or in dev where discovery stays
- * on the local relay.
+ * in, the user's relay list has not loaded yet, or in local builds where
+ * discovery stays on the local relay.
  */
 async function getDiscoveryRelays(): Promise<string[]> {
-  if (STLSTR_DEV_MODE) return getLookupRelays();
+  if (STLSTR_LOCAL_MODE) return getLookupRelays();
 
   const pubkey = accountManager.active?.pubkey;
   if (pubkey) {
@@ -166,7 +166,8 @@ function artifactUrlFrom(event: NostrEvent): string | undefined {
 function allowedArtifactUrl(value: string): string | undefined {
   try {
     const url = new URL(value);
-    if (url.protocol === 'https:' || (STLSTR_DEV_MODE && url.protocol === 'http:')) {
+    // Plain http artifact URLs are only trusted against local infrastructure.
+    if (url.protocol === 'https:' || (STLSTR_LOCAL_MODE && url.protocol === 'http:')) {
       return url.toString();
     }
     return undefined;

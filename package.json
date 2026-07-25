@@ -6,6 +6,7 @@
   "description": "A pnpm monorepo: the stlstr Vite host app and a collection of NIP-5D napplets.",
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "local": "node scripts/dev.mjs --local",
     "prepare": "pnpm napplet:build",
     "verify": "pnpm test && VITE_DEV_PRIVKEY_HEX=${VITE_DEV_PRIVKEY_HEX:-00000000000000000000000000000000000000000000000000000000deadbeef} turbo run type-check build --filter={./napplets/*} --filter={./lib/*}",
     "test": "pnpm test:scripts && turbo run test --filter={./napplets/*} --filter={./lib/*}",

@@ -16,7 +16,7 @@ import type { ISigner } from 'applesauce-signers';
 import { Actions, createUploadAuth } from 'blossom-client-sdk';
 import type { BlobDescriptor, EventTemplate, SignedEvent, UploadType } from 'blossom-client-sdk';
 import { mergeBlossomServers } from 'applesauce-common/helpers/blossom';
-import { STLSTR_DEV_MODE } from './nostr';
+import { STLSTR_LOCAL_MODE } from './nostr';
 import { firstDefinedValue } from './observable';
 import { getFallbackBlossomServers } from './settings';
 
@@ -31,8 +31,8 @@ export type UploadServiceOptions = {
 
 async function getBlossomServers(user: User | null): Promise<string[]> {
   const fallback = mergeBlossomServers(getFallbackBlossomServers());
-  // Dev builds always upload to the local Blossom server.
-  if (!user || STLSTR_DEV_MODE) return fallback;
+  // `pnpm local` builds always upload to the local Blossom server.
+  if (!user || STLSTR_LOCAL_MODE) return fallback;
 
   // The account's own media server list wins; app settings only fill the gap.
   const listed = mergeBlossomServers(await firstDefinedValue(user.blossomServers$)).map((server) =>

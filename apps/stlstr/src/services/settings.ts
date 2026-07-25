@@ -6,17 +6,18 @@ import {
   PRODUCTION_BLOSSOM_SERVERS,
   PRODUCTION_EXTRA_RELAYS,
   PRODUCTION_LOOKUP_RELAYS,
-  STLSTR_DEV_BLOSSOM_SERVER,
-  STLSTR_DEV_MODE,
+  STLSTR_LOCAL_BLOSSOM_SERVER,
+  STLSTR_LOCAL_MODE,
 } from './nostr';
 
 const SETTINGS_STORAGE_KEY = 'stlstr.settings.v1';
 
 /**
- * Dev builds are pinned to the local relay and Blossom server, so the relay and media
- * server settings are read-only there.
+ * `pnpm local` builds are pinned to the local relay and Blossom server, so the relay and
+ * media server settings are read-only there. `pnpm dev` uses production defaults and
+ * leaves them editable.
  */
-export const NETWORK_SETTINGS_LOCKED = STLSTR_DEV_MODE;
+export const NETWORK_SETTINGS_LOCKED = STLSTR_LOCAL_MODE;
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type NappletUpdateBehavior = 'banner' | 'auto-grant' | 'silent-reprompt';
@@ -228,14 +229,14 @@ export function resetNappletOverrides(): void {
 
 /**
  * Relays the shell falls back to when the account has no relay list of its own.
- * Dev builds always use the local relay.
+ * Local builds always use the local relay.
  */
 export function getAppRelays(): string[] {
   if (NETWORK_SETTINGS_LOCKED) return NOSTR_EXTRA_RELAYS;
   return settings.appRelays.length > 0 ? settings.appRelays : DEFAULT_SETTINGS.appRelays;
 }
 
-/** Relays used to resolve profiles and relay lists. Dev builds always use the local relay. */
+/** Relays used to resolve profiles and relay lists. Local builds always use the local relay. */
 export function getLookupRelays(): string[] {
   if (NETWORK_SETTINGS_LOCKED) return NOSTR_LOOKUP_RELAYS;
   return settings.lookupRelays.length > 0 ? settings.lookupRelays : DEFAULT_SETTINGS.lookupRelays;
@@ -243,10 +244,10 @@ export function getLookupRelays(): string[] {
 
 /**
  * Media servers used when the signed-in account publishes no Blossom server list.
- * Dev builds always use the local Blossom server.
+ * Local builds always use the local Blossom server.
  */
 export function getFallbackBlossomServers(): string[] {
-  if (NETWORK_SETTINGS_LOCKED) return [STLSTR_DEV_BLOSSOM_SERVER];
+  if (NETWORK_SETTINGS_LOCKED) return [STLSTR_LOCAL_BLOSSOM_SERVER];
   return settings.blossomServers;
 }
 

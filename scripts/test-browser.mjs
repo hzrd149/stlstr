@@ -12,9 +12,9 @@ const host = process.env.STLSTR_TEST_HOST || '127.0.0.1';
 const port = Number(process.env.STLSTR_TEST_PORT || 5174);
 const baseUrl = `http://${host}:${port}`;
 /**
- * The local dev relay, which is expected to already be running — the same one dev builds
- * read from via `STLSTR_DEV_RELAY`. Fixtures are seeded into it rather than served from a
- * throwaway relay, so tests and manual development see the same printables.
+ * The local dev relay, which is expected to already be running — the same one `pnpm local`
+ * builds read from via `STLSTR_LOCAL_RELAY`. Fixtures are seeded into it rather than served
+ * from a throwaway relay, so tests and manual development see the same printables.
  */
 const relayUrl = process.env.STLSTR_TEST_RELAY_URL || 'ws://localhost:4869';
 const registryPath = join(root, 'apps', 'stlstr', 'public', 'napplets.dev.json');
@@ -153,7 +153,9 @@ async function main() {
     ],
     {
       cwd: root,
-      env: { ...process.env, VITE_STLSTR_DEV_RELAY: relayUrl },
+      // The suite asserts against seeded fixtures, so the app has to run pinned to the
+      // local relay rather than the production ones `pnpm dev` uses.
+      env: { ...process.env, VITE_STLSTR_LOCAL: '1', VITE_STLSTR_LOCAL_RELAY: relayUrl },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );

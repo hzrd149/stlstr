@@ -67,16 +67,28 @@ Install with pnpm:
 pnpm install
 ```
 
-Run the host, napplet build watchers, and local Kehto Paja:
+Run the host, napplet build watchers, and local Kehto Paja against the
+production relays and Blossom servers:
 
 ```sh
 pnpm dev
 ```
 
+To develop against a local relay (`ws://localhost:4869`) and local Blossom
+server (`http://localhost:24242`) instead — both expected to already be running
+on your machine — use:
+
+```sh
+pnpm local
+```
+
+`pnpm local` also makes the relay and media server settings read-only, since
+everything is pinned to the local pair.
+
 Scripts are namespaced: `app:*` builds and deploys the stlstr host app (as an
 [nsyte](https://github.com/sandwichfarm/nsyte) static site), and `napplet:*`
 builds and deploys the napplets (to Nostr/Blossom via the napplet CLI). Shared
-scripts (`dev`, `verify`, `test`, `format`) stay unprefixed.
+scripts (`dev`, `local`, `verify`, `test`, `format`) stay unprefixed.
 
 Build all napplets:
 

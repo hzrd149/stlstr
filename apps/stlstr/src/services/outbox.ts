@@ -13,7 +13,7 @@ import type { ISigner } from 'applesauce-signers';
 import type { NostrEvent as ApplesauceNostrEvent } from 'nostr-tools';
 import type { Filter } from 'applesauce-core/helpers/filter';
 import { mergeRelaySets } from 'applesauce-core/helpers/relays';
-import { eventStore, STLSTR_DEV_MODE, relayPool } from './nostr';
+import { eventStore, STLSTR_LOCAL_MODE, relayPool } from './nostr';
 import { firstDefinedValue } from './observable';
 import { collectRequest, normalizeFilters } from './relay-query';
 import { getAppRelays } from './settings';
@@ -61,7 +61,8 @@ async function resolveReadRelays(
   filters: NostrFilter[],
   options?: { authors?: string[]; relays?: string[] },
 ) {
-  if (STLSTR_DEV_MODE)
+  // Local builds have a single relay and no NIP-65 lists to route with, so skip resolution.
+  if (STLSTR_LOCAL_MODE)
     return { relays: getAppRelays(), source: 'policy' as const, missingAuthors: [] };
 
   const authors = collectAuthors(filters, options?.authors);
@@ -99,7 +100,7 @@ async function resolvePublishRelays(
   getActiveUser: ActiveUserProvider,
   options?: { relays?: string[]; toOutbox?: boolean; toInboxes?: string[] },
 ) {
-  if (STLSTR_DEV_MODE) return getAppRelays();
+  if (STLSTR_LOCAL_MODE) return getAppRelays();
 
   const activeUser = getActiveUser();
   const relays = mergeRelaySets(options?.relays);
