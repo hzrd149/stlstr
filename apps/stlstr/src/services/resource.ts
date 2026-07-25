@@ -1,6 +1,10 @@
 import { createResourceService, type ResourceInfo } from '@kehto/services';
 import type { ServiceHandler } from '@kehto/runtime';
+import type { User } from 'applesauce-common/casts';
+import { mergeBlossomServers } from 'applesauce-common/helpers/blossom';
+import { Actions, buildBlossomURI, parseBlossomURI } from 'blossom-client-sdk';
 import { STLSTR_DEV_MODE } from './nostr';
+import { firstDefinedValue } from './observable';
 import { getFallbackBlossomServers } from './settings';
 
 /**
@@ -26,6 +30,16 @@ const MAX_CONCURRENT_FETCHES = 8;
 const ANY_MEDIA_ORIGIN = '*';
 
 type PolicyFailure = string | null;
+
+async function getBlossomServers(user: User | null): Promise<string[]> {
+  const fallback = mergeBlossomServers(getFallbackBlossomServers()).map((server) => server.toString());
+  if (!user || STLSTR_DEV_MODE) return fallback;
+
+  const listed = mergeBlossomServers(await firstDefinedValue(user.blossomServers$)).map((server) =>
+    server.toString(),
+  );
+  return listed.length > 0 ? listed : fallback;
+}
 
 function isPrivateIpv4(hostname: string): boolean {
   const parts = hostname.split('.');
@@ -77,6 +91,8 @@ function checkUrlPolicy(rawUrl: string): PolicyFailure {
       : null;
   }
 
+  if (url.protocol === 'blossom:') return null;
+
   // Dev builds run against a local Blossom server over plain http.
   if (url.protocol === 'http:' && STLSTR_DEV_MODE && isPrivateHostname(url.hostname)) return null;
 
@@ -84,8 +100,36 @@ function checkUrlPolicy(rawUrl: string): PolicyFailure {
 }
 
 function originPasses(origin: string): boolean {
+  // Custom schemes such as `blossom:` have an opaque `null` origin. Let the fetch
+  // policy inspect the full URI and candidate server list before any network request.
+  if (origin === 'null') return true;
   // `origin` is already scheme://host[:port], so the URL policy applies unchanged.
   return checkUrlPolicy(origin) === null;
+}
+
+function serverPassesPolicy(server: string): boolean {
+  try {
+    const url = new URL(server.includes('://') ? server : `https://${server}`);
+    return checkUrlPolicy(url.origin) === null;
+  } catch {
+    return false;
+  }
+}
+
+function resolveBlossomDownload(rawUrl: string, servers: string[]) {
+  const parsed = parseBlossomURI(rawUrl);
+  if (parsed.size !== undefined && parsed.size > MAX_BYTES) {
+    throw new Error(`declared blossom blob is larger than ${MAX_BYTES} bytes`);
+  }
+
+  const safeHints = parsed.servers.filter(serverPassesPolicy);
+  const safeFallbacks = servers.filter(serverPassesPolicy);
+  if (safeHints.length === 0 && safeFallbacks.length === 0) {
+    throw new Error('No policy-allowed Blossom servers are available for this blob.');
+  }
+
+  parsed.servers = safeHints;
+  return { uri: buildBlossomURI(parsed), fallbackServers: safeFallbacks };
 }
 
 function startsWith(bytes: Uint8Array, signature: number[], offset = 0): boolean {
@@ -191,6 +235,8 @@ function createFetchQueue(limit: number) {
 export type ResourceServiceOptions = {
   /** Resolves a napplet window to its NIP-5D identity, normally the session registry. */
   resolveIdentity: (windowId: string) => { dTag: string; aggregateHash: string } | null;
+  /** Current account, used only to prefer the user's Blossom server list for downloads. */
+  getActiveUser: () => User | null;
 };
 
 /**
@@ -201,6 +247,7 @@ export type ResourceServiceOptions = {
  */
 export function createStlstrResourceService({
   resolveIdentity,
+  getActiveUser,
 }: ResourceServiceOptions): ServiceHandler {
   const withSlot = createFetchQueue(MAX_CONCURRENT_FETCHES);
 
@@ -209,7 +256,7 @@ export function createStlstrResourceService({
       { scheme: 'https', enabled: true },
       { scheme: 'http', enabled: STLSTR_DEV_MODE },
       { scheme: 'data', enabled: true },
-      { scheme: 'blossom', enabled: false },
+      { scheme: 'blossom', enabled: true },
       { scheme: 'htree', enabled: false },
       { scheme: 'nostr', enabled: false },
     ],
@@ -247,14 +294,26 @@ export function createStlstrResourceService({
         init.signal.addEventListener('abort', abortForTimeout);
 
         try {
-          const response = await fetch(url, {
-            method: init.method ?? 'GET',
-            headers: init.headers,
-            signal: timeout.signal,
-            redirect: 'follow',
-            credentials: 'omit',
-            referrerPolicy: 'no-referrer',
-          });
+          const isBlossomUrl = new URL(url).protocol === 'blossom:';
+          const response = isBlossomUrl
+            ? await (async () => {
+                if (init.method && init.method !== 'GET') reject(`unsupported blossom method: ${init.method}`);
+
+                const blossom = resolveBlossomDownload(url, await getBlossomServers(getActiveUser()));
+                return Actions.resolveBlob(blossom.uri, {
+                  fallbackServers: blossom.fallbackServers,
+                  signal: timeout.signal,
+                  timeout: FETCH_TIMEOUT_MS,
+                });
+              })()
+            : await fetch(url, {
+                method: init.method ?? 'GET',
+                headers: init.headers,
+                signal: timeout.signal,
+                redirect: 'follow',
+                credentials: 'omit',
+                referrerPolicy: 'no-referrer',
+              });
 
           if (!response.ok) reject(`upstream responded ${response.status}`);
 

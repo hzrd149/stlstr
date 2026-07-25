@@ -167,7 +167,7 @@ function createStlstrAdapter({ navigate, resolveIdentity }: AdapterOptions): She
         getActiveUser,
         getSigner: () => accountManager.active?.signer ?? null,
       }),
-      resource: createStlstrResourceService({ resolveIdentity }),
+      resource: createStlstrResourceService({ resolveIdentity, getActiveUser }),
       intent: createStlstrIntentService({ navigate }),
       // NAP-IDENTITY is read-only: napplets learn who the user is, never act as them.
       // This is what lets a napplet gate an owner-only action such as "Edit".
