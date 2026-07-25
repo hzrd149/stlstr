@@ -1,5 +1,7 @@
 import { useSyncExternalStore, useState, type FormEvent, type ReactNode } from 'react';
 import { use$ } from 'applesauce-react/hooks';
+import { ensureHttpURL } from 'applesauce-core/helpers/url';
+import { HardDrive, Radio, type LucideIcon } from 'lucide-react';
 import { accountManager } from './services/accounts';
 import { ARCHETYPES } from './services/intent-map';
 import {
@@ -9,7 +11,7 @@ import {
   resolveNappletNaddr,
   type ResolvedNapplet,
 } from './services/napplets';
-import { getUser } from './services/nostr';
+import { getUser, relayPool } from './services/nostr';
 import {
   NETWORK_SETTINGS_LOCKED,
   addBlossomServer,
@@ -75,6 +77,62 @@ function relayHost(url: string) {
   }
 }
 
+/** The favicon a plain HTTP service exposes. Blossom servers have no metadata document to ask. */
+function faviconUrl(url: string): string | undefined {
+  try {
+    return new URL('/favicon.ico', ensureHttpURL(url)).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A square badge for a service, showing its icon and falling back to a glyph while the icon
+ * loads, when the service has none, or when the image fails to load.
+ */
+function ServiceIcon({ src, fallback: Fallback }: { src?: string; fallback: LucideIcon }) {
+  // Remember which src failed, not just that one did, so a new icon gets a fresh attempt.
+  const [failedSrc, setFailedSrc] = useState<string>();
+  const failed = failedSrc !== undefined && failedSrc === src;
+
+  return (
+    <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-base-200 ring-1 ring-base-300/70">
+      {src && !failed ? (
+        <img
+          src={src}
+          alt=""
+          className="size-full object-cover"
+          loading="lazy"
+          onError={() => setFailedSrc(src)}
+        />
+      ) : (
+        <Fallback className="size-4 text-base-content/45" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Relay branding the way applesauce does it: `Relay.icon$` serves the NIP-11 `icon` field and
+ * falls back to the relay's favicon. Going through the pool means one shared, cached NIP-11
+ * fetch per relay instead of one per list row.
+ */
+function RelayIcon({ url }: { url: string }) {
+  const icon = use$(() => {
+    try {
+      return relayPool.relay(url).icon$;
+    } catch {
+      return undefined;
+    }
+  }, [url]);
+
+  return <ServiceIcon src={icon} fallback={Radio} />;
+}
+
+function MediaServerIcon({ url }: { url: string }) {
+  return <ServiceIcon src={faviconUrl(url)} fallback={HardDrive} />;
+}
+
 function Section({
   title,
   description,
@@ -98,10 +156,12 @@ function Section({
 function UrlList({
   values,
   emptyLabel,
+  kind = 'relay',
   onRemove,
 }: {
   values: string[];
   emptyLabel: string;
+  kind?: 'relay' | 'media';
   onRemove?: (value: string) => void;
 }) {
   if (values.length === 0) {
@@ -112,7 +172,8 @@ function UrlList({
     <ul className="divide-y divide-base-300 rounded-box bg-base-100 ring-1 ring-base-300/70">
       {values.map((value) => (
         <li key={value} className="flex items-center justify-between gap-3 px-3 py-2">
-          <div className="min-w-0">
+          {kind === 'relay' ? <RelayIcon url={value} /> : <MediaServerIcon url={value} />}
+          <div className="min-w-0 flex-1">
             <div className="truncate font-medium">{relayHost(value)}</div>
             <div className="truncate font-mono text-xs text-base-content/55">{value}</div>
           </div>
@@ -245,7 +306,7 @@ function AccountMediaServers() {
 
   return (
     <div className="grid gap-2">
-      <UrlList values={values} emptyLabel="No media servers listed." />
+      <UrlList values={values} emptyLabel="No media servers listed." kind="media" />
       <p className="text-sm text-base-content/60">
         Uploads go to these servers. The backup servers below are only used when this list is empty.
       </p>
@@ -369,8 +430,8 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
                   Choose a napplet for {archetypeLabel(archetype)}
                 </h3>
                 <p className="mt-1 text-sm text-base-content/65">
-                  Showing all loadable napplets found on your relays. Compatibility badges
-                  are advisory until published napplets advertise archetypes reliably.
+                  Showing all loadable napplets found on your relays. Compatibility badges are
+                  advisory until published napplets advertise archetypes reliably.
                 </p>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => setPickerOpen(false)}>
@@ -575,6 +636,7 @@ export default function SettingsView() {
                 <UrlList
                   values={getFallbackBlossomServers()}
                   emptyLabel="No media server configured."
+                  kind="media"
                 />
               </div>
             </Section>
@@ -617,6 +679,7 @@ export default function SettingsView() {
                 <UrlList
                   values={settings.blossomServers}
                   emptyLabel="No backup media servers. Uploads will fail unless your account lists one."
+                  kind="media"
                   onRemove={removeBlossomServer}
                 />
                 <AddUrlForm
