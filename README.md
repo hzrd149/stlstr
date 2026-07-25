@@ -112,16 +112,15 @@ servers, and signing); `nsyte` must be on `PATH`.
 
 Publishing napplets to Nostr is separate from the app deploy above, and is only
 needed for cross-runtime discovery of the napplets as standalone NIP-5A apps.
-Local deploys are guarded and use `.napplet/config.dev.json` only:
+There is one target — `.napplet/config.json`, signed with the `hzrd149` key.
+Store that key once in the OS keychain (it is never written to the repo), then
+deploy:
 
 ```sh
-pnpm napplet:deploy
+pnpm napplet:login        # store the hzrd149 nsec under keyReference "hzrd149"
+pnpm napplet:deploy:dry   # preview the publish without writing anything
+pnpm napplet:deploy       # build, then publish every napplet
 ```
 
-Production deploys are explicit and sign with the `hzrd149` key. Store that key
-once in the OS keychain (it is never written to the repo), then deploy:
-
-```sh
-pnpm napplet:login:prod   # store the hzrd149 nsec under keyReference "hzrd149"
-pnpm napplet:deploy:prod
-```
+Every napplet deploy is public and permanent: relay writes are append-only and
+Blossom blobs are content-addressed, so preview with `napplet:deploy:dry` first.

@@ -22,14 +22,10 @@
     "napplet:discover": "napplet discover --all",
     "napplet:conformance": "pnpm napplet:build && napplet conformance --all",
     "napplet:debug": "napplet debug --all",
-    "napplet:deploy": "node scripts/check-dev-target.mjs && pnpm napplet:build && napplet deploy --all --config .napplet/config.dev.json",
-    "napplet:deploy:dry": "node scripts/check-dev-target.mjs && pnpm napplet:build && napplet deploy --all --dry-run --config .napplet/config.dev.json",
-    "napplet:deploy:prod": "pnpm napplet:build && napplet deploy --all --config .napplet/config.json",
-    "napplet:deploy:prod:dry": "pnpm napplet:build && napplet deploy --all --dry-run --config .napplet/config.json",
-    "napplet:login": "napplet keys store --name stlstr --prompt-sec && napplet keys use --name stlstr --config .napplet/config.dev.json",
-    "napplet:logout": "napplet keys delete --name stlstr",
-    "napplet:login:prod": "napplet keys store --name hzrd149 --prompt-sec && napplet keys use --name hzrd149 --config .napplet/config.json",
-    "napplet:logout:prod": "napplet keys delete --name hzrd149",
+    "napplet:deploy": "pnpm napplet:build && napplet deploy --all --config .napplet/config.json",
+    "napplet:deploy:dry": "pnpm napplet:build && napplet deploy --all --dry-run --config .napplet/config.json",
+    "napplet:login": "napplet keys store --name hzrd149 --prompt-sec && napplet keys use --name hzrd149 --config .napplet/config.json",
+    "napplet:logout": "napplet keys delete --name hzrd149",
     "napplet:keys": "napplet keys"
   },
   "engines": {
