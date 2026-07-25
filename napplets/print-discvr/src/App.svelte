@@ -245,20 +245,20 @@
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 
-  async function openAddress(address: string): Promise<void> {
+  async function openMake(eventId: string): Promise<void> {
     if (!hasIntent()) return;
-    const result = await intent.open('printable-detail', { address });
-    if (!result.ok) makesStatus = result.error ?? 'Could not open that print.';
+    const result = await intent.open('make-detail', { eventId });
+    if (!result.ok) makesStatus = result.error ?? 'Could not open that make.';
   }
 
   function openSearch(query: string): void {
     if (!hasIntent()) return;
-    void intent.open('printable-browse', query ? { query } : {});
+    void intent.open('printable-search', query ? { query } : {});
   }
 
   function openTopic(topic: string): void {
     if (!hasIntent()) return;
-    void intent.open('printable-browse', { tag: topic });
+    void intent.open('printable-search', { tag: topic });
   }
 
   function applyIntent(): void {
@@ -381,14 +381,14 @@
         <div class="grid gap-3" data-testid="discover-makes">
           {#each freshMakes as make (make.id)}
             <article class="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3">
-              <button type="button" class="text-left" onclick={() => openAddress(make.address)}>
+              <button type="button" class="text-left" onclick={() => openMake(make.id)}>
                 <CoverImage cover={make.cover} title={make.title} class="aspect-square" />
               </button>
               <div class="min-w-0 content-center">
                 <button
                   type="button"
                   class="line-clamp-2 text-left text-sm font-semibold"
-                  onclick={() => openAddress(make.address)}
+                  onclick={() => openMake(make.id)}
                 >
                   {make.title}
                 </button>

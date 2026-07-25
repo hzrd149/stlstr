@@ -22,8 +22,8 @@
    * keeps ownership of routing.
    */
 
-  const OPEN_TOPIC = 'printable-browse:open';
-  const READY_TOPIC = 'printable-browse:ready';
+  const OPEN_TOPIC = 'printable-search:open';
+  const READY_TOPIC = 'printable-search:ready';
 
   /** How many printables to pull for the feed. Pagination is a follow-up. */
   const FEED_LIMIT = 60;
@@ -201,7 +201,7 @@
     const normalized = normalizeTopics(nextTopics);
     const raw = searchText(nextQuery, normalized);
     // Route through the shell so the URL matches what is shown and the search is linkable.
-    if (hasIntent()) void intent.open('printable-browse', raw ? { query: raw } : {});
+    if (hasIntent()) void intent.open('printable-search', raw ? { query: raw } : {});
     else {
       query = nextQuery.trim();
       topics = normalized;
@@ -222,7 +222,7 @@
   }
 
   function openTopic(next: string): void {
-    if (hasIntent()) void intent.open('printable-browse', { tag: next });
+    if (hasIntent()) void intent.open('printable-search', { tag: next });
     else {
       query = '';
       topics = normalizeTopics([next]);
