@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'stl-preview',
-      // `inc` delivers the intent payload, `resource` fetches the STL bytes, and `link`
+      // `inc` may deliver an intent payload, `resource` fetches the STL bytes, and `link`
       // lets oversized or unsupported files fall back to a shell-mediated download.
       requires: ['inc', 'resource', 'link', 'theme'],
       artifactMode: 'single-file',

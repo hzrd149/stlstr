@@ -29,8 +29,10 @@
   type Phase = 'idle' | 'loading' | 'ready' | 'too-large' | 'unsupported' | 'error';
 
   let phase = $state<Phase>('idle');
-  let status = $state('Waiting for an STL to preview...');
+  let status = $state('Paste an STL file URL to preview it.');
   let file = $state<FileMeta | null>(null);
+  let urlInput = $state('');
+  let inputError = $state('');
   let triangles = $state(0);
   let canvas = $state<HTMLCanvasElement | null>(null);
 
@@ -112,6 +114,7 @@
     const token = (loadToken += 1);
     const stale = () => token !== loadToken;
 
+    inputError = '';
     file = meta;
     triangles = 0;
     phase = 'loading';
@@ -157,19 +160,34 @@
   function applyIntent(payload: unknown): void {
     const meta = readPayload(payload);
     if (!meta) {
-      phase = 'error';
-      status = 'The shell opened the STL viewer without a file URL.';
+      phase = 'idle';
+      status = 'Paste an STL file URL to preview it.';
       return;
     }
 
     void loadFile(meta);
   }
 
+  function submitUrl(event: SubmitEvent): void {
+    event.preventDefault();
+
+    const url = urlInput.trim();
+    if (!url) {
+      inputError = 'Enter a model URL first.';
+      return;
+    }
+
+    void loadFile({ url, name: basename(url), mime: '', sizeBytes: 0 });
+  }
+
   onMount(() => {
     if (!hasInc()) {
-      phase = 'error';
-      status = 'This shell cannot deliver the STL to preview.';
-      return;
+      phase = 'idle';
+      status = 'Paste an STL file URL to preview it.';
+      return () => {
+        viewer?.dispose();
+        viewer = null;
+      };
     }
 
     // Subscribe BEFORE signalling readiness — the shell flushes on the ready signal.
@@ -207,6 +225,35 @@
       {/if}
 
       <p class="text-base-content/70" aria-live="polite" data-testid="preview-status">{status}</p>
+
+      {#if phase !== 'loading'}
+        <form class="mx-auto grid w-full max-w-xl gap-2" onsubmit={submitUrl}>
+          <div class="join w-full">
+            <input
+              class="input join-item w-full"
+              type="url"
+              bind:value={urlInput}
+              placeholder="https://example.com/model.stl"
+              aria-label="STL model URL"
+              disabled={!hasResource()}
+              data-testid="preview-url-input"
+            />
+            <button
+              class="btn btn-primary join-item"
+              type="submit"
+              disabled={!hasResource()}
+              data-testid="preview-url-submit"
+            >
+              Preview
+            </button>
+          </div>
+          {#if inputError}
+            <p class="text-sm text-error" aria-live="polite" data-testid="preview-url-error">
+              {inputError}
+            </p>
+          {/if}
+        </form>
+      {/if}
 
       {#if file && (phase === 'too-large' || phase === 'unsupported')}
         <div class="flex flex-wrap justify-center gap-2">
