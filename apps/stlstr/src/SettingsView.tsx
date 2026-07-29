@@ -13,11 +13,10 @@ import {
 } from './services/napplets';
 import { getUser, relayPool } from './services/nostr';
 import {
-  NETWORK_SETTINGS_LOCKED,
+  RELAY_SETTINGS_LOCKED,
   addBlossomServer,
   addRelay,
   getAppRelays,
-  getFallbackBlossomServers,
   getLookupRelays,
   getSettings,
   removeBlossomServer,
@@ -611,85 +610,80 @@ export default function SettingsView() {
           </Section>
         )}
 
-        {activeTab === 'network' &&
-          (NETWORK_SETTINGS_LOCKED ? (
+        {activeTab === 'network' && (
+          <>
+            {RELAY_SETTINGS_LOCKED ? (
+              <Section
+                title="Local relays"
+                description="This local development build reads and publishes only through your local relay."
+              >
+                <div className="alert alert-info text-sm">
+                  <span>
+                    Relay settings are pinned by the dev server and cannot be changed here. Media
+                    servers are still editable below.
+                  </span>
+                </div>
+                <div className="grid gap-2">
+                  <h3 className="text-sm font-semibold">Relays</h3>
+                  <UrlList values={getAppRelays()} emptyLabel="No relay configured." />
+                </div>
+                <div className="grid gap-2">
+                  <h3 className="text-sm font-semibold">Lookup relays</h3>
+                  <UrlList values={getLookupRelays()} emptyLabel="No lookup relay configured." />
+                </div>
+              </Section>
+            ) : (
+              <>
+                <Section
+                  title="Your relays"
+                  description="Relays your account publishes to and receives messages on. STLstr uses these whenever your account has them."
+                >
+                  <AccountRelays />
+                </Section>
+
+                <Section
+                  title="Backup relays"
+                  description="Used only for accounts with no relay list of their own, including while you are logged out."
+                >
+                  <UrlList
+                    values={settings.appRelays}
+                    emptyLabel="No backup relays. STLstr will fall back to its built-in relays."
+                    onRemove={(value) => removeRelay('appRelays', value)}
+                  />
+                  <AddUrlForm
+                    label="Add an app relay"
+                    placeholder="wss://relay.example.com"
+                    onAdd={(value) => addRelay('appRelays', value)}
+                  />
+                </Section>
+              </>
+            )}
+
             <Section
-              title="Relays and media servers"
-              description="This is a development build, so STLstr talks only to your local relay and Blossom server."
+              title="Your media servers"
+              description="Where your images and model files are stored. Uploads go here whenever your account has a list."
             >
-              <div className="alert alert-info text-sm">
-                <span>
-                  These are pinned by the dev server and cannot be changed here. Account relay and
-                  media server lists are ignored while running in development.
-                </span>
-              </div>
-              <div className="grid gap-2">
-                <h3 className="text-sm font-semibold">Relays</h3>
-                <UrlList values={getAppRelays()} emptyLabel="No relay configured." />
-              </div>
-              <div className="grid gap-2">
-                <h3 className="text-sm font-semibold">Lookup relays</h3>
-                <UrlList values={getLookupRelays()} emptyLabel="No lookup relay configured." />
-              </div>
-              <div className="grid gap-2">
-                <h3 className="text-sm font-semibold">Media servers</h3>
-                <UrlList
-                  values={getFallbackBlossomServers()}
-                  emptyLabel="No media server configured."
-                  kind="media"
-                />
-              </div>
+              <AccountMediaServers />
             </Section>
-          ) : (
-            <>
-              <Section
-                title="Your relays"
-                description="Relays your account publishes to and receives messages on. STLstr uses these whenever your account has them."
-              >
-                <AccountRelays />
-              </Section>
 
-              <Section
-                title="Backup relays"
-                description="Used only for accounts with no relay list of their own, including while you are logged out."
-              >
-                <UrlList
-                  values={settings.appRelays}
-                  emptyLabel="No backup relays. STLstr will fall back to its built-in relays."
-                  onRemove={(value) => removeRelay('appRelays', value)}
-                />
-                <AddUrlForm
-                  label="Add an app relay"
-                  placeholder="wss://relay.example.com"
-                  onAdd={(value) => addRelay('appRelays', value)}
-                />
-              </Section>
-
-              <Section
-                title="Your media servers"
-                description="Where your images and model files are stored. Uploads go here whenever your account has a list."
-              >
-                <AccountMediaServers />
-              </Section>
-
-              <Section
-                title="Backup media servers"
-                description="Used for uploads only when your account has no media server list of its own."
-              >
-                <UrlList
-                  values={settings.blossomServers}
-                  emptyLabel="No backup media servers. Uploads will fail unless your account lists one."
-                  kind="media"
-                  onRemove={removeBlossomServer}
-                />
-                <AddUrlForm
-                  label="Add a media server"
-                  placeholder="https://blossom.example.com"
-                  onAdd={addBlossomServer}
-                />
-              </Section>
-            </>
-          ))}
+            <Section
+              title="Backup media servers"
+              description="Used for uploads and Blossom downloads when your account has no media server list of its own."
+            >
+              <UrlList
+                values={settings.blossomServers}
+                emptyLabel="No backup media servers. Uploads will fail unless your account lists one."
+                kind="media"
+                onRemove={removeBlossomServer}
+              />
+              <AddUrlForm
+                label="Add a media server"
+                placeholder="https://blossom.example.com"
+                onAdd={addBlossomServer}
+              />
+            </Section>
+          </>
+        )}
 
         {activeTab === 'napplets' && (
           <Section
@@ -703,7 +697,7 @@ export default function SettingsView() {
         {activeTab === 'advanced' && (
           <Section title="Advanced" description="Lower-level runtime and reset controls.">
             <div className="grid gap-6">
-              {!NETWORK_SETTINGS_LOCKED && (
+              {!RELAY_SETTINGS_LOCKED && (
                 <div className="grid gap-3">
                   <div>
                     <h2 className="font-semibold">Lookup relays</h2>

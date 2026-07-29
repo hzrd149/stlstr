@@ -8,15 +8,15 @@ This repo publishes those napplets as reusable app surfaces. Other napplet runti
 
 Each napplet declares one protocol-facing archetype. The folder name is the local package/deploy `d` tag; the archetype is the interoperable role that other runtimes should target with NAP-INTENT.
 
-| Napplet        | Archetype          | Intent action      | Payload                   | Purpose                                                                                                                                                                         |
-| -------------- | ------------------ | ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `print-search` | `printable-search` | `open`             | Optional `query` or `tag` | Search printables and tag-filter printable feeds.                                                                                                                              |
-| `user-profile` | `profile`          | `open`             | `pubkey`                  | Show a maker profile and their published printables. This intentionally uses the generic `profile` archetype so profile links work across unrelated napplet collections.         |
-| `print-detail` | `printable-detail` | `open`             | `address`                 | Show one printable, its media/files, maker attribution, comments, reactions, and edit actions.                                                                                  |
-| `print-create` | `printable-create` | `open` or `create` | Optional `remixOf`        | Publish a new printable and upload its media/files.                                                                                                                             |
-| `print-edit`   | `printable-edit`   | `edit`             | `address`                 | Load an owned printable and publish a replacement event.                                                                                                                        |
-| `part-detail`  | `part-detail`      | `open`             | `fileId`                  | Show metadata for a NIP-94 part file and offer relevant actions.                                                                                                                |
-| `stl-preview`  | `stl-preview`      | `open`             | `url`, optional metadata  | Preview an STL file in 3D from NAP-RESOURCE fetch parameters, usually as an overlay.                                                                                            |
+| Napplet        | Archetype          | Intent action      | Payload                   | Purpose                                                                                                                                                                  |
+| -------------- | ------------------ | ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `print-search` | `printable-search` | `open`             | Optional `query` or `tag` | Search printables and tag-filter printable feeds.                                                                                                                        |
+| `user-profile` | `profile`          | `open`             | `pubkey`                  | Show a maker profile and their published printables. This intentionally uses the generic `profile` archetype so profile links work across unrelated napplet collections. |
+| `print-detail` | `printable-detail` | `open`             | `address`                 | Show one printable, its media/files, maker attribution, comments, reactions, and edit actions.                                                                           |
+| `print-create` | `printable-create` | `open` or `create` | Optional `remixOf`        | Publish a new printable and upload its media/files.                                                                                                                      |
+| `print-edit`   | `printable-edit`   | `edit`             | `address`                 | Load an owned printable and publish a replacement event.                                                                                                                 |
+| `part-detail`  | `part-detail`      | `open`             | `fileId`                  | Show metadata for a NIP-94 part file and offer relevant actions.                                                                                                         |
+| `stl-preview`  | `stl-preview`      | `open`             | `url`, optional metadata  | Preview an STL file in 3D from NAP-RESOURCE fetch parameters, usually as an overlay.                                                                                     |
 
 Printable addresses use `33500:<pubkey>:<d>`, where kind `33500` is stlstr's printable event kind. Part details use a Nostr file event id as `fileId`. STL previews use resource metadata such as `{ url, name, mime, size }`; callers resolve any Nostr event before opening the viewer.
 
@@ -68,22 +68,21 @@ pnpm install
 ```
 
 Run the host, napplet build watchers, and local Kehto Paja against the
-production relays and Blossom servers:
+production relays and configured Blossom servers:
 
 ```sh
 pnpm dev
 ```
 
-To develop against a local relay (`ws://localhost:4869`) and local Blossom
-server (`http://localhost:24242`) instead — both expected to already be running
-on your machine — use:
+To develop against a local relay (`ws://localhost:4869`) instead — expected to
+already be running on your machine — use:
 
 ```sh
 pnpm local
 ```
 
-`pnpm local` also makes the relay and media server settings read-only, since
-everything is pinned to the local pair.
+`pnpm local` also makes relay settings read-only. Media server settings remain
+editable and direct local Blossom URLs are not blocked by policy.
 
 Scripts are namespaced: `app:*` builds and deploys the stlstr host app (as an
 [nsyte](https://github.com/sandwichfarm/nsyte) static site), and `napplet:*`

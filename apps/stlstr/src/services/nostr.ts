@@ -10,10 +10,10 @@ import type { NostrEvent } from 'nostr-tools';
 export const STLSTR_DEV_MODE = import.meta.env.DEV;
 
 /**
- * True only for `pnpm local`, which pins the shell to the local relay and Blossom server
- * instead of the production ones. `pnpm dev` is a dev build that talks to production.
+ * True only for `pnpm local`, which pins the shell to the local relay instead of the
+ * production ones. `pnpm dev` is a dev build that talks to production.
  *
- * Gated on `DEV` as well so a production build can never be pointed at localhost by a
+ * Gated on `DEV` as well so a production build can never be pointed at a local relay by a
  * stray environment variable.
  */
 export const STLSTR_LOCAL_MODE = STLSTR_DEV_MODE && import.meta.env.VITE_STLSTR_LOCAL === '1';
@@ -23,8 +23,6 @@ export const STLSTR_LOCAL_MODE = STLSTR_DEV_MODE && import.meta.env.VITE_STLSTR_
  * own fixture relay on a free port instead of fighting a running dev relay for 4869.
  */
 export const STLSTR_LOCAL_RELAY = import.meta.env.VITE_STLSTR_LOCAL_RELAY || 'ws://localhost:4869';
-export const STLSTR_LOCAL_BLOSSOM_SERVER =
-  import.meta.env.VITE_STLSTR_LOCAL_BLOSSOM_SERVER || 'http://localhost:24242';
 
 export const PRODUCTION_LOOKUP_RELAYS = ['wss://purplepag.es', 'wss://index.hzrd149.com'];
 export const PRODUCTION_EXTRA_RELAYS = [

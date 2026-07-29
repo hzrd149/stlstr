@@ -6,18 +6,16 @@ import {
   PRODUCTION_BLOSSOM_SERVERS,
   PRODUCTION_EXTRA_RELAYS,
   PRODUCTION_LOOKUP_RELAYS,
-  STLSTR_LOCAL_BLOSSOM_SERVER,
   STLSTR_LOCAL_MODE,
 } from './nostr';
 
 const SETTINGS_STORAGE_KEY = 'stlstr.settings.v1';
 
 /**
- * `pnpm local` builds are pinned to the local relay and Blossom server, so the relay and
- * media server settings are read-only there. `pnpm dev` uses production defaults and
- * leaves them editable.
+ * `pnpm local` builds are pinned to the local relay. Media server settings stay editable so
+ * direct Blossom URLs and fallback servers behave the same way in local and production modes.
  */
-export const NETWORK_SETTINGS_LOCKED = STLSTR_LOCAL_MODE;
+export const RELAY_SETTINGS_LOCKED = STLSTR_LOCAL_MODE;
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type NappletUpdateBehavior = 'banner' | 'auto-grant' | 'silent-reprompt';
@@ -183,7 +181,7 @@ export function resetSettings(): StlstrSettings {
 
 /** Adds a relay to one of the relay lists. Returns false if the URL is invalid or already listed. */
 export function addRelay(key: 'appRelays' | 'lookupRelays', value: string): boolean {
-  if (NETWORK_SETTINGS_LOCKED) return false;
+  if (RELAY_SETTINGS_LOCKED) return false;
   const normalized = parseRelayUrl(value);
   if (!normalized || settings[key].includes(normalized)) return false;
   updateSettings({ [key]: [...settings[key], normalized] });
@@ -191,13 +189,12 @@ export function addRelay(key: 'appRelays' | 'lookupRelays', value: string): bool
 }
 
 export function removeRelay(key: 'appRelays' | 'lookupRelays', value: string): void {
-  if (NETWORK_SETTINGS_LOCKED) return;
+  if (RELAY_SETTINGS_LOCKED) return;
   updateSettings({ [key]: settings[key].filter((relay) => relay !== value) });
 }
 
 /** Adds a media server. Returns false if the URL is invalid or already listed. */
 export function addBlossomServer(value: string): boolean {
-  if (NETWORK_SETTINGS_LOCKED) return false;
   const normalized = parseServerUrl(value);
   if (!normalized || settings.blossomServers.includes(normalized)) return false;
   updateSettings({ blossomServers: [...settings.blossomServers, normalized] });
@@ -205,7 +202,6 @@ export function addBlossomServer(value: string): boolean {
 }
 
 export function removeBlossomServer(value: string): void {
-  if (NETWORK_SETTINGS_LOCKED) return;
   updateSettings({
     blossomServers: settings.blossomServers.filter((server) => server !== value),
   });
@@ -232,22 +228,20 @@ export function resetNappletOverrides(): void {
  * Local builds always use the local relay.
  */
 export function getAppRelays(): string[] {
-  if (NETWORK_SETTINGS_LOCKED) return NOSTR_EXTRA_RELAYS;
+  if (RELAY_SETTINGS_LOCKED) return NOSTR_EXTRA_RELAYS;
   return settings.appRelays.length > 0 ? settings.appRelays : DEFAULT_SETTINGS.appRelays;
 }
 
 /** Relays used to resolve profiles and relay lists. Local builds always use the local relay. */
 export function getLookupRelays(): string[] {
-  if (NETWORK_SETTINGS_LOCKED) return NOSTR_LOOKUP_RELAYS;
+  if (RELAY_SETTINGS_LOCKED) return NOSTR_LOOKUP_RELAYS;
   return settings.lookupRelays.length > 0 ? settings.lookupRelays : DEFAULT_SETTINGS.lookupRelays;
 }
 
 /**
  * Media servers used when the signed-in account publishes no Blossom server list.
- * Local builds always use the local Blossom server.
  */
 export function getFallbackBlossomServers(): string[] {
-  if (NETWORK_SETTINGS_LOCKED) return [STLSTR_LOCAL_BLOSSOM_SERVER];
   return settings.blossomServers;
 }
 

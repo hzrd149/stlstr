@@ -4,9 +4,8 @@
 //   - every napplet workspace package as `vite build --watch` into dist/
 //   - Kehto Paja on its own port (5197), targeting the stlstr app
 //
-// By default the app talks to the production relays and Blossom servers. `--local`
-// (i.e. `pnpm local`) pins it to the local relay and Blossom server instead, which are
-// expected to already be running on this machine.
+// By default the app talks to the production relays. `--local` (i.e. `pnpm local`) pins it
+// to the local relay instead, which is expected to already be running on this machine.
 //
 // The script writes apps/stlstr/public/napplets.dev.json before startup. Vite
 // serves that file from the app origin, so the stlstr app can discover every
@@ -28,7 +27,6 @@ const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_APP_PORT = 5173;
 const DEFAULT_PAJA_PORT = 5197;
 const DEFAULT_LOCAL_RELAY = 'ws://localhost:4869';
-const DEFAULT_LOCAL_BLOSSOM_SERVER = 'http://localhost:24242';
 
 const argv = process.argv.slice(2);
 let host = process.env.STLSTR_DEV_HOST || DEFAULT_HOST;
@@ -204,8 +202,6 @@ process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
 const localRelay = process.env.VITE_STLSTR_LOCAL_RELAY || DEFAULT_LOCAL_RELAY;
-const localBlossomServer =
-  process.env.VITE_STLSTR_LOCAL_BLOSSOM_SERVER || DEFAULT_LOCAL_BLOSSOM_SERVER;
 
 console.error(`Starting stlstr dev environment (${local ? 'local' : 'production'} network)`);
 console.error(`  app:      ${appUrl}`);
@@ -213,9 +209,8 @@ console.error(`  registry: ${appUrl}/napplets.dev.json`);
 if (runPaja) console.error(`  paja:     ${pajaUrl} -> ${appUrl}`);
 if (local) {
   console.error(`  relay:    ${localRelay} (expected to already be running)`);
-  console.error(`  blossom:  ${localBlossomServer} (expected to already be running)`);
 } else {
-  console.error('  network:  production relays and Blossom servers (`pnpm local` for local ones)');
+  console.error('  network:  production relays (`pnpm local` for the local relay)');
 }
 if (napplets.length === 0) {
   console.error('  napplets: none (scaffold one with `pnpm napplet:new <name>`)');
@@ -244,7 +239,6 @@ start(
     ? {
         VITE_STLSTR_LOCAL: '1',
         VITE_STLSTR_LOCAL_RELAY: localRelay,
-        VITE_STLSTR_LOCAL_BLOSSOM_SERVER: localBlossomServer,
       }
     : {},
 );

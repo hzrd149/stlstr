@@ -59,7 +59,8 @@ test('NAP-RESOURCE reports the shell fetch policy', async () => {
     const schemes = Object.fromEntries(info.schemes.map((entry) => [entry.scheme, entry.enabled]));
 
     assert.equal(schemes.https, true);
-    assert.equal(schemes.blossom, false, 'blossom: is not resolved by the shell yet');
+    assert.equal(schemes.http, true);
+    assert.equal(schemes.blossom, true);
     assert.equal(info.maxBytes, 10 * 1024 * 1024);
     assert.equal(info.maxUrls, 100);
   } finally {

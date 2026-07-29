@@ -3,14 +3,14 @@ import type { ServiceHandler } from '@kehto/runtime';
 import type { User } from 'applesauce-common/casts';
 import { mergeBlossomServers } from 'applesauce-common/helpers/blossom';
 import { Actions, buildBlossomURI, parseBlossomURI } from 'blossom-client-sdk';
-import { STLSTR_LOCAL_MODE } from './nostr';
 import { firstDefinedValue } from './observable';
 import { getFallbackBlossomServers } from './settings';
 
 /**
  * NAP-RESOURCE is the only network-fetch primitive a sandboxed napplet has, so this
- * service is the shell's SSRF and content boundary. Napplets hand us URLs; we decide
- * what is fetchable, how big it may be, and what MIME type the bytes actually are.
+ * service is the shell's network and content boundary. Napplets hand us URLs; we decide
+ * which schemes are fetchable, how big responses may be, and what MIME type the bytes
+ * actually are.
  */
 
 /** Response size cap. NAP-RESOURCE recommends 10 MiB. */
@@ -32,8 +32,10 @@ const ANY_MEDIA_ORIGIN = '*';
 type PolicyFailure = string | null;
 
 async function getBlossomServers(user: User | null): Promise<string[]> {
-  const fallback = mergeBlossomServers(getFallbackBlossomServers()).map((server) => server.toString());
-  if (!user || STLSTR_LOCAL_MODE) return fallback;
+  const fallback = mergeBlossomServers(getFallbackBlossomServers()).map((server) =>
+    server.toString(),
+  );
+  if (!user) return fallback;
 
   const listed = mergeBlossomServers(await firstDefinedValue(user.blossomServers$)).map((server) =>
     server.toString(),
@@ -41,41 +43,8 @@ async function getBlossomServers(user: User | null): Promise<string[]> {
   return listed.length > 0 ? listed : fallback;
 }
 
-function isPrivateIpv4(hostname: string): boolean {
-  const parts = hostname.split('.');
-  if (parts.length !== 4) return false;
-
-  const octets = parts.map((part) => Number(part));
-  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return false;
-
-  const [a, b] = octets;
-  if (a === 10 || a === 127 || a === 0) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  // Link-local, which covers the 169.254.169.254 cloud metadata endpoint.
-  if (a === 169 && b === 254) return true;
-  return false;
-}
-
-function isPrivateHostname(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-
-  if (host === 'localhost' || host.endsWith('.localhost')) return true;
-  if (host === '::1' || host === '::' || host === '0.0.0.0') return true;
-  // IPv6 unique-local (fc00::/7) and link-local (fe80::/10).
-  if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;
-  if (/^fe[89ab][0-9a-f]:/.test(host)) return true;
-  if (isPrivateIpv4(host)) return true;
-  return false;
-}
-
 /**
  * Decides whether a URL may be fetched at all. Returns a reason when it may not.
- *
- * A browser cannot re-check the resolved address after DNS the way the NAP-RESOURCE
- * policy describes, so this blocks private hosts by literal and by name only. The
- * fetch still leaves the user's browser, exactly as an `<img src>` would, so this is a
- * policy boundary for the napplet rather than a network boundary for the user.
  */
 function checkUrlPolicy(rawUrl: string): PolicyFailure {
   let url: URL;
@@ -85,16 +54,8 @@ function checkUrlPolicy(rawUrl: string): PolicyFailure {
     return `not a valid URL: ${rawUrl}`;
   }
 
-  if (url.protocol === 'https:') {
-    return isPrivateHostname(url.hostname)
-      ? `private host is not fetchable: ${url.hostname}`
-      : null;
-  }
-
+  if (url.protocol === 'http:' || url.protocol === 'https:') return null;
   if (url.protocol === 'blossom:') return null;
-
-  // `pnpm local` builds run against a local Blossom server over plain http.
-  if (url.protocol === 'http:' && STLSTR_LOCAL_MODE && isPrivateHostname(url.hostname)) return null;
 
   return `unsupported scheme: ${url.protocol}`;
 }
@@ -254,7 +215,7 @@ export function createStlstrResourceService({
   const resourceInfo: ResourceInfo = {
     schemes: [
       { scheme: 'https', enabled: true },
-      { scheme: 'http', enabled: STLSTR_LOCAL_MODE },
+      { scheme: 'http', enabled: true },
       { scheme: 'data', enabled: true },
       { scheme: 'blossom', enabled: true },
       { scheme: 'htree', enabled: false },
@@ -297,9 +258,13 @@ export function createStlstrResourceService({
           const isBlossomUrl = new URL(url).protocol === 'blossom:';
           const response = isBlossomUrl
             ? await (async () => {
-                if (init.method && init.method !== 'GET') reject(`unsupported blossom method: ${init.method}`);
+                if (init.method && init.method !== 'GET')
+                  reject(`unsupported blossom method: ${init.method}`);
 
-                const blossom = resolveBlossomDownload(url, await getBlossomServers(getActiveUser()));
+                const blossom = resolveBlossomDownload(
+                  url,
+                  await getBlossomServers(getActiveUser()),
+                );
                 return Actions.resolveBlob(blossom.uri, {
                   fallbackServers: blossom.fallbackServers,
                   signal: timeout.signal,

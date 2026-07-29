@@ -78,7 +78,7 @@ export function parseImages(tags: string[][]): PrintableImage[] {
  * Fetches an image and returns an object URL, or '' when it cannot be shown.
  *
  * Callers own the URL and MUST revoke it. A refusal is not surfaced as an error: the shell
- * blocks SVG and private hosts by policy, and a list is still usable without art.
+ * can still reject unsupported or unsafe resources, and a list is usable without art.
  */
 export async function loadImageUrl(url: string): Promise<string> {
   if (!url || !hasResource()) return '';

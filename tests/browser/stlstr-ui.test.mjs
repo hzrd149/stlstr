@@ -136,14 +136,12 @@ test('stlstr renders settings in the shell and saves changes', async () => {
 
     await page.click('button[role="tab"]:nth-child(2)');
 
-    // Dev builds pin relays and media servers, so those settings are read-only.
+    // Local builds pin relays only; media servers remain editable.
     const settingsText = await page.$eval('main', (node) => node.textContent ?? '');
-    assert.match(settingsText, /development build/i);
+    assert.match(settingsText, /local development build/i);
     assert.ok(settingsText.includes(relayUrl), `settings should list ${relayUrl}`);
-    assert.match(settingsText, /localhost:24242/);
     assert.equal(await page.$('input[aria-label="Add an app relay"]'), null);
-    assert.equal(await page.$('input[aria-label="Add a media server"]'), null);
-    assert.equal(await page.$('button[aria-label^="Remove "]'), null);
+    assert.notEqual(await page.$('input[aria-label="Add a media server"]'), null);
 
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('main [role="tablist"]');
