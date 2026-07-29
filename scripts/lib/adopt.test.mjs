@@ -58,9 +58,9 @@ test('adopts old boilerplate without app-owned runtime bootstrap', async () => {
 
     const pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
     assert.equal(pkg.dependencies[shimPackage], undefined);
-    assert.equal(pkg.dependencies['@napplet/sdk'], '^0.24.4');
-    assert.equal(pkg.devDependencies['@napplet/conformance-cli'], '^0.2.15');
-    assert.equal(pkg.devDependencies['@napplet/vite-plugin'], '^0.11.3');
+    assert.equal(pkg.dependencies['@napplet/sdk'], '^0.27.0');
+    assert.equal(pkg.devDependencies['@napplet/conformance-cli'], '^0.2.18');
+    assert.equal(pkg.devDependencies['@napplet/vite-plugin'], '^0.14.0');
     assert.equal(pkg.scripts['test:guidance'], undefined);
     assert.equal(pkg.scripts.verify, 'pnpm type-check && pnpm build');
     assert.equal(pkg.scripts['test:conformance'], 'pnpm build && napplet-conformance ./dist');

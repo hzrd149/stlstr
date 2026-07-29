@@ -29,7 +29,7 @@
     "verify": "pnpm type-check"
   },
   "dependencies": {
-    "@napplet/sdk": "^0.24.4",
+    "@napplet/sdk": "^0.27.0",
     "applesauce-common": "^6.2.0",
     "applesauce-core": "^6.2.0",
     "marked": "^18.0.7",

@@ -12,7 +12,8 @@ export default defineConfig({
       requires: ['upload', 'outbox', 'identity', 'inc', 'intent'],
       artifactMode: 'single-file',
       archetypes: [
-        { slug: 'part-upload', naps: ['napplet:part-upload/open', 'napplet:part-upload/create'] },
+        { slug: 'part-upload', convention: 'napplet:part-upload/open' },
+        { slug: 'part-upload', convention: 'napplet:part-upload/create' },
       ],
     }),
   ],

@@ -18,7 +18,11 @@ export default defineConfig({
       archetypes: [
         {
           slug: 'printable-edit',
-          naps: ['napplet:printable-edit/open', 'napplet:printable-edit/edit'],
+          convention: 'napplet:printable-edit/open',
+        },
+        {
+          slug: 'printable-edit',
+          convention: 'napplet:printable-edit/edit',
         },
       ],
     }),

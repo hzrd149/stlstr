@@ -11,7 +11,7 @@ export default defineConfig({
       nappletType: 'print-discvr',
       requires: ['outbox', 'inc', 'intent', 'resource', 'identity'],
       artifactMode: 'single-file',
-      archetypes: [{ slug: 'printable-discovery', naps: ['napplet:printable-discovery/open'] }],
+      archetypes: [{ slug: 'printable-discovery', convention: 'napplet:printable-discovery/open' }],
     }),
   ],
   build: {

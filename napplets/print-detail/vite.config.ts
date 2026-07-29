@@ -27,7 +27,7 @@ export default defineConfig({
       artifactMode: 'single-file',
       // The protocol names the payload SHAPE this role accepts — an unnumbered
       // convention per the naps repo, not a NAP domain.
-      archetypes: [{ slug: 'printable-detail', naps: ['napplet:printable-detail/open'] }],
+      archetypes: [{ slug: 'printable-detail', convention: 'napplet:printable-detail/open' }],
     }),
   ],
   build: {

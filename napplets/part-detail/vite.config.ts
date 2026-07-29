@@ -13,7 +13,7 @@ export default defineConfig({
       // comments/usages, `identity` gates comment compose, and `intent` opens related views.
       requires: ['inc', 'outbox', 'resource', 'intent', 'link', 'theme', 'identity', 'count'],
       artifactMode: 'single-file',
-      archetypes: [{ slug: 'part-detail', naps: ['napplet:part-detail/open'] }],
+      archetypes: [{ slug: 'part-detail', convention: 'napplet:part-detail/open' }],
     }),
   ],
   build: {

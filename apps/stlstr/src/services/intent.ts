@@ -57,7 +57,7 @@ function candidateFor(archetype: string): IntentCandidate {
     dTag: napplet?.dTag ?? entry.dTag,
     title: napplet?.title ?? entry.title,
     actions: actionsFor(archetype),
-    protocols: napplet?.protocols.length ? napplet.protocols : conventionsFor(archetype),
+    conventions: napplet?.conventions.length ? napplet.conventions : conventionsFor(archetype),
     isDefault: true,
   };
 }
@@ -135,9 +135,11 @@ export function createStlstrIntentService({ navigate }: IntentServiceOptions): S
           return failed(archetype, action, `${preference} does not handle ${archetype}`);
         }
 
-        const protocols = napplet?.protocols.length ? napplet.protocols : conventionsFor(archetype);
-        if (request.protocol && !protocols.includes(request.protocol)) {
-          return failed(archetype, action, `unsupported protocol ${request.protocol}`);
+        const conventions = napplet?.conventions.length
+          ? napplet.conventions
+          : conventionsFor(archetype);
+        if (request.convention && !conventions.includes(request.convention)) {
+          return failed(archetype, action, `unsupported convention ${request.convention}`);
         }
 
         const payload = normalizePayload(archetype, asPayload(request.payload));
@@ -168,7 +170,7 @@ export function createStlstrIntentService({ navigate }: IntentServiceOptions): S
           handled: true,
           handler: handlerDTag,
           windowId: `route-${entry.routeId}-${handlerDTag}`,
-          protocol: request.protocol ?? protocols[0],
+          convention: request.convention ?? conventions[0],
         };
       },
     },

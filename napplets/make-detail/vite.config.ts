@@ -15,7 +15,7 @@ export default defineConfig({
       // parent print and the maker profile.
       requires: ['inc', 'outbox', 'identity', 'count', 'resource', 'intent', 'theme'],
       artifactMode: 'single-file',
-      archetypes: [{ slug: 'make-detail', naps: ['napplet:make-detail/open'] }],
+      archetypes: [{ slug: 'make-detail', convention: 'napplet:make-detail/open' }],
     }),
   ],
   build: {

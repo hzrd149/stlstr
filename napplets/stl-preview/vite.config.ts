@@ -13,7 +13,7 @@ export default defineConfig({
       // lets oversized or unsupported files fall back to a shell-mediated download.
       requires: ['inc', 'resource', 'link', 'theme'],
       artifactMode: 'single-file',
-      archetypes: [{ slug: 'stl-preview', naps: ['napplet:stl-preview/open'] }],
+      archetypes: [{ slug: 'stl-preview', convention: 'napplet:stl-preview/open' }],
     }),
   ],
   build: {

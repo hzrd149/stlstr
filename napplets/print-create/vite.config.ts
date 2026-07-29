@@ -14,7 +14,11 @@ export default defineConfig({
       archetypes: [
         {
           slug: 'printable-create',
-          naps: ['napplet:printable-create/open', 'napplet:printable-create/create'],
+          convention: 'napplet:printable-create/open',
+        },
+        {
+          slug: 'printable-create',
+          convention: 'napplet:printable-create/create',
         },
       ],
     }),

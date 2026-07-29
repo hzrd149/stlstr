@@ -10,12 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@kehto/acl": "^0.15.6",
-    "@kehto/runtime": "^0.18.5",
-    "@kehto/services": "^0.16.5",
-    "@kehto/shell": "^0.17.2",
-    "@napplet/core": "^0.28.0",
-    "@napplet/nap": "^0.28.0",
+    "@kehto/acl": "^0.17.0",
+    "@kehto/runtime": "^0.20.0",
+    "@kehto/services": "^0.18.0",
+    "@kehto/shell": "^0.19.0",
+    "@napplet/core": "^0.31.0",
+    "@napplet/nap": "^0.31.0",
     "applesauce-accounts": "^6.2.0",
     "applesauce-actions": "^6.2.0",
     "applesauce-common": "^6.2.0",

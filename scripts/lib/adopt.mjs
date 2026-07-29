@@ -12,9 +12,9 @@ import { join } from 'node:path';
 const D_TAG_PATTERN = /^[a-z0-9-]{1,13}$/;
 const SHIM_PACKAGE = '@napplet/shim';
 const CURRENT_NAPPLET_PACKAGES = {
-  '@napplet/sdk': '^0.24.4',
-  '@napplet/conformance-cli': '^0.2.15',
-  '@napplet/vite-plugin': '^0.11.3',
+  '@napplet/sdk': '^0.27.0',
+  '@napplet/conformance-cli': '^0.2.18',
+  '@napplet/vite-plugin': '^0.14.0',
 };
 const STATIC_SHIM_IMPORT =
   /^[\t ]*import(?:[\t ]+[^'"\r\n]+[\t ]+from)?[\t ]*['"]@napplet\/shim(?:\/[^'"]*)?['"];?[\t ]*(?:\/\/[^\r\n]*)?\r?\n?/gm;

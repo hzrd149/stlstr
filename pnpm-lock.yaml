@@ -208,14 +208,14 @@ importers:
   .:
     devDependencies:
       '@kehto/cli':
-        specifier: ^0.2.16
-        version: 0.2.16(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))
+        specifier: ^0.4.0
+        version: 0.4.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))
       '@napplelets/napplet-cli':
         specifier: workspace:*
         version: link:tools/napplet-cli
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       nostr-tools:
         specifier: ^2.24.1
         version: 2.24.1(typescript@6.0.3)
@@ -238,23 +238,23 @@ importers:
   apps/stlstr:
     dependencies:
       '@kehto/acl':
-        specifier: ^0.15.6
-        version: 0.15.6(@napplet/core@0.28.0)(@napplet/nap@0.28.0)
+        specifier: ^0.17.0
+        version: 0.17.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)
       '@kehto/runtime':
-        specifier: ^0.18.5
-        version: 0.18.5(@napplet/core@0.28.0)(@napplet/nap@0.28.0)
+        specifier: ^0.20.0
+        version: 0.20.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)
       '@kehto/services':
-        specifier: ^0.16.5
-        version: 0.16.5(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))
+        specifier: ^0.18.0
+        version: 0.18.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))
       '@kehto/shell':
-        specifier: ^0.17.2
-        version: 0.17.2(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))
+        specifier: ^0.19.0
+        version: 0.19.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))
       '@napplet/core':
-        specifier: ^0.28.0
-        version: 0.28.0
+        specifier: ^0.31.0
+        version: 0.31.0
       '@napplet/nap':
-        specifier: ^0.28.0
-        version: 0.28.0
+        specifier: ^0.31.0
+        version: 0.31.0
       applesauce-accounts:
         specifier: ^6.2.0
         version: 6.2.0(@capacitor/core@7.6.8)(typescript@6.0.3)
@@ -353,8 +353,8 @@ importers:
   lib/napplet-kit:
     dependencies:
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       applesauce-common:
         specifier: ^6.2.0
         version: 6.2.0(typescript@5.9.3)
@@ -378,8 +378,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -388,11 +388,11 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -418,8 +418,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -428,11 +428,11 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -458,8 +458,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -468,11 +468,11 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -498,8 +498,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -508,51 +508,11 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
-      '@sveltejs/vite-plugin-svelte':
-        specifier: ^7.2.0
-        version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
-      '@tailwindcss/vite':
-        specifier: ^4.3.3
-        version: 4.3.3(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
-      daisyui:
-        specifier: ^5.7.0
-        version: 5.7.0
-      tailwindcss:
-        specifier: ^4.3.3
-        version: 4.3.3
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vite:
-        specifier: ^8.1.4
-        version: 8.1.5(@types/node@24.13.3)(jiti@2.7.0)
-
-  napplets/print-search:
-    dependencies:
-      '@lucide/svelte':
-        specifier: ^1.26.0
-        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
-      '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
-      '@stlstr/napplet-kit':
-        specifier: workspace:*
-        version: link:../../lib/napplet-kit
-      svelte:
-        specifier: ^5.56.4
-        version: 5.56.7(@typescript-eslint/types@8.65.0)
-    devDependencies:
-      '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
-      '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -578,8 +538,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -588,11 +548,11 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -618,8 +578,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -634,11 +594,11 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -664,8 +624,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -674,11 +634,11 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -704,8 +664,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -714,11 +674,51 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^7.2.0
+        version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+      '@tailwindcss/vite':
+        specifier: ^4.3.3
+        version: 4.3.3(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+      daisyui:
+        specifier: ^5.7.0
+        version: 5.7.0
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^8.1.4
+        version: 8.1.5(@types/node@24.13.3)(jiti@2.7.0)
+
+  napplets/print-search:
+    dependencies:
+      '@lucide/svelte':
+        specifier: ^1.26.0
+        version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
+      '@napplet/sdk':
+        specifier: ^0.27.0
+        version: 0.27.0
+      '@stlstr/napplet-kit':
+        specifier: workspace:*
+        version: link:../../lib/napplet-kit
+      svelte:
+        specifier: ^5.56.4
+        version: 5.56.7(@typescript-eslint/types@8.65.0)
+    devDependencies:
+      '@napplet/conformance-cli':
+        specifier: ^0.2.18
+        version: 0.2.18
+      '@napplet/vite-plugin':
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -744,8 +744,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -754,11 +754,11 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -784,8 +784,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))
       '@napplet/sdk':
-        specifier: ^0.24.4
-        version: 0.24.4
+        specifier: ^0.27.0
+        version: 0.27.0
       '@stlstr/napplet-kit':
         specifier: workspace:*
         version: link:../../lib/napplet-kit
@@ -794,11 +794,11 @@ importers:
         version: 5.56.7(@typescript-eslint/types@8.65.0)
     devDependencies:
       '@napplet/conformance-cli':
-        specifier: ^0.2.15
-        version: 0.2.15
+        specifier: ^0.2.18
+        version: 0.2.18
       '@napplet/vite-plugin':
-        specifier: ^0.11.3
-        version: 0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
+        specifier: ^0.14.0
+        version: 0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.2.0
         version: 7.2.0(svelte@5.56.7(@typescript-eslint/types@8.65.0))(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))
@@ -821,8 +821,8 @@ importers:
   tools/napplet-cli:
     dependencies:
       '@napplet/cli':
-        specifier: jsr:^0.2.0
-        version: '@jsr/napplet__cli@0.2.0(@capacitor/core@7.6.8)(typescript@6.0.3)'
+        specifier: jsr:^0.3.0
+        version: '@jsr/napplet__cli@0.3.0(@capacitor/core@7.6.8)(typescript@6.0.3)'
 
 packages:
 
@@ -983,8 +983,8 @@ packages:
   '@jsr/libs__qrcode@3.1.0':
     resolution: {integrity: sha512-k41pBxqUhwQnGxxW9VtQ/nDzQkJQaxpb1sDFhh9bwZlvParTu7CjsLLyfJMcKNzgrx/v5exiFIzZhtYxuAfaKg==, tarball: https://npm.jsr.io/~/11/@jsr/libs__qrcode/3.1.0.tgz}
 
-  '@jsr/napplet__cli@0.2.0':
-    resolution: {integrity: sha512-Ofl4vI5X1Rj1kaEE3PJhy8Dx6qqRRFqClwRhbP4Qemie4305rkDORhZyswVrGQLuqIsjzYguKFWmmu7dnB4/lg==, tarball: https://npm.jsr.io/~/11/@jsr/napplet__cli/0.2.0.tgz}
+  '@jsr/napplet__cli@0.3.0':
+    resolution: {integrity: sha512-A1Z6IkMokalHt4t1yDZq1Uv9whsUBnvj8qmmnAAKFGY/C7f7qCyc8Q/9XJVdGAM39PxaqqYuT0fuPpoDjiYxLA==, tarball: https://npm.jsr.io/~/11/@jsr/napplet__cli/0.3.0.tgz}
 
   '@jsr/std__bytes@1.0.6':
     resolution: {integrity: sha512-St6yKggjFGhxS52IFLJWvkchRFbAKg2Xh8UxA4S1EGz7GJ2Ui+ssDDldj/w2c8vCxvl6qgR0HaYbKeFJNqujmA==, tarball: https://npm.jsr.io/~/11/@jsr/std__bytes/1.0.6.tgz}
@@ -1001,58 +1001,58 @@ packages:
   '@jsr/std__streams@1.1.1':
     resolution: {integrity: sha512-V9auR/i6gJz6SR1+h5wc4EN42IC5+ObBjXu/h7Buef7UOE0GtX4vRSx+3MJywEiBcJqQC+lCnf+wBAodvBL1SA==, tarball: https://npm.jsr.io/~/11/@jsr/std__streams/1.1.1.tgz}
 
-  '@kehto/acl@0.15.6':
-    resolution: {integrity: sha512-6cInnqVh7UdqNePrHl1QCuQyWripUt5ZN8Do5pEIj6ogknjC1IGruqEurZFjRq2uUpBQSUvmwCqAhtvKtvTo5A==}
+  '@kehto/acl@0.17.0':
+    resolution: {integrity: sha512-bSwRGG97xO+rkf7Qt8LBGk/qZWieAAcOlgmLZ9cQqwPMYZdrZOF4ANGT7YjpDVPtFxkOwQhXmlizrEtKuFef9Q==}
     peerDependencies:
-      '@napplet/core': '>=0.23.0 <=0.28.x'
-      '@napplet/nap': '>=0.23.0 <=0.28.x'
+      '@napplet/core': '>=0.31.0 <0.32.0'
+      '@napplet/nap': '>=0.31.0 <0.32.0'
 
-  '@kehto/cli@0.2.16':
-    resolution: {integrity: sha512-44aKUnwo8IB0gpd2aTNasqaEQZad3rTo7dyoEGvg0NwQeCni4i63oN1P7nebxoAT42QB8WJ7J4grvAANV41wrg==}
+  '@kehto/cli@0.4.0':
+    resolution: {integrity: sha512-X3l7CWGzxiFli02/M1vIb7+d4YffU/t9Z0+0URTe5k8hDoHUIEiBG3Kycwpgm3bfqxNedqlrt6nMP6hmtXKhZQ==}
     hasBin: true
     peerDependencies:
-      '@napplet/core': '>=0.23.0 <=0.28.x'
-      '@napplet/nap': '>=0.23.0 <=0.28.x'
+      '@napplet/core': '>=0.31.0 <0.32.0'
+      '@napplet/nap': '>=0.31.0 <0.32.0'
       nostr-tools: '>=2.23.3 <=2.x'
 
-  '@kehto/firewall@0.3.9':
-    resolution: {integrity: sha512-UVqWpIqJiq0nJGZC/0hXjYW3INxijpE2n8SqTTDoyAa/bRknYPEt+PNssdpasjFD+SXdCllLdYwTwa+qtajW4Q==}
+  '@kehto/firewall@0.5.0':
+    resolution: {integrity: sha512-krsdog07xpfAyMjsybs4E5I2rHsXGOxQ+4zEM/fqo/Ayv+8S0KvFYNY9YjoY8Lshm1tsdnxeJ5/Bn7ttLHBZ/Q==}
     peerDependencies:
-      '@napplet/core': '>=0.23.0 <=0.28.x'
+      '@napplet/core': '>=0.31.0 <0.32.0'
 
-  '@kehto/nip@0.4.2':
-    resolution: {integrity: sha512-QQ8l8Nzp1hZMJCQSr0kW+89R9JgVi5BppNJXwIgQiSRWv0oEZ8OGnjuREyywOy3hp25itpU0PWPPvmrGzFh1QA==}
+  '@kehto/nip@0.5.0':
+    resolution: {integrity: sha512-IpqKKaYrNEBePVQXLvEjU3xU5+f7Gc9m+XQyM2+nEQkwuCPjWR9CsgjUZdnvdstx57uuwa1tFKsSbPOdO/y/jA==}
     peerDependencies:
       nostr-tools: '>=2.23.3 <=2.x'
 
-  '@kehto/paja@0.8.0':
-    resolution: {integrity: sha512-Kks2ZFAhIxY6Tw+nrOE+OGFwNylFYIMTZe5J2GzkfKzPq8/xjGnTfHqzD4sCj1yculiNVW/WNqE/oGBTSwxRVg==}
+  '@kehto/paja@0.10.0':
+    resolution: {integrity: sha512-HUegeenvW13fJo9KhXYPfCcNSp3wHh4yKHZrwFFPX6hzakFvUUZEiATeoUXln/1gcGgdRE1nmlRRc5kuKc2zRg==}
     peerDependencies:
-      '@napplet/core': '>=0.23.0 <=0.28.x'
-      '@napplet/nap': '>=0.23.0 <=0.28.x'
+      '@napplet/core': '>=0.31.0 <0.32.0'
+      '@napplet/nap': '>=0.31.0 <0.32.0'
       nostr-tools: '>=2.23.3 <=2.x'
 
-  '@kehto/runtime@0.18.5':
-    resolution: {integrity: sha512-fFHMp0VQ1g5qQsjQJZwdKH/pVqqRBHPrWd2q57Me4VTia54kFct+V5HU8O9Qy/cUcv8yeNN5b7PHUW1M4iKnhA==}
+  '@kehto/runtime@0.20.0':
+    resolution: {integrity: sha512-15agmiwZmPjJWIhy+6E7F0fBn24GwFcRB+iT/nnVCpV9yC+C/W99GMnqSAnX+QjAmARHJH6hfGivnpgRYuoFiw==}
     peerDependencies:
-      '@napplet/core': '>=0.23.0 <=0.28.x'
-      '@napplet/nap': '>=0.23.0 <=0.28.x'
+      '@napplet/core': '>=0.31.0 <0.32.0'
+      '@napplet/nap': '>=0.31.0 <0.32.0'
 
-  '@kehto/services@0.16.5':
-    resolution: {integrity: sha512-yyJyDg+b81cTqOWhim9VcUgWgNuv7kxJIfXP2BAkZRDDLKlFpW9kTCHzkY9I3uXGNi2yUWWq41QpLaW22w2MNw==}
+  '@kehto/services@0.18.0':
+    resolution: {integrity: sha512-1j0cf6XtwLF+GZ6yIPWU4mP8ngT/p2EIdXqRtC2Tns9YkUAxuxeNfjFLK5fTuJA3N6IW6y0DWFF6OE9m8a8OEA==}
     peerDependencies:
-      '@napplet/core': '>=0.23.0 <=0.28.x'
-      '@napplet/nap': '>=0.23.0 <=0.28.x'
+      '@napplet/core': '>=0.31.0 <0.32.0'
+      '@napplet/nap': '>=0.31.0 <0.32.0'
       nostr-tools: '>=2.23.3 <=2.x'
     peerDependenciesMeta:
       nostr-tools:
         optional: true
 
-  '@kehto/shell@0.17.2':
-    resolution: {integrity: sha512-C5/Etvt5say90c0EEgsdIbIToxrWEp0Fs3/PsVhbyuUuJG9/EQFLchLTpGbZ6ZEnvPHqu8r1g1OzVWQjDUm4Rw==}
+  '@kehto/shell@0.19.0':
+    resolution: {integrity: sha512-MIFE/i4MmizxCquzaZbeUh1QMwdC/GS/tcOD1GzZwJWXkL6RqYcNwWQ+DExuWRcaHaobW/8pIHe/oIS0rFP7FA==}
     peerDependencies:
-      '@napplet/core': '>=0.23.0 <=0.28.x'
-      '@napplet/nap': '>=0.23.0 <=0.28.x'
+      '@napplet/core': '>=0.31.0 <0.32.0'
+      '@napplet/nap': '>=0.31.0 <0.32.0'
       nostr-tools: '>=2.23.3 <=2.x'
 
   '@kehto/wm@0.0.2':
@@ -1069,29 +1069,29 @@ packages:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
 
-  '@napplet/conformance-cli@0.2.15':
-    resolution: {integrity: sha512-iQnvXKnrONFsVfXLqv1P6XnPQz8nMM17caPH+ddQ0smmXHGnKV9HBX2fw3INGzDyruHGaXcVNsATYZWZTSuvCQ==}
+  '@napplet/conformance-cli@0.2.18':
+    resolution: {integrity: sha512-cWN6XRohN8iE+2xuaTh4LxBOj2iLkGhyCjsV+1g7TGNaj4hkEp+u792dX1eA2vFIVa/k1qR9QAZHO0jkzPdONw==}
     hasBin: true
 
-  '@napplet/conformance@0.13.0':
-    resolution: {integrity: sha512-3e6ifbv6jc6LatAnFQjfqmfJbPtTRq96uo/QQUF4xOIsuoX0kShTj+RBdjq4JJJMl6MvQRoQX6t+oAcMuzuWng==}
+  '@napplet/conformance@0.16.0':
+    resolution: {integrity: sha512-VW+hqIFgE7VXhlXavGv708YkbnvJGxJbBkQiZzjrIY5M79hHX7kCZF9kynOIrkr+axiBM4km9YJtGPF25nPHTg==}
 
-  '@napplet/core@0.28.0':
-    resolution: {integrity: sha512-iJ0vX6YYFCcgEm4cyR5s9MUtY01j79fnQZ8mNB+cgjwYBOZwUdt/FNNAfAzGsepNtMBORzhXUdo0/CKebBa+hg==}
+  '@napplet/core@0.31.0':
+    resolution: {integrity: sha512-HXmPn5c+Tt58XN6Sr3RTVwjbJHKP0y94mDxsB04p8+0Q3ehTNQEQjV2EcZ0WXnjNjhtYeuG2hXA5Zqeu5B6HtQ==}
 
-  '@napplet/nap@0.28.0':
-    resolution: {integrity: sha512-1L3oDk0BDuag3RdN7E0u3BQKfl0KmX33omSE3VZsGJD2/JJr9lzx1MsZLdjFB9coxOZyX9M3QaHumTHoXdj6Dg==}
+  '@napplet/nap@0.31.0':
+    resolution: {integrity: sha512-1y4zwQXjUTtnYJ62itzv8l0CbucKSngWpJNmsdKvi63iDdzxBx3djWgluByR1PN9VJdNe2t/Wcf5Zh/vxED+yA==}
     peerDependencies:
       json-schema-to-ts: ^3.1.1
     peerDependenciesMeta:
       json-schema-to-ts:
         optional: true
 
-  '@napplet/sdk@0.24.4':
-    resolution: {integrity: sha512-g/0Gtvxl6fiTwE1MGZXqv9ztEnzVkJvriZvUKt9IKfIOso5L4dPRpWb/6sczcTNsHdatKjfLk0lQ6KPS8ezjWQ==}
+  '@napplet/sdk@0.27.0':
+    resolution: {integrity: sha512-hVK+R010W4bkVmJa2d87UvaxflTvdX8e9Adj8aFQWCPZsUXWiXNUTpBLTlyZKS1k3ttPcpqr0/0Rp82YzySMgQ==}
 
-  '@napplet/vite-plugin@0.11.3':
-    resolution: {integrity: sha512-4k4xlzYVJHY2dSw5wrR9VxqAj/VL3QAzIfBZUgZI073gDDJac63WUkzj8xeGXB9QRqsqZBCemXGLZB0q+vyV6Q==}
+  '@napplet/vite-plugin@0.14.0':
+    resolution: {integrity: sha512-WaJ3LUjuVAYtw17iqP5+6Kb30X/x0KGVQMPsnwEu2IlJ6+Kbzt94turdgLn5LxbZLKB1EoeboBmNeNX4aeRZrQ==}
     peerDependencies:
       vite: '>=5.0.0'
 
@@ -3103,7 +3103,7 @@ snapshots:
 
   '@jsr/libs__qrcode@3.1.0': {}
 
-  '@jsr/napplet__cli@0.2.0(@capacitor/core@7.6.8)(typescript@6.0.3)':
+  '@jsr/napplet__cli@0.3.0(@capacitor/core@7.6.8)(typescript@6.0.3)':
     dependencies:
       '@jsr/libs__qrcode': 3.1.0
       '@jsr/std__media-types': 1.1.0
@@ -3132,63 +3132,63 @@ snapshots:
     dependencies:
       '@jsr/std__bytes': 1.0.6
 
-  '@kehto/acl@0.15.6(@napplet/core@0.28.0)(@napplet/nap@0.28.0)':
+  '@kehto/acl@0.17.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)':
     dependencies:
-      '@napplet/core': 0.28.0
-      '@napplet/nap': 0.28.0
+      '@napplet/core': 0.31.0
+      '@napplet/nap': 0.31.0
 
-  '@kehto/cli@0.2.16(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))':
+  '@kehto/cli@0.4.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))':
     dependencies:
-      '@kehto/paja': 0.8.0(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))
-      '@napplet/core': 0.28.0
-      '@napplet/nap': 0.28.0
+      '@kehto/paja': 0.10.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))
+      '@napplet/core': 0.31.0
+      '@napplet/nap': 0.31.0
       nostr-tools: 2.24.1(typescript@6.0.3)
 
-  '@kehto/firewall@0.3.9(@napplet/core@0.28.0)':
+  '@kehto/firewall@0.5.0(@napplet/core@0.31.0)':
     dependencies:
-      '@napplet/core': 0.28.0
+      '@napplet/core': 0.31.0
 
-  '@kehto/nip@0.4.2(nostr-tools@2.24.1(typescript@6.0.3))':
+  '@kehto/nip@0.5.0(nostr-tools@2.24.1(typescript@6.0.3))':
     dependencies:
       '@noble/hashes': 2.2.0
       nostr-tools: 2.24.1(typescript@6.0.3)
 
-  '@kehto/paja@0.8.0(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))':
+  '@kehto/paja@0.10.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))':
     dependencies:
-      '@kehto/acl': 0.15.6(@napplet/core@0.28.0)(@napplet/nap@0.28.0)
-      '@kehto/firewall': 0.3.9(@napplet/core@0.28.0)
-      '@kehto/nip': 0.4.2(nostr-tools@2.24.1(typescript@6.0.3))
-      '@kehto/runtime': 0.18.5(@napplet/core@0.28.0)(@napplet/nap@0.28.0)
-      '@kehto/services': 0.16.5(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))
-      '@kehto/shell': 0.17.2(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))
+      '@kehto/acl': 0.17.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)
+      '@kehto/firewall': 0.5.0(@napplet/core@0.31.0)
+      '@kehto/nip': 0.5.0(nostr-tools@2.24.1(typescript@6.0.3))
+      '@kehto/runtime': 0.20.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)
+      '@kehto/services': 0.18.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))
+      '@kehto/shell': 0.19.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))
       '@kehto/wm': 0.0.2
-      '@napplet/core': 0.28.0
-      '@napplet/nap': 0.28.0
+      '@napplet/core': 0.31.0
+      '@napplet/nap': 0.31.0
       nostr-tools: 2.24.1(typescript@6.0.3)
 
-  '@kehto/runtime@0.18.5(@napplet/core@0.28.0)(@napplet/nap@0.28.0)':
+  '@kehto/runtime@0.20.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)':
     dependencies:
-      '@kehto/acl': 0.15.6(@napplet/core@0.28.0)(@napplet/nap@0.28.0)
-      '@kehto/firewall': 0.3.9(@napplet/core@0.28.0)
-      '@napplet/core': 0.28.0
-      '@napplet/nap': 0.28.0
+      '@kehto/acl': 0.17.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)
+      '@kehto/firewall': 0.5.0(@napplet/core@0.31.0)
+      '@napplet/core': 0.31.0
+      '@napplet/nap': 0.31.0
       '@noble/curves': 2.2.0
       '@noble/hashes': 2.2.0
 
-  '@kehto/services@0.16.5(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))':
+  '@kehto/services@0.18.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))':
     dependencies:
-      '@kehto/runtime': 0.18.5(@napplet/core@0.28.0)(@napplet/nap@0.28.0)
-      '@napplet/core': 0.28.0
-      '@napplet/nap': 0.28.0
+      '@kehto/runtime': 0.20.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)
+      '@napplet/core': 0.31.0
+      '@napplet/nap': 0.31.0
     optionalDependencies:
       nostr-tools: 2.24.1(typescript@6.0.3)
 
-  '@kehto/shell@0.17.2(@napplet/core@0.28.0)(@napplet/nap@0.28.0)(nostr-tools@2.24.1(typescript@6.0.3))':
+  '@kehto/shell@0.19.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)(nostr-tools@2.24.1(typescript@6.0.3))':
     dependencies:
-      '@kehto/acl': 0.15.6(@napplet/core@0.28.0)(@napplet/nap@0.28.0)
-      '@kehto/runtime': 0.18.5(@napplet/core@0.28.0)(@napplet/nap@0.28.0)
-      '@napplet/core': 0.28.0
-      '@napplet/nap': 0.28.0
+      '@kehto/acl': 0.17.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)
+      '@kehto/runtime': 0.20.0(@napplet/core@0.31.0)(@napplet/nap@0.31.0)
+      '@napplet/core': 0.31.0
+      '@napplet/nap': 0.31.0
       nostr-tools: 2.24.1(typescript@6.0.3)
 
   '@kehto/wm@0.0.2': {}
@@ -3204,34 +3204,34 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
-  '@napplet/conformance-cli@0.2.15':
+  '@napplet/conformance-cli@0.2.18':
     dependencies:
-      '@napplet/conformance': 0.13.0
+      '@napplet/conformance': 0.16.0
       playwright: 1.61.1
     transitivePeerDependencies:
       - json-schema-to-ts
 
-  '@napplet/conformance@0.13.0':
+  '@napplet/conformance@0.16.0':
     dependencies:
-      '@napplet/core': 0.28.0
-      '@napplet/nap': 0.28.0
+      '@napplet/core': 0.31.0
+      '@napplet/nap': 0.31.0
     transitivePeerDependencies:
       - json-schema-to-ts
 
-  '@napplet/core@0.28.0': {}
+  '@napplet/core@0.31.0': {}
 
-  '@napplet/nap@0.28.0':
+  '@napplet/nap@0.31.0':
     dependencies:
-      '@napplet/core': 0.28.0
+      '@napplet/core': 0.31.0
 
-  '@napplet/sdk@0.24.4':
+  '@napplet/sdk@0.27.0':
     dependencies:
-      '@napplet/core': 0.28.0
-      '@napplet/nap': 0.28.0
+      '@napplet/core': 0.31.0
+      '@napplet/nap': 0.31.0
     transitivePeerDependencies:
       - json-schema-to-ts
 
-  '@napplet/vite-plugin@0.11.3(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))':
+  '@napplet/vite-plugin@0.14.0(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0))':
     dependencies:
       nostr-tools: 2.24.1(typescript@5.9.3)
       vite: 8.1.5(@types/node@24.13.3)(jiti@2.7.0)

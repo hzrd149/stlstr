@@ -113,7 +113,7 @@ export type ResolvedNapplet = {
   description?: string;
   aggregateHash: string;
   artifactUrl: string;
-  protocols: string[];
+  conventions: string[];
   source: 'default' | 'override';
   naddr?: string;
   pubkey?: string;
@@ -134,10 +134,10 @@ function tagValue(event: NostrEvent, name: string): string | undefined {
 }
 
 function hasCompatibleArchetype(event: NostrEvent, archetype: string): boolean {
-  const protocols = conventionsFor(archetype);
+  const conventions = conventionsFor(archetype);
   return event.tags.some(
     (tag) =>
-      tag[0] === 'archetype' && tag[1] === archetype && protocols.some((p) => tag.includes(p)),
+      tag[0] === 'archetype' && tag[1] === archetype && conventions.some((id) => tag.includes(id)),
   );
 }
 
@@ -199,7 +199,7 @@ function resolvedFromManifest(
     description: tagValue(manifest, 'description'),
     aggregateHash,
     artifactUrl,
-    protocols: conventionsFor(archetype),
+    conventions: conventionsFor(archetype),
     source: 'override',
     naddr,
     pubkey: manifest.pubkey,
@@ -259,7 +259,7 @@ export function defaultNappletForArchetype(archetype: string): ResolvedNapplet |
     description: entry.description,
     aggregateHash: `dev-${entry.dTag}-build`,
     artifactUrl: defaultArtifactUrl(entry.dTag),
-    protocols: conventionsFor(archetype),
+    conventions: conventionsFor(archetype),
     source: 'default',
   };
 }
@@ -337,7 +337,7 @@ function resolvedFromOverride(archetype: string, override: NappletOverride): Res
     description: override.description ?? fallback?.description,
     aggregateHash: override.aggregateHash ?? `override-${override.dTag}`,
     artifactUrl: override.artifactUrl ?? '',
-    protocols: conventionsFor(archetype),
+    conventions: conventionsFor(archetype),
     source: 'override',
     naddr: override.naddr,
     pubkey: override.pubkey,
