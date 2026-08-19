@@ -14,11 +14,11 @@ The design reuses existing Nostr primitives where possible:
 
 ## Kinds
 
-| kind    | name                 | type        |
-| ------- | -------------------- | ----------- |
-| `33500` | Printable            | addressable |
-| `2351`  | Make                 | regular     |
-| `30050` | Printable Set        | addressable |
+| kind    | name          | type        |
+| ------- | ------------- | ----------- |
+| `33500` | Printable     | addressable |
+| `2351`  | Make          | regular     |
+| `30050` | Printable Set | addressable |
 
 ## Markdown Content
 

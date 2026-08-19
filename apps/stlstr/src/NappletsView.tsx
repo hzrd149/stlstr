@@ -19,10 +19,7 @@ import {
   type IntentDoc,
   type NappletCategory,
 } from './services/intent-map';
-import {
-  NAPPLET_PUBLISHER_PUBKEY,
-  publishedNappletNaddr,
-} from './services/napplets';
+import { NAPPLET_PUBLISHER_PUBKEY, publishedNappletNaddr } from './services/napplets';
 
 /** Opens a napplet by naddr in the hosted Paja runtime. */
 function pajaUrl(naddr: string): string {
@@ -204,8 +201,8 @@ function Showcase({ copied, onCopy }: { copied: string | null; onCopy: (value: s
         <p className="max-w-2xl text-base text-base-content/70">
           STLstr is built from small, sandboxed napplets — and it publishes every one of them for
           other Nostr apps to embed. Drop a maker profile, a 3D preview, or the whole printable feed
-          into your own app without rebuilding any of it. Copy a napplet&rsquo;s naddr or archetype, or
-          open it straight away in Paja.
+          into your own app without rebuilding any of it. Copy a napplet&rsquo;s naddr or archetype,
+          or open it straight away in Paja.
         </p>
       </header>
 
