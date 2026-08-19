@@ -120,6 +120,8 @@ export type ResolvedNapplet = {
   identifier?: string;
   relays?: string[];
   compatibleWithArchetype?: boolean;
+  /** NAP domains the napplet's signed manifest declares, when one was resolved. */
+  requires?: string[];
 };
 
 export type LoadedNapplet = ResolvedNapplet & {
@@ -131,6 +133,10 @@ const defaultArtifactCache = new Map<string, Promise<LoadedNapplet>>();
 
 function tagValue(event: NostrEvent, name: string): string | undefined {
   return event.tags.find((tag) => tag[0] === name && tag[1])?.[1]?.trim() || undefined;
+}
+
+function requiredDomains(event: NostrEvent): string[] {
+  return event.tags.filter((tag) => tag[0] === 'requires' && tag[1]).map((tag) => tag[1].trim());
 }
 
 function hasCompatibleArchetype(event: NostrEvent, archetype: string): boolean {
@@ -206,6 +212,7 @@ function resolvedFromManifest(
     identifier: dTag,
     relays,
     compatibleWithArchetype: hasCompatibleArchetype(manifest, archetype),
+    requires: requiredDomains(manifest),
   };
 }
 
@@ -221,7 +228,53 @@ async function resolveRegistryNappletUrl(name: string, fallbackUrl: string): Pro
   }
 }
 
-function readNappletDomains(html: string): string[] {
+/**
+ * The NAP domains to inject for a napplet, in order of trust.
+ *
+ * The signed NIP-5A manifest is the real declaration, so an override resolved from a manifest
+ * event already carries it. Built-in napplets are loaded straight from an artifact URL with no
+ * event behind them, so their manifest is read from the `.nip5a-manifest.json` sidecar the vite
+ * plugin writes next to `index.html` — served in dev by the napplet-dist middleware and copied
+ * into the app's own dist for production.
+ *
+ * The `<meta name="napplet-requires">` fallback is for artifacts built with
+ * `@napplet/vite-plugin` before 0.14, which advertised the list in the HTML instead. It is an
+ * unsigned declaration by an artifact about itself, so it is consulted last.
+ *
+ * A napplet whose domains cannot be resolved is still mounted, with whatever this returns —
+ * feature detection is the napplet's job, and refusing to mount would turn a missing manifest
+ * into a blank screen.
+ */
+async function resolveNappletDomains(
+  napplet: ResolvedNapplet,
+  artifactUrl: string,
+  html: string,
+): Promise<string[]> {
+  if (napplet.requires?.length) return napplet.requires;
+
+  const fromSidecar = await fetchSidecarDomains(artifactUrl);
+  if (fromSidecar.length) return fromSidecar;
+
+  return readMetaDomains(html);
+}
+
+async function fetchSidecarDomains(artifactUrl: string): Promise<string[]> {
+  try {
+    const url = new URL('.nip5a-manifest.json', artifactUrl);
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) return [];
+
+    const manifest = (await response.json()) as Partial<NostrEvent>;
+    if (!Array.isArray(manifest.tags)) return [];
+
+    return requiredDomains(manifest as NostrEvent);
+  } catch {
+    // No sidecar, unreadable, or not JSON — fall through to the legacy meta tag.
+    return [];
+  }
+}
+
+function readMetaDomains(html: string): string[] {
   const content = new DOMParser()
     .parseFromString(html, 'text/html')
     .querySelector('meta[name="napplet-requires"]')
@@ -393,5 +446,10 @@ async function fetchNappletArtifact(napplet: ResolvedNapplet, url: string): Prom
   }
 
   const html = await response.text();
-  return { ...napplet, artifactUrl: url, html, domains: readNappletDomains(html) };
+  return {
+    ...napplet,
+    artifactUrl: url,
+    html,
+    domains: await resolveNappletDomains(napplet, url, html),
+  };
 }

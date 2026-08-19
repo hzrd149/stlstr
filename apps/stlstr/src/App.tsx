@@ -149,6 +149,16 @@ function createStlstrAdapter({ navigate, resolveIdentity }: AdapterOptions): She
     hotkeys: {
       executeHotkeyFromForward: () => {},
     },
+    // `@kehto/shell` gates every service-only domain on a matching `isAvailable()` hook: a
+    // registered handler under `services` is not enough, and a domain that fails the gate is
+    // dropped from the live set, so its messages are silently never answered. Both resolvers
+    // below are wired unconditionally further down, so both are always available.
+    intent: {
+      isAvailable: () => true,
+    },
+    link: {
+      isAvailable: () => true,
+    },
     workerRelay: {
       getWorkerRelay: () => null,
     },
@@ -770,10 +780,13 @@ function NappletFrame({
       const loaded = await loadNappletArtifact(mountedNapplet);
       if (cancelled) return;
 
+      // Mount regardless: a napplet that gets fewer domains than it wanted is expected to
+      // feature-detect and degrade, and refusing to mount would turn an unreadable manifest
+      // into a blank frame. The warning is for the developer, not a gate.
       const domains = loaded.domains;
       if (domains.length === 0) {
         console.warn(
-          `[stlstr] ${mountedNapplet.dTag} declares no NAP domains; add them to its vite.config nip5aManifest({ requires }).`,
+          `[stlstr] ${mountedNapplet.dTag} declares no NAP domains, so it is mounted with none; check its manifest \`requires\` and that it was built with VITE_DEV_PRIVKEY_HEX set.`,
         );
       }
 
