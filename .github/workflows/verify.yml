@@ -1,0 +1,71 @@
+name: Verify
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Formatting, unit tests, type-check and napplet builds. `type-check` runs svelte-check,
+  # so this job is what catches SDK drift inside `.svelte` files — plain tsc skips them.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from the `packageManager` field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm format:check
+
+      - run: pnpm verify
+
+  # The end-to-end suite, in its own job so a browser or relay problem cannot be mistaken
+  # for a type error. It drives the built napplets in a real Chromium against seeded fixtures.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The suite expects a relay on ws://localhost:4869 — locally that is the developer's own
+      # dev relay, so CI stands up a throwaway in-memory one at the same address.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Start a local test relay
+        run: |
+          go install github.com/fiatjaf/nak@latest
+          "$(go env GOPATH)/bin/nak" serve --port 4869 --quiet &
+          for _ in $(seq 1 30); do
+            (exec 3<>/dev/tcp/localhost/4869) 2>/dev/null && exit 0
+            sleep 1
+          done
+          echo "relay never came up on 4869" >&2
+          exit 1
+
+      # ubuntu-latest ships Google Chrome; test-browser.mjs finds it on this path.
+      - run: pnpm test:browser
+        env:
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
