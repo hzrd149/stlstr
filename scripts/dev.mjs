@@ -27,6 +27,7 @@ const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_APP_PORT = 5173;
 const DEFAULT_PAJA_PORT = 5197;
 const DEFAULT_LOCAL_RELAY = 'ws://localhost:4869';
+const DEV_PRIVKEY_HEX = '00000000000000000000000000000000000000000000000000000000deadbeef';
 
 const argv = process.argv.slice(2);
 let host = process.env.STLSTR_DEV_HOST || DEFAULT_HOST;
@@ -244,16 +245,25 @@ start(
 );
 
 for (const napplet of napplets) {
-  start(`napplet:${napplet.folder}`, 'pnpm', [
-    '--filter',
-    `./napplets/${napplet.folder}`,
-    'exec',
-    'vite',
-    'build',
-    '--watch',
-    '--mode',
-    'development',
-  ]);
+  start(
+    `napplet:${napplet.folder}`,
+    'pnpm',
+    [
+      '--filter',
+      `./napplets/${napplet.folder}`,
+      'exec',
+      'vite',
+      'build',
+      '--watch',
+      '--mode',
+      'development',
+    ],
+    // Same dummy key the root `napplet:build` script sets. `@napplet/vite-plugin` returns
+    // before it assembles the manifest unless this is set, and the shell reads that
+    // manifest's `requires` to decide which NAP domains a napplet gets — so without it every
+    // napplet mounts with an empty `window.napplet`.
+    { VITE_DEV_PRIVKEY_HEX: process.env.VITE_DEV_PRIVKEY_HEX || DEV_PRIVKEY_HEX },
+  );
 }
 
 if (runPaja) {

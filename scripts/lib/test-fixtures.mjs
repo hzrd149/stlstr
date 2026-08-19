@@ -23,10 +23,15 @@ export const MAKERS = {
  * Bump this whenever fixture content changes.
  *
  * The dev relay is long-lived and shared, and `kind:33500` is addressable: a relay that
-  * already holds a fixture printable will keep the copy it has unless the replacement is
+ * already holds a fixture printable will keep the copy it has unless the replacement is
  * strictly newer. Without a bump, an edited description silently never reaches the tests.
+ *
+ * The same applies to the `kind:0` profiles, and they are the more fragile half: the fixture
+ * secret keys are `'1'.repeat(64)` and `'2'.repeat(64)`, which any other tool pointed at the
+ * same relay may also have published under. A stray newer profile for those keys outranks
+ * ours and every display-name assertion fails with someone else's name.
  */
-const BASE_TIME = 1_784_900_000;
+const BASE_TIME = 1_787_000_000;
 
 /**
  * A description exercising the Markdown rules in NIP.md, including the ones that must be
@@ -34,7 +39,7 @@ const BASE_TIME = 1_784_900_000;
  *
  * The hostile cases are fixtures, not decoration: a `javascript:` link, a `data:` image and
  * a raw HTML element are the three things a description must never be able to turn into
-  * markup, so they are seeded here and asserted against in `printable-markdown.test.mjs`.
+ * markup, so they are seeded here and asserted against in `printable-markdown.test.mjs`.
  */
 const MARKDOWN_DESCRIPTION = `## Print settings
 
@@ -116,7 +121,7 @@ export function descriptionOf(printable, baseUrl) {
  *                NAP-RESOURCE has something real to proxy.
  */
 /**
-  * The part file every fixture printable carries, as a kind-1063 (NIP-94) event. It is a real
+ * The part file every fixture printable carries, as a kind-1063 (NIP-94) event. It is a real
  * 684-byte binary STL served by the test's own Vite server, so the detail napplets can
  * resolve a real NIP-94 event and the STL viewer can exercise NAP-RESOURCE fetch, parse,
  * render rather than a stub.

@@ -18,6 +18,9 @@ const baseUrl = `http://${host}:${port}`;
  */
 const relayUrl = process.env.STLSTR_TEST_RELAY_URL || 'ws://localhost:4869';
 const registryPath = join(root, 'apps', 'stlstr', 'public', 'napplets.dev.json');
+const devPrivkeyHex =
+  process.env.VITE_DEV_PRIVKEY_HEX ||
+  '00000000000000000000000000000000000000000000000000000000deadbeef';
 const testNapplets = [
   { name: 'print-discvr', title: 'Discover Prints' },
   { name: 'print-search', title: 'Printable Search' },
@@ -128,7 +131,12 @@ async function main() {
   writeRegistry();
 
   for (const napplet of testNapplets) {
-    await run('pnpm', ['--filter', `./napplets/${napplet.name}`, 'build']);
+    // Same dummy key the root `napplet:build` script sets. Without it `@napplet/vite-plugin`
+    // returns before it assembles the manifest's `requires`, so the napplet ships declaring no
+    // NAP domains, the shell injects none, and every suite times out on an inert iframe.
+    await run('pnpm', ['--filter', `./napplets/${napplet.name}`, 'build'], {
+      env: { VITE_DEV_PRIVKEY_HEX: devPrivkeyHex },
+    });
 
     if (!existsSync(join(root, 'napplets', napplet.name, 'dist', 'index.html'))) {
       throw new Error(`${napplet.title} napplet build did not produce dist/index.html`);
