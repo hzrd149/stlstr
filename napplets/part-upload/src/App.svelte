@@ -18,6 +18,7 @@
   import { looksLikeStl } from '@stlstr/napplet-kit/stl';
   import { renderStlThumbnail } from '@stlstr/napplet-kit/stl-thumbnail';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
+  import type { Subscription } from '@stlstr/napplet-kit/inc';
   import { onDestroy, onMount } from 'svelte';
 
   const OPEN_TOPIC = 'part-upload:open';
@@ -329,7 +330,7 @@
 
   function onFileChange(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
-    const nextRows = Array.from(input.files ?? []).map((file) => ({
+    const nextRows: SelectedPart[] = Array.from(input.files ?? []).map((file) => ({
       id: rowId(file),
       file,
       name: file.name,
@@ -369,7 +370,10 @@
     return result;
   }
 
-  async function uploadThumbnail(row: SelectedPart, thumbnail: Blob): Promise<UploadResult> {
+  async function uploadThumbnail(
+    row: SelectedPart,
+    thumbnail: Blob,
+  ): Promise<UploadResult & { url: string }> {
     const name = thumbnailName(row.file);
     const file = new File([thumbnail], name, { type: thumbnail.type || 'image/png' });
     const result = await upload.upload({
@@ -383,7 +387,7 @@
       throw new Error(result.error ?? `Thumbnail upload failed for ${row.file.name}`);
     }
     if (!result.url) throw new Error(`Thumbnail upload did not return a URL for ${row.file.name}`);
-    return result;
+    return { ...result, url: result.url };
   }
 
   async function thumbnailTagsFor(row: SelectedPart): Promise<NostrTag[]> {
@@ -519,7 +523,7 @@
   }
 
   onMount(() => {
-    let identitySubscription: { unsubscribe(): void } | null = null;
+    let identitySubscription: Subscription | null = null;
     if (hasIdentity()) {
       void identity
         .getPublicKey()
@@ -531,16 +535,16 @@
       status = 'This shell cannot tell us who is signed in, so parts cannot be published.';
     }
 
-    if (!hasInc()) return () => identitySubscription?.unsubscribe();
+    if (!hasInc()) return () => identitySubscription?.close();
 
     const openSubscription = inc.on(OPEN_TOPIC, applyIntent);
     const createSubscription = inc.on(CREATE_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC, [], '');
+    inc.emit(READY_TOPIC);
 
     return () => {
-      openSubscription.unsubscribe();
-      createSubscription.unsubscribe();
-      identitySubscription?.unsubscribe();
+      openSubscription.close();
+      createSubscription.close();
+      identitySubscription?.close();
     };
   });
 
@@ -588,7 +592,7 @@
                 type="button"
                 class="grid aspect-square place-items-center overflow-hidden rounded-box bg-base-200 text-left"
                 onclick={() => openThumbnailEditor(row)}
-                disabled={!isStlFile(row.file) || row.status === 'done' || row.duplicate || busy}
+                disabled={!isStlFile(row.file) || row.status === 'done' || !!row.duplicate || busy}
                 aria-label={`Edit thumbnail for ${row.name || row.file.name}`}
                 data-testid="edit-upload-thumbnail"
               >

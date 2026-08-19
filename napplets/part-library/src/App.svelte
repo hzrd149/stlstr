@@ -14,6 +14,7 @@
   import { fetchMakers, makerDisplayName, type MakerProfile } from '@stlstr/napplet-kit/profiles';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
+  import type { Subscription } from '@stlstr/napplet-kit/inc';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { buildSlicerBridgeUri, isSlicerOpenableFile } from '@stlstr/napplet-kit/slicers';
   import Download from '@lucide/svelte/icons/download';
@@ -28,13 +29,13 @@
    * The signed-in user's own part files.
    *
    * Every file is an independent NIP-94 `kind:1063` event (see NIP.md). Until now they were
-    * only ever created as a side effect of publishing a printable, which made them invisible
-    * to the person who owns them: unreachable except through whichever printable happens to
+   * only ever created as a side effect of publishing a printable, which made them invisible
+   * to the person who owns them: unreachable except through whichever printable happens to
    * reference them, and impossible to audit or reuse.
    *
    * The role a file plays — `part`, `instructions`, `aux` — lives on the referencing
-    * printable's `e` tag, not on the file event, because the same file can be a part in one
-    * printable and an auxiliary in another. So this page cannot group or filter by role. It
+   * printable's `e` tag, not on the file event, because the same file can be a part in one
+   * printable and an auxiliary in another. So this page cannot group or filter by role. It
    * shows files, and answers "what uses this" by querying the other direction.
    */
 
@@ -180,11 +181,11 @@
   }
 
   /**
-    * Resolves which printables reference these files, per NIP.md's "find printables using a
-    * specific file event" query.
+   * Resolves which printables reference these files, per NIP.md's "find printables using a
+   * specific file event" query.
    *
    * Deliberately **not** author-scoped. Files are meant to be shared — the NIP asks clients
-    * to let printables reference other people's file events — so a stranger's printable appearing
+   * to let printables reference other people's file events — so a stranger's printable appearing
    * here is correct, and is exactly what someone needs to know before removing a file.
    *
    * What it finds is bounded by the relays the shell reads. An empty result means "nothing
@@ -340,7 +341,7 @@
     // NAP-IDENTITY is the only source for who the user is, and it has two halves: the
     // answer at mount and the push that keeps it current. Without the subscription this
     // page would still show the previous account's files after a switch.
-    let identitySubscription: { unsubscribe(): void } | null = null;
+    let identitySubscription: Subscription | null = null;
     if (hasIdentity()) {
       void identity
         .getPublicKey()
@@ -361,15 +362,15 @@
       status = 'This shell cannot tell us who is signed in, so your parts cannot be listed.';
     }
 
-    if (!hasInc()) return () => identitySubscription?.unsubscribe();
+    if (!hasInc()) return () => identitySubscription?.close();
 
     // Subscribe BEFORE signalling readiness, or the shell flushes into a dead listener.
     const subscription = inc.on(OPEN_TOPIC, () => {});
-    inc.emit(READY_TOPIC, [], '');
+    inc.emit(READY_TOPIC);
 
     return () => {
-      subscription.unsubscribe();
-      identitySubscription?.unsubscribe();
+      subscription.close();
+      identitySubscription?.close();
     };
   });
 </script>
@@ -554,8 +555,8 @@
             <div class="mt-3 border-t border-base-300 pt-3" data-testid="part-usage">
               {#if uses.length === 0}
                 <p class="text-sm text-base-content/70">
-                  No printable on the relays we can reach references this file. That is not proof none
-                  does.
+                  No printable on the relays we can reach references this file. That is not proof
+                  none does.
                 </p>
               {:else}
                 <ul class="grid gap-1">

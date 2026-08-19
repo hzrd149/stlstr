@@ -9,6 +9,7 @@
     "./files": "./src/files.ts",
     "./tags": "./src/tags.ts",
     "./capabilities": "./src/capabilities.ts",
+    "./inc": "./src/inc.ts",
     "./images": "./src/images.ts",
     "./markdown": "./src/markdown.ts",
     "./stl": "./src/stl.ts",
@@ -24,7 +25,7 @@
     "./components/GalleryImage.svelte": "./src/components/GalleryImage.svelte"
   },
   "scripts": {
-    "type-check": "tsc --noEmit",
+    "type-check": "svelte-check --tsconfig ./tsconfig.json --threshold error",
     "build": "tsc --noEmit",
     "verify": "pnpm type-check"
   },
@@ -36,6 +37,7 @@
     "svelte": "^5.56.4"
   },
   "devDependencies": {
+    "svelte-check": "^4.7.6",
     "typescript": "^5.9.3"
   }
 }

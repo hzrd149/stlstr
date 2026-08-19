@@ -12,6 +12,7 @@
   } from '@napplet/sdk';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
+  import type { IncEvent, Subscription } from '@stlstr/napplet-kit/inc';
   import { onMount } from 'svelte';
 
   type UploadResult = Awaited<ReturnType<typeof upload.upload>>;
@@ -35,7 +36,7 @@
    * untrusted — it crossed a sandbox boundary, and anyone can type any URL — so the owner
    * is taken from the loaded event's author and compared against the signed-in user. The
    * gate has to be right before replacement publishing exists, because publishing a
-    * replacement is what would overwrite someone else's printable.
+   * replacement is what would overwrite someone else's printable.
    */
 
   const OPEN_TOPIC = 'printable-edit:edit';
@@ -123,7 +124,7 @@
   function parseImageTags(tags: string[][]): ImageDraft[] {
     return tags
       .filter((tag) => tag[0] === 'imeta')
-      .map((tag, index) => {
+      .map((tag, index): ImageDraft | null => {
         const fields = tag.slice(1);
         const url = imetaValue(fields, 'url');
         if (!url) return null;
@@ -361,7 +362,8 @@
     }
   }
 
-  function applyIntent(payload: unknown): void {
+  function applyIntent(event: IncEvent): void {
+    const payload = event.payload;
     const requested = (payload as { address?: unknown } | undefined)?.address;
     if (typeof requested !== 'string' || requested.length === 0) {
       status = 'The shell opened this page without a print to edit.';
@@ -535,7 +537,7 @@
   onMount(() => {
     // NAP-IDENTITY has two halves: the answer at mount, and the push that keeps it
     // current. Without the subscription, signing in would leave the gate shut.
-    let identitySubscription: { unsubscribe(): void } | null = null;
+    let identitySubscription: Subscription | null = null;
     if (hasIdentity()) {
       void identity
         .getPublicKey()
@@ -552,16 +554,16 @@
 
     if (!hasInc()) {
       status = 'This shell cannot deliver the print to edit.';
-      return () => identitySubscription?.unsubscribe();
+      return () => identitySubscription?.close();
     }
 
     // Subscribe BEFORE signalling readiness — the shell flushes on the ready signal.
     const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC, [], '');
+    inc.emit(READY_TOPIC);
 
     return () => {
-      subscription.unsubscribe();
-      identitySubscription?.unsubscribe();
+      subscription.close();
+      identitySubscription?.close();
       for (const image of images) revokePreview(image.previewUrl);
     };
   });
@@ -594,7 +596,9 @@
       <form class="grid gap-4" data-testid="edit-form" onsubmit={(event) => event.preventDefault()}>
         {#if draftLoaded}
           <div class="alert alert-info">
-            <span>A saved draft is loaded. Publishing will replace the current printable event.</span>
+            <span
+              >A saved draft is loaded. Publishing will replace the current printable event.</span
+            >
           </div>
         {/if}
 
@@ -783,7 +787,7 @@
           <div class="alert alert-success">
             <span>Published the replacement event.</span>
             {#if hasIntent() && !leaving}
-              <button type="button" class="btn btn-outline btn-sm" onclick={viewObject}>
+              <button type="button" class="btn btn-outline btn-sm" onclick={viewPrintable}>
                 Open print
               </button>
             {/if}

@@ -14,6 +14,7 @@
   import { eventThreadFilter } from '@stlstr/napplet-kit/comments';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
+  import type { IncEvent, Subscription } from '@stlstr/napplet-kit/inc';
   import {
     FILE_KIND,
     PRINTABLE_KIND,
@@ -353,7 +354,8 @@
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 
-  function applyIntent(payload: unknown): void {
+  function applyIntent(event: IncEvent): void {
+    const payload = event.payload;
     const id = (payload as { fileId?: unknown } | undefined)?.fileId;
     if (typeof id !== 'string' || id.length === 0) {
       status = 'The shell opened this page without a part to show.';
@@ -375,7 +377,7 @@
         });
     }
 
-    let identitySubscription: { unsubscribe(): void } | null = null;
+    let identitySubscription: Subscription | null = null;
     if (hasIdentity()) {
       void identity
         .getPublicKey()
@@ -392,15 +394,15 @@
 
     if (!hasInc()) {
       status = 'This shell cannot deliver the part to show.';
-      return () => identitySubscription?.unsubscribe();
+      return () => identitySubscription?.close();
     }
 
     const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC, [], '');
+    inc.emit(READY_TOPIC);
 
     return () => {
-      subscription.unsubscribe();
-      identitySubscription?.unsubscribe();
+      subscription.close();
+      identitySubscription?.close();
       stlViewer?.dispose();
       stlViewer = null;
     };

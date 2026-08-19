@@ -3,6 +3,7 @@
   import { looksLikeStl, parseStl } from '@stlstr/napplet-kit/stl';
   import { createViewer, type Viewer } from '@stlstr/napplet-kit/stl-viewer';
   import { hasDomain } from '@stlstr/napplet-kit/capabilities';
+  import type { IncEvent } from '@stlstr/napplet-kit/inc';
   import { buildSlicerBridgeUri, isSlicerOpenableFile } from '@stlstr/napplet-kit/slicers';
   import { onMount, tick } from 'svelte';
 
@@ -157,7 +158,8 @@
     }
   }
 
-  function applyIntent(payload: unknown): void {
+  function applyIntent(event: IncEvent): void {
+    const payload = event.payload;
     const meta = readPayload(payload);
     if (!meta) {
       phase = 'idle';
@@ -192,10 +194,10 @@
 
     // Subscribe BEFORE signalling readiness — the shell flushes on the ready signal.
     const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC, [], '');
+    inc.emit(READY_TOPIC);
 
     return () => {
-      subscription.unsubscribe();
+      subscription.close();
       viewer?.dispose();
       viewer = null;
     };

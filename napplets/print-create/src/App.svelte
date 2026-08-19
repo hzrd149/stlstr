@@ -24,6 +24,7 @@
   import { createViewer, type Viewer } from '@stlstr/napplet-kit/stl-viewer';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
+  import type { Subscription } from '@stlstr/napplet-kit/inc';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
@@ -746,7 +747,7 @@
     // NAP-IDENTITY is the only source for who the user is, and it has two halves: the
     // question answered at mount, and the push that keeps it current. Without the
     // subscription this napplet would still think you were signed out after you logged in.
-    let identitySubscription: { unsubscribe(): void } | null = null;
+    let identitySubscription: Subscription | null = null;
     if (hasIdentity()) {
       void identity
         .getPublicKey()
@@ -766,7 +767,7 @@
 
     void loadDraft();
 
-    return () => identitySubscription?.unsubscribe();
+    return () => identitySubscription?.close();
   });
 
   onDestroy(() => {

@@ -3,6 +3,7 @@
   import MakerLink from '@stlstr/napplet-kit/components/MakerLink.svelte';
   import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
+  import type { IncEvent } from '@stlstr/napplet-kit/inc';
   import { onMount } from 'svelte';
   import CoverImage from './lib/CoverImage.svelte';
   import {
@@ -49,7 +50,9 @@
   let loading = $state(true);
 
   const orderedObjects = $derived(
-    query && sortMode === 'relevance' ? [...printables.values()] : sortByNewest(printables.values()),
+    query && sortMode === 'relevance'
+      ? [...printables.values()]
+      : sortByNewest(printables.values()),
   );
   const feed = $derived(filterPrintables(orderedObjects, { query, topics }));
 
@@ -233,7 +236,8 @@
 
   // ---------------------------------------------------------------- lifecycle
 
-  function applyIntent(payload: unknown): void {
+  function applyIntent(event: IncEvent): void {
+    const payload = event.payload;
     const values = (payload ?? {}) as { query?: unknown; tag?: unknown; tags?: unknown };
     const parsed = parseSearchInput(typeof values.query === 'string' ? values.query : '');
     query = parsed.query;
@@ -255,10 +259,10 @@
 
     // Subscribe BEFORE signalling readiness, or the shell flushes into a dead listener.
     const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC, [], '');
+    inc.emit(READY_TOPIC);
 
     return () => {
-      subscription.unsubscribe();
+      subscription.close();
       window.clearTimeout(makerTimer);
       closeFeed?.();
     };

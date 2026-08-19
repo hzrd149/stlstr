@@ -8,7 +8,13 @@
   import { threadFilter } from '@stlstr/napplet-kit/comments';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import { formatBytes, isPreviewable, readFileMeta, type FileMeta } from '@stlstr/napplet-kit/files';
+  import type { IncEvent, Subscription } from '@stlstr/napplet-kit/inc';
+  import {
+    formatBytes,
+    isPreviewable,
+    readFileMeta,
+    type FileMeta,
+  } from '@stlstr/napplet-kit/files';
   import { parseImages, type PrintableImage } from '@stlstr/napplet-kit/images';
   import {
     buildSlicerBridgeUri,
@@ -255,7 +261,8 @@
     if (!result.ok) status = result.error ?? 'Could not open the editor.';
   }
 
-  function applyIntent(payload: unknown): void {
+  function applyIntent(event: IncEvent): void {
+    const payload = event.payload;
     const address = (payload as { address?: unknown } | undefined)?.address;
     if (typeof address !== 'string' || address.length === 0) {
       status = 'The shell opened this page without a print to show.';
@@ -281,7 +288,7 @@
 
     // Read who is signed in now, then keep it current: signing in or out has to
     // re-evaluate the owner gate without a reload.
-    let identitySubscription: { unsubscribe(): void } | null = null;
+    let identitySubscription: Subscription | null = null;
     if (hasIdentity()) {
       void identity
         .getPublicKey()
@@ -298,16 +305,16 @@
 
     if (!hasInc()) {
       status = 'This shell cannot deliver the print to show.';
-      return () => identitySubscription?.unsubscribe();
+      return () => identitySubscription?.close();
     }
 
     // Subscribe BEFORE signalling readiness — the shell flushes on the ready signal.
     const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC, [], '');
+    inc.emit(READY_TOPIC);
 
     return () => {
-      subscription.unsubscribe();
-      identitySubscription?.unsubscribe();
+      subscription.close();
+      identitySubscription?.close();
     };
   });
 </script>
@@ -412,7 +419,9 @@
                   >
                     {part.meta.name}
                   </button>
-                  <span class="text-xs text-base-content/60">{formatBytes(part.meta.sizeBytes)}</span>
+                  <span class="text-xs text-base-content/60"
+                    >{formatBytes(part.meta.sizeBytes)}</span
+                  >
                 </span>
               </span>
               <div class="flex shrink-0 flex-wrap justify-end gap-2">

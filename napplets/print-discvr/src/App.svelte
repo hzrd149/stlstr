@@ -2,6 +2,7 @@
   import { identity, inc, intent, outbox, type NostrEvent } from '@napplet/sdk';
   import MakerLink from '@stlstr/napplet-kit/components/MakerLink.svelte';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
+  import type { Subscription } from '@stlstr/napplet-kit/inc';
   import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { onMount } from 'svelte';
@@ -209,7 +210,7 @@
 
     friendsLoading = true;
     try {
-      const follows = (await identity.getFollows(pubkey)).slice(0, 80);
+      const follows = (await identity.getFollows()).slice(0, 80);
       if (follows.length === 0) {
         friendsStatus = 'Follow makers on Nostr to personalize this section.';
         return;
@@ -278,7 +279,7 @@
     closeDiscovery = openDiscovery();
     closeMakes = openMakes();
 
-    let identitySubscription: { unsubscribe(): void } | null = null;
+    let identitySubscription: Subscription | null = null;
     if (hasIdentity()) {
       void identity
         .getPublicKey()
@@ -291,7 +292,7 @@
 
     if (!hasInc()) {
       return () => {
-        identitySubscription?.unsubscribe();
+        identitySubscription?.close();
         closeDiscovery?.();
         closeMakes?.();
         window.clearTimeout(makerTimer);
@@ -299,11 +300,11 @@
     }
 
     const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC, [], '');
+    inc.emit(READY_TOPIC);
 
     return () => {
-      subscription.unsubscribe();
-      identitySubscription?.unsubscribe();
+      subscription.close();
+      identitySubscription?.close();
       closeDiscovery?.();
       closeMakes?.();
       window.clearTimeout(makerTimer);
