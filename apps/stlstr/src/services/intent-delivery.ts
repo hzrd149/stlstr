@@ -3,22 +3,19 @@ import { intentTopic, readyTopic, type StlstrIntent } from './intent-map';
 /**
  * intent-delivery.ts — hands an intent payload to the napplet that renders the route.
  *
- * NAP-INTENT has no inbound message: `IntentInboundMessage` is only the three `.result`
- * types plus `intent.changed`, so the handling napplet never learns its intent through the
- * intent domain. Delivery is out of band, and the channel is a targeted `inc.event` posted
- * straight at the napplet's iframe — the same seam hyprgate-gui uses.
+ * Existing napplets receive their route through a targeted INC convention. The shared host
+ * sends it on the frame's bound Kehto MessagePort and observes readiness on that port.
+ * Keep the application-ready handshake: shell initialization alone does not mean the
+ * napplet has subscribed. A later guest migration can adopt native intent.deliver.
  *
  * Two constraints make this work, both learned the hard way upstream:
  *
- * - **Targeted, never broadcast.** The runtime's inc fan-out reaches every subscriber on a
- *   topic. Posting directly to one `contentWindow` keeps one route's payload out of the next
- *   route's napplet.
+ * - **Targeted, never broadcast.** The host sends to one registered frame's port.
  * - **Readiness handshake.** A freshly mounted napplet has not subscribed yet when the shell
  *   is ready to deliver, so the payload is buffered and flushed when the napplet emits its
  *   ready topic. Delivering eagerly loses the payload to the cold start.
  *
- * stlstr mounts exactly one napplet per route, so unlike hyprgate this needs no cross-window
- * buffer map — one pending payload per frame.
+ * Each frame owns its pending payload, including the independently mounted preview.
  */
 
 export type IntentDelivery = {
@@ -35,6 +32,8 @@ export type IntentDelivery = {
    * normal inc subscribers see it.
    */
   observeReady(event: MessageEvent): boolean;
+  /** Observes an envelope already authenticated by the shared Kehto host. */
+  observeMessage(message: unknown): boolean;
   /** Drops buffered state when the frame unmounts. */
   dispose(): void;
 };
@@ -42,6 +41,8 @@ export type IntentDelivery = {
 export type IntentDeliveryOptions = {
   /** Resolves the target iframe's window, or null before it exists. */
   getTarget: () => Window | null;
+  /** Kehto's source-bound MessagePort transport. */
+  send?: (message: unknown) => void;
 };
 
 type IncEmitMessage = { type?: unknown; topic?: unknown };
@@ -55,7 +56,7 @@ function toCloneablePayload(payload: Record<string, unknown>): Record<string, st
   return plain;
 }
 
-export function createIntentDelivery({ getTarget }: IntentDeliveryOptions): IntentDelivery {
+export function createIntentDelivery({ getTarget, send }: IntentDeliveryOptions): IntentDelivery {
   let pending: StlstrIntent | null = null;
   let ready = false;
   let delivered = false;
@@ -74,15 +75,13 @@ export function createIntentDelivery({ getTarget }: IntentDeliveryOptions): Inte
     // The iframe is not registered yet; the next readiness signal retries.
     if (!target) return;
 
-    target.postMessage(
-      {
-        type: 'inc.event',
-        topic: intentTopic(pending.archetype, pending.action),
-        payload: toCloneablePayload(pending.payload),
-        sender: 'shell',
-      },
-      '*',
-    );
+    const post = send ?? ((message: unknown) => target.postMessage(message, '*'));
+    post({
+      type: 'inc.event',
+      topic: intentTopic(pending.archetype, pending.action),
+      payload: toCloneablePayload(pending.payload),
+      sender: 'shell',
+    });
 
     delivered = true;
     pending = null;
@@ -101,22 +100,26 @@ export function createIntentDelivery({ getTarget }: IntentDeliveryOptions): Inte
     flush();
   }
 
+  function observeMessage(message: unknown) {
+    const data = message as IncEmitMessage | null;
+    if (!data || typeof data !== 'object' || data.type !== 'inc.emit') return false;
+    if (!archetype || data.topic !== readyTopic(archetype)) return false;
+    ready = true;
+    flush();
+    return true;
+  }
+
   return {
     seed: arm,
 
     redeliver: arm,
+    observeMessage,
 
     observeReady(event) {
       const target = getTarget();
       if (!target || event.source !== target) return false;
 
-      const data = event.data as IncEmitMessage | null;
-      if (!data || typeof data !== 'object' || data.type !== 'inc.emit') return false;
-      if (!archetype || data.topic !== readyTopic(archetype)) return false;
-
-      ready = true;
-      flush();
-      return true;
+      return observeMessage(event.data);
     },
 
     dispose() {

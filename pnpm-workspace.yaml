@@ -19,6 +19,7 @@ minimumReleaseAgeExclude:
   - applesauce-react@7.1.0
   - applesauce-signers@7.1.0
   - applesauce-relay@7.1.0
+  - applesauce-extra@7.1.0
 
 # This is a development workspace: we deliberately do NOT pin or override any
 # versions so napplets are always tested against the real, latest resolved

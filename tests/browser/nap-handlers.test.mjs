@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import puppeteer from 'puppeteer';
+import { readFile } from 'node:fs/promises';
+import { finalizeEvent, generateSecretKey } from 'nostr-tools';
 
 /**
  * End-to-end coverage for the shell's NAP service handlers. These drive the real wire
@@ -25,8 +27,36 @@ after(async () => {
 });
 
 /** Opens the search route, which is granted both the resource and intent domains. */
-async function openBrowseNapplet(path = '/search') {
+async function openBrowseNapplet(path = '/search', extraDomains = []) {
   const page = await browser.newPage();
+  if (extraDomains.length) {
+    const manifest = JSON.parse(
+      await readFile(
+        new URL('../../napplets/print-search/dist/.nip5a-manifest.json', import.meta.url),
+        'utf8',
+      ),
+    );
+    const capabilityTag = manifest.tags.some((tag) => tag[0] === 'x' && tag[2] === 'aggregate')
+      ? 'requires'
+      : 'R';
+    const signed = finalizeEvent(
+      {
+        ...manifest,
+        tags: [...manifest.tags, ...extraDomains.map((domain) => [capabilityTag, domain])],
+      },
+      generateSecretKey(),
+    );
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (request.url().endsWith('/print-search/.nip5a-manifest.json')) {
+        void request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(signed),
+        });
+      } else void request.continue();
+    });
+  }
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle0' });
 
@@ -63,6 +93,57 @@ test('NAP-RESOURCE reports the shell fetch policy', async () => {
     assert.equal(schemes.blossom, true);
     assert.equal(info.maxBytes, 10 * 1024 * 1024);
     assert.equal(info.maxUrls, 100);
+  } finally {
+    await page.close();
+  }
+});
+
+test('Applesauce common answers anonymous follows through the frame port', async () => {
+  const { page, frame } = await openBrowseNapplet();
+  try {
+    const result = await frame.evaluate(() => window.napplet.common.follows());
+    assert.equal(result.ok, false);
+    assert.ok(result.error, 'anonymous social actions return a concrete failure');
+  } finally {
+    await page.close();
+  }
+});
+
+test('Applesauce lists is available only when declared by the manifest', async () => {
+  const ordinary = await openBrowseNapplet();
+  try {
+    assert.equal(await ordinary.frame.evaluate(() => typeof window.napplet.lists), 'undefined');
+  } finally {
+    await ordinary.page.close();
+  }
+  const { page, frame } = await openBrowseNapplet('/search', ['lists']);
+  try {
+    const { lists: supported } = await frame.evaluate(() => window.napplet.lists.supported());
+    assert.ok(supported.length > 0, JSON.stringify(supported));
+    assert.ok(supported.some((list) => list.type === 'bookmarks'));
+  } finally {
+    await page.close();
+  }
+});
+
+test('the host refuses artifact bytes that do not match the signed manifest', async () => {
+  const page = await browser.newPage();
+  try {
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (request.url().endsWith('/print-search/index.html')) {
+        void request.respond({
+          status: 200,
+          contentType: 'text/html',
+          body: '<p>Tampered artifact</p>',
+        });
+      } else void request.continue();
+    });
+    await page.goto(`${baseUrl}/search`, { waitUntil: 'networkidle0' });
+    await page.waitForFunction(() =>
+      document.querySelector('[role="alert"]')?.textContent?.includes('Could not load'),
+    );
+    assert.equal(await page.$('iframe[title="Search prints napplet"]'), null);
   } finally {
     await page.close();
   }
@@ -133,7 +214,7 @@ test('NAP-INTENT advertises the archetypes the shell can route', async () => {
     assert.equal(detail.available, true);
     assert.equal(detail.hasDefault, true);
     assert.deepEqual(
-      detail.candidates.map((candidate) => candidate.dTag),
+      detail.candidates.map((candidate) => candidate.id),
       ['print-detail'],
     );
 
@@ -172,7 +253,6 @@ test('NAP-INTENT open navigates the shell to the print route', async () => {
     );
 
     assert.equal(result.ok, true);
-    assert.equal(result.handled, true);
     assert.equal(result.handler, 'print-detail');
 
     await page.waitForFunction(

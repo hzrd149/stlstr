@@ -1,4 +1,11 @@
 import type { Filter } from 'applesauce-core/helpers/filter';
+import {
+  getNappletCatalogId,
+  resolveNapplet,
+  openNappletArtifactCache,
+  parseNappletManifest,
+  verifyBlobHash,
+} from '@kehto/nip/5d';
 import { mergeRelaySets } from 'applesauce-core/helpers/relays';
 import type { NostrEvent } from 'nostr-tools';
 import { nip19 } from 'nostr-tools';
@@ -107,6 +114,7 @@ type NappletRegistry = {
 };
 
 export type ResolvedNapplet = {
+  manifest?: NostrEvent;
   archetype: string;
   dTag: string;
   title: string;
@@ -125,6 +133,7 @@ export type ResolvedNapplet = {
 };
 
 export type LoadedNapplet = ResolvedNapplet & {
+  catalogId: string;
   html: string;
   domains: string[];
 };
@@ -136,14 +145,20 @@ function tagValue(event: NostrEvent, name: string): string | undefined {
 }
 
 function requiredDomains(event: NostrEvent): string[] {
-  return event.tags.filter((tag) => tag[0] === 'requires' && tag[1]).map((tag) => tag[1].trim());
+  const manifest = parseNappletManifest(event);
+  return [...manifest.requires, ...(manifest.optional ?? [])];
 }
 
 function hasCompatibleArchetype(event: NostrEvent, archetype: string): boolean {
   const conventions = conventionsFor(archetype);
-  return event.tags.some(
-    (tag) =>
-      tag[0] === 'archetype' && tag[1] === archetype && conventions.some((id) => tag.includes(id)),
+  return (
+    event.tags.some((tag) => tag[0] === 'z' && tag[1] === archetype) ||
+    event.tags.some(
+      (tag) =>
+        tag[0] === 'archetype' &&
+        tag[1] === archetype &&
+        conventions.some((id) => tag.includes(id)),
+    )
   );
 }
 
@@ -151,9 +166,9 @@ function artifactUrlFrom(event: NostrEvent): string | undefined {
   const direct = tagValue(event, 'url') || tagValue(event, 'artifact') || tagValue(event, 'html');
   if (direct) return allowedArtifactUrl(direct);
 
-  const indexHash = event.tags.find(
-    (tag) => tag[0] === 'path' && tag[1] === '/index.html' && tag[2],
-  )?.[2];
+  const indexHash =
+    event.tags.find((tag) => tag[0] === 'x' && tag.length === 2)?.[1] ??
+    event.tags.find((tag) => tag[0] === 'path' && tag[1] === '/index.html' && tag[2])?.[2];
   if (!indexHash) return undefined;
 
   for (const server of event.tags
@@ -199,6 +214,7 @@ function resolvedFromManifest(
     throw new Error('That napplet manifest does not include a loadable artifact URL.');
 
   return {
+    manifest,
     archetype,
     dTag,
     title: tagValue(manifest, 'title') ?? dTag,
@@ -226,66 +242,6 @@ async function resolveRegistryNappletUrl(name: string, fallbackUrl: string): Pro
   } catch {
     return fallbackUrl;
   }
-}
-
-/**
- * The NAP domains to inject for a napplet, in order of trust.
- *
- * The signed NIP-5A manifest is the real declaration, so an override resolved from a manifest
- * event already carries it. Built-in napplets are loaded straight from an artifact URL with no
- * event behind them, so their manifest is read from the `.nip5a-manifest.json` sidecar the vite
- * plugin writes next to `index.html` — served in dev by the napplet-dist middleware and copied
- * into the app's own dist for production.
- *
- * The `<meta name="napplet-requires">` fallback is for artifacts built with
- * `@napplet/vite-plugin` before 0.14, which advertised the list in the HTML instead. It is an
- * unsigned declaration by an artifact about itself, so it is consulted last.
- *
- * A napplet whose domains cannot be resolved is still mounted, with whatever this returns —
- * feature detection is the napplet's job, and refusing to mount would turn a missing manifest
- * into a blank screen.
- */
-async function resolveNappletDomains(
-  napplet: ResolvedNapplet,
-  artifactUrl: string,
-  html: string,
-): Promise<string[]> {
-  if (napplet.requires?.length) return napplet.requires;
-
-  const fromSidecar = await fetchSidecarDomains(artifactUrl);
-  if (fromSidecar.length) return fromSidecar;
-
-  return readMetaDomains(html);
-}
-
-async function fetchSidecarDomains(artifactUrl: string): Promise<string[]> {
-  try {
-    const url = new URL('.nip5a-manifest.json', artifactUrl);
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) return [];
-
-    const manifest = (await response.json()) as Partial<NostrEvent>;
-    if (!Array.isArray(manifest.tags)) return [];
-
-    return requiredDomains(manifest as NostrEvent);
-  } catch {
-    // No sidecar, unreadable, or not JSON — fall through to the legacy meta tag.
-    return [];
-  }
-}
-
-function readMetaDomains(html: string): string[] {
-  const content = new DOMParser()
-    .parseFromString(html, 'text/html')
-    .querySelector('meta[name="napplet-requires"]')
-    ?.getAttribute('content');
-
-  if (!content) return [];
-
-  return content
-    .split(',')
-    .map((domain) => domain.trim())
-    .filter(Boolean);
 }
 
 async function fetchManifest(
@@ -434,22 +390,58 @@ export async function loadNappletArtifact(napplet: ResolvedNapplet): Promise<Loa
 }
 
 async function fetchNappletArtifact(napplet: ResolvedNapplet, url: string): Promise<LoadedNapplet> {
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(
-      napplet.source === 'default'
-        ? STLSTR_DEV_MODE
-          ? `Build ${napplet.dTag} first: ${response.status} ${response.statusText}`
-          : `Built-in napplet ${napplet.dTag} is missing from this deployment: ${response.status} ${response.statusText}`
-        : `Could not load ${napplet.title}: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  const html = await response.text();
+  const artifactUrl = new URL(url, window.location.href).href;
+  const manifest =
+    napplet.manifest ??
+    (napplet.source === 'default'
+      ? await fetch(new URL('.nip5a-manifest.json', artifactUrl), { cache: 'no-store' }).then(
+          async (response) => {
+            if (!response.ok) throw new Error(`Build ${napplet.dTag} first: manifest unavailable.`);
+            return response.json() as Promise<NostrEvent>;
+          },
+        )
+      : napplet.pubkey && napplet.identifier
+        ? await fetchManifest(
+            napplet.pubkey,
+            napplet.identifier,
+            napplet.relays ?? (await getDiscoveryRelays()),
+          )
+        : null);
+  if (!manifest) throw new Error(`Could not resolve ${napplet.title}'s manifest.`);
+  const resolved = await resolveNapplet({
+    event: manifest,
+    cache: STLSTR_DEV_MODE ? undefined : await openNappletArtifactCache(),
+    fetchBlob: async (hash, servers) => {
+      const path = manifest.tags.find((tag) => tag[0] === 'path' && tag[2] === hash)?.[1];
+      const locations =
+        napplet.source === 'default'
+          ? [
+              path && path !== '/index.html'
+                ? new URL(path.replace(/^\//, ''), artifactUrl).href
+                : artifactUrl,
+            ]
+          : [...servers.map((server) => `${server.replace(/\/$/, '')}/${hash}`), artifactUrl];
+      for (const location of locations) {
+        try {
+          const response = await fetch(location, { cache: 'no-store' });
+          if (response.ok) {
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            if (verifyBlobHash(bytes, hash)) return bytes;
+          }
+        } catch {
+          /* Try the next declared location. */
+        }
+      }
+      throw new Error(`Could not load ${napplet.title}'s artifact.`);
+    },
+  });
   return {
     ...napplet,
-    artifactUrl: url,
-    html,
-    domains: await resolveNappletDomains(napplet, url, html),
+    manifest,
+    catalogId: getNappletCatalogId(manifest),
+    aggregateHash: resolved.aggregateHash,
+    artifactUrl,
+    html: resolved.indexHtml,
+    domains: [...resolved.manifest.requires, ...(resolved.manifest.optional ?? [])],
   };
 }

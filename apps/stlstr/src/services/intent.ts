@@ -54,10 +54,11 @@ function candidateFor(archetype: string): IntentCandidate {
   const entry = ARCHETYPES[archetype];
   const napplet = resolveConfiguredNapplet(archetype);
   return {
-    dTag: napplet?.dTag ?? entry.dTag,
+    id: napplet?.dTag ?? entry.dTag,
     title: napplet?.title ?? entry.title,
     actions: actionsFor(archetype),
     conventions: napplet?.conventions.length ? napplet.conventions : conventionsFor(archetype),
+    contracts: [],
     isDefault: true,
   };
 }
@@ -90,8 +91,8 @@ function hrefFor(intent: StlstrIntent): string | null {
   return previewHref(`${window.location.pathname}${window.location.search}`, intent.payload);
 }
 
-function failed(archetype: string, action: string, error: string): IntentResult {
-  return { ok: false, archetype, action, handled: false, error };
+function failed(_archetype: string, _action: string, error: string): IntentResult {
+  return { ok: false, error };
 }
 
 export type IntentServiceOptions = {
@@ -100,11 +101,16 @@ export type IntentServiceOptions = {
    * from the URL, so an in-app invocation and a pasted deep link cannot diverge.
    */
   navigate: (href: string) => void;
+  resolveSender: (windowId: string) => string | undefined;
 };
 
 /** Creates the shell's NAP-INTENT handler. */
-export function createStlstrIntentService({ navigate }: IntentServiceOptions): ServiceHandler {
+export function createStlstrIntentService({
+  navigate,
+  resolveSender,
+}: IntentServiceOptions): ServiceHandler {
   return createIntentService({
+    resolveSender,
     resolver: {
       available: (archetype) => availabilityFor(archetype),
 
@@ -167,9 +173,7 @@ export function createStlstrIntentService({ navigate }: IntentServiceOptions): S
           ok: true,
           archetype,
           action,
-          handled: true,
           handler: handlerDTag,
-          windowId: `route-${entry.routeId}-${handlerDTag}`,
           convention: request.convention ?? conventions[0],
         };
       },

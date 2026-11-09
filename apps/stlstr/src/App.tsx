@@ -8,18 +8,11 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import {
-  createShellBridge,
-  injectNappletNamespacePrelude,
-  originRegistry,
-  type ShellAdapter,
-  type ShellBridge,
-} from '@kehto/shell';
+import { acquireNappletHost } from './services/napplet-host';
 import { NostrConnectAccount } from 'applesauce-accounts/accounts';
 import { getDisplayName, getProfilePicture } from 'applesauce-core/helpers';
 import { use$ } from 'applesauce-react/hooks';
 import { NostrConnectSigner } from 'applesauce-signers/signers';
-import { verifyEvent } from 'nostr-tools';
 import { toDataURL } from 'qrcode';
 import {
   ArrowLeft,
@@ -52,12 +45,7 @@ import {
   loginWithExtension,
   type StlstrAccount,
 } from './services/accounts';
-import { createCountService } from './services/count';
-import { createStlstrIdentityService } from './services/identity';
 import { createIntentDelivery, type IntentDelivery } from './services/intent-delivery';
-import { createStlstrIntentService } from './services/intent';
-import { createStlstrLinkService } from './services/links';
-import { sealNappletFrame } from './services/sandbox';
 import {
   baseHref,
   hasPreview,
@@ -65,21 +53,9 @@ import {
   overlayFromLocation,
   type StlstrIntent,
 } from './services/intent-map';
-import { STLSTR_DEV_MODE, getUser, relayPool } from './services/nostr';
-import {
-  loadNappletArtifact,
-  resolveConfiguredNapplet,
-  type ResolvedNapplet,
-} from './services/napplets';
-import { createOutboxService } from './services/outbox';
-import { createStlstrResourceService } from './services/resource';
-import {
-  getAppRelays,
-  getLookupRelays,
-  getSettings,
-  subscribeToSettings,
-} from './services/settings';
-import { createUploadService } from './services/upload';
+import { getUser } from './services/nostr';
+import { resolveConfiguredNapplet, type ResolvedNapplet } from './services/napplets';
+import { getSettings, subscribeToSettings } from './services/settings';
 import SettingsView from './SettingsView';
 import NappletsView from './NappletsView';
 
@@ -87,110 +63,6 @@ declare global {
   interface Window {
     nostr?: unknown;
   }
-}
-
-type AdapterOptions = {
-  /** Pushes a shell route. NAP-INTENT resolves archetypes by navigating the shell. */
-  navigate: (href: string) => void;
-  /** Resolves a napplet window to its NIP-5D identity for NAP-RESOURCE grant checks. */
-  resolveIdentity: (windowId: string) => { dTag: string; aggregateHash: string } | null;
-};
-
-function createStlstrAdapter({ navigate, resolveIdentity }: AdapterOptions): ShellAdapter {
-  const subscriptions = new Map<string, () => void>();
-
-  const getActiveUser = () => {
-    const pubkey = accountManager.active?.pubkey;
-    return pubkey ? getUser(pubkey) : null;
-  };
-  const routeRelayUrls = (relayUrls: string[]) => (STLSTR_DEV_MODE ? getAppRelays() : relayUrls);
-
-  return {
-    relayPool: {
-      getRelayPool: () => ({
-        subscription: (relayUrls, filters) =>
-          relayPool.subscription(routeRelayUrls(relayUrls), filters),
-        publish: (relayUrls, event) => {
-          void relayPool.publish(routeRelayUrls(relayUrls), event);
-        },
-        request: (relayUrls, filters) => relayPool.request(routeRelayUrls(relayUrls), filters),
-      }),
-      trackSubscription: (key, cleanup) => subscriptions.set(key, cleanup),
-      untrackSubscription: (key) => {
-        subscriptions.get(key)?.();
-        subscriptions.delete(key);
-      },
-      openScopedRelay: () => {},
-      closeScopedRelay: () => {},
-      publishToScopedRelay: () => false,
-      selectRelayTier: () => getAppRelays(),
-    },
-    relayConfig: {
-      // Relay lists are owned by the settings view; napplets only read them.
-      addRelay: () => {},
-      removeRelay: () => {},
-      getRelayConfig: () => ({
-        discovery: getLookupRelays(),
-        super: getAppRelays(),
-        outbox: getAppRelays(),
-      }),
-      getNip66Suggestions: () => [],
-    },
-    windowManager: {
-      createWindow: () => null,
-    },
-    auth: {
-      getUserPubkey: () => accountManager.active?.pubkey ?? null,
-      getSigner: () => accountManager.active?.signer ?? null,
-    },
-    config: {
-      getNappUpdateBehavior: () => getSettings().nappletUpdateBehavior,
-    },
-    hotkeys: {
-      executeHotkeyFromForward: () => {},
-    },
-    // `@kehto/shell` gates every service-only domain on a matching `isAvailable()` hook: a
-    // registered handler under `services` is not enough, and a domain that fails the gate is
-    // dropped from the live set, so its messages are silently never answered. Both resolvers
-    // below are wired unconditionally further down, so both are always available.
-    intent: {
-      isAvailable: () => true,
-    },
-    link: {
-      isAvailable: () => true,
-    },
-    workerRelay: {
-      getWorkerRelay: () => null,
-    },
-    crypto: {
-      verifyEvent: async (event) => verifyEvent(event),
-    },
-    upload: {
-      getUploader: () => ({ rails: ['blossom'] }),
-    },
-    services: {
-      outbox: createOutboxService({
-        getActiveUser,
-        getSigner: () => accountManager.active?.signer ?? null,
-      }),
-      upload: createUploadService({
-        getActiveUser,
-        getSigner: () => accountManager.active?.signer ?? null,
-      }),
-      resource: createStlstrResourceService({ resolveIdentity, getActiveUser }),
-      intent: createStlstrIntentService({ navigate }),
-      // NAP-IDENTITY is read-only: napplets learn who the user is, never act as them.
-      // This is what lets a napplet gate an owner-only action such as "Edit".
-      identity: createStlstrIdentityService({
-        getSigner: () => accountManager.active?.signer ?? null,
-      }),
-      link: createStlstrLinkService(),
-      count: createCountService(),
-    },
-    onUnroutedMessage: (info) => {
-      console.warn('[stlstr] dropped napplet message', info);
-    },
-  };
 }
 
 /** Collapses the mobile drawer. Navigating with it still open would hide the new page. */
@@ -696,8 +568,8 @@ function NappletFrame({
   frameKey?: string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const bridgeRef = useRef<ShellBridge | null>(null);
   const [status, setStatus] = useState('Loading napplet...');
+  const [failure, setFailure] = useState<string | null>(null);
   const { pathname } = useLocation();
   const navigate = useShellNavigate();
   const identity = frameKey ?? pathname;
@@ -733,78 +605,19 @@ function NappletFrame({
   }, [navigate]);
 
   useEffect(() => {
-    let cancelled = false;
-    // The adapter needs the bridge's session registry, and the bridge needs the adapter,
-    // so identity is resolved lazily through this binding rather than at construction.
-    let bridge: ShellBridge | null = null;
-    const adapter = createStlstrAdapter({
-      navigate: (href) => navigateRef.current(href),
-      resolveIdentity: (windowId) => {
-        const entry = bridge?.runtime.sessionRegistry
-          .getAllEntries()
-          .find((session) => session.windowId === windowId);
-        return entry ? { dTag: entry.dTag, aggregateHash: entry.aggregateHash } : null;
-      },
-    });
-
-    const shell = createShellBridge(adapter);
-    bridge = shell;
-    bridgeRef.current = shell;
+    const controller = new AbortController();
+    const { host, release } = acquireNappletHost((href) => navigateRef.current(href));
     const mountedNapplet = nappletRef.current;
-    const windowId = `route-${routeId}-${mountedNapplet.dTag}`;
 
     const delivery = createIntentDelivery({
       getTarget: () => iframeRef.current?.contentWindow ?? null,
+      send: (message) => host.send(iframeRef.current, message),
     });
     deliveryRef.current = delivery;
-
-    // Observing the readiness signal is NON-consuming: the message still reaches the
-    // bridge so ordinary inc subscribers see it.
-    //
-    // The source check is load-bearing once more than one frame is mounted — the preview
-    // dialog puts a second napplet on this same `window`. Every frame installs its own
-    // listener and its own bridge, while `originRegistry` is a module-level singleton, so
-    // without this guard frame A's messages reach frame B's bridge, resolve to a windowId
-    // absent from B's session registry, and are either dropped as unrouted or serviced twice.
-    const handleMessage = (event: MessageEvent) => {
-      if (event.source !== iframeRef.current?.contentWindow) return;
-      delivery.observeReady(event);
-      shell.handleMessage(event);
-    };
-    window.addEventListener('message', handleMessage);
 
     async function loadNapplet() {
       const iframe = iframeRef.current;
       if (!iframe?.contentWindow) return;
-
-      const loaded = await loadNappletArtifact(mountedNapplet);
-      if (cancelled) return;
-
-      // Mount regardless: a napplet that gets fewer domains than it wanted is expected to
-      // feature-detect and degrade, and refusing to mount would turn an unreadable manifest
-      // into a blank frame. The warning is for the developer, not a gate.
-      const domains = loaded.domains;
-      if (domains.length === 0) {
-        console.warn(
-          `[stlstr] ${mountedNapplet.dTag} declares no NAP domains, so it is mounted with none; check its manifest \`requires\` and that it was built with VITE_DEV_PRIVKEY_HEX set.`,
-        );
-      }
-
-      originRegistry.register(iframe.contentWindow, windowId, {
-        dTag: loaded.dTag,
-        aggregateHash: loaded.aggregateHash,
-      });
-      shell.runtime.sessionRegistry.register(windowId, {
-        pubkey: '',
-        windowId,
-        origin: window.location.origin,
-        type: loaded.dTag,
-        dTag: loaded.dTag,
-        aggregateHash: loaded.aggregateHash,
-        registeredAt: Date.now(),
-        instanceId: windowId,
-        provenance: 'nip-5d',
-      });
 
       // Buffer the payload BEFORE the napplet can boot and signal readiness. Read through
       // the ref, so a payload that changed while this async load was in flight is the one
@@ -815,43 +628,25 @@ function NappletFrame({
         deliveredKeyRef.current = JSON.stringify(seeded);
       }
 
-      // Sealed last so the guard sits ahead of the NAP prelude and the napplet's own code.
-      iframe.srcdoc = sealNappletFrame(injectNappletNamespacePrelude(loaded.html, { domains }));
-      setStatus(`Loaded ${loaded.title}`);
+      await host.mount(mountedNapplet, iframe, delivery, controller.signal, setFailure);
+      if (!controller.signal.aborted) setStatus(`Loaded ${mountedNapplet.title}`);
     }
 
     loadNapplet().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : `Failed to load ${mountedNapplet.title}.`);
+      if (controller.signal.aborted) return;
+      setFailure(
+        error instanceof Error ? error.message : `Failed to load ${mountedNapplet.title}.`,
+      );
     });
 
     return () => {
-      cancelled = true;
-      window.removeEventListener('message', handleMessage);
-      originRegistry.unregister(windowId);
-      shell.runtime.sessionRegistry.unregister(windowId);
-      shell.destroy();
+      controller.abort();
       delivery.dispose();
+      release();
       deliveryRef.current = null;
       deliveredKeyRef.current = '';
-      bridge = null;
-      bridgeRef.current = null;
     };
   }, [nappletMountKey, routeId, identity]);
-
-  // NAP-IDENTITY is request/response, so a napplet that asked "who is signed in?" at mount
-  // would hold a stale answer forever. Pushing on every account change is what lets an
-  // owner-gated action (printable-detail's "Edit this print") appear the moment the owner
-  // signs in, instead of after a reload.
-  //
-  // `publishIdentityChanged`, NOT `injectEvent`: the former posts the `identity.changed`
-  // envelope the SDK's `identity.onChanged` listens for, while the latter would deliver an
-  // inc.event on a topic nothing is subscribed to.
-  useEffect(() => {
-    const subscription = accountManager.active$.subscribe((account) => {
-      bridgeRef.current?.publishIdentityChanged(account?.pubkey ?? '');
-    });
-    return () => subscription.unsubscribe();
-  }, []);
 
   // A payload change on a frame that is already up. `deliveredKeyRef` is the interlock
   // against the mount seed: whichever of the two runs first records the key, and the other
@@ -870,13 +665,20 @@ function NappletFrame({
 
   return (
     <section className="flex h-full flex-col bg-base-100">
-      <iframe
-        key={identity}
-        ref={iframeRef}
-        title={`${title} napplet`}
-        sandbox="allow-scripts"
-        className="h-full w-full flex-1 border-0 bg-base-100"
-      />
+      {failure && (
+        <p role="alert" className="p-4 text-error">
+          {failure}
+        </p>
+      )}
+      {!failure && (
+        <iframe
+          key={identity}
+          ref={iframeRef}
+          title={`${title} napplet`}
+          sandbox="allow-scripts"
+          className="h-full w-full flex-1 border-0 bg-base-100"
+        />
+      )}
       <span className="sr-only" aria-live="polite">
         {status}
       </span>
@@ -898,6 +700,7 @@ function NappletRouteFrame({
   frameKey?: string;
 }) {
   useSyncExternalStore(subscribeToSettings, getSettings, getSettings);
+  const { pathname } = useLocation();
   const napplet = resolveConfiguredNapplet(archetype);
 
   if (!napplet) {
@@ -912,6 +715,7 @@ function NappletRouteFrame({
 
   return (
     <NappletFrame
+      key={`${frameKey ?? pathname}:${napplet.source}:${napplet.aggregateHash}:${napplet.artifactUrl}`}
       napplet={napplet}
       routeId={routeId}
       title={title}

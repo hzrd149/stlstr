@@ -28,7 +28,9 @@ async function openStlstr(path = '/', viewport = { width: 1280, height: 900 }) {
 }
 
 async function nappletFrame(page, title) {
-  const iframeHandle = await page.waitForSelector(`iframe[title="${title} napplet"]`);
+  const iframeHandle = await page.waitForSelector(
+    `iframe[title="${title} napplet"][data-napplet-ready="true"]`,
+  );
   const frame = await iframeHandle.contentFrame();
   assert.ok(frame, `${title} iframe should be available`);
   return frame;
