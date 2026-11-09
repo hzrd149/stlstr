@@ -108,7 +108,7 @@ function NappletCard({
   const { archetype, entry, category, naddr } = napplet;
 
   return (
-    <article className="flex flex-col gap-3 rounded-box bg-base-100 p-4 ring-1 ring-base-300/60">
+    <article className="flex flex-col gap-2">
       <div className="flex items-start gap-3">
         <img
           src={nappletIcon}
@@ -126,17 +126,17 @@ function NappletCard({
         </div>
       </div>
 
-      <div className="grid gap-0.5">
+      <div className="grid gap-0.5 pl-12">
         {Object.entries(entry.intents).map(([action, doc]) => (
           <IntentItem key={action} convention={conventionId(archetype, action)} doc={doc} />
         ))}
       </div>
 
       {naddr && (
-        <div className="mt-auto flex gap-2">
+        <div className="flex gap-1 pl-11">
           <button
             type="button"
-            className="btn btn-sm flex-1"
+            className="btn btn-ghost btn-xs font-normal text-base-content/70"
             onClick={() => onCopy(naddr)}
             title={naddr}
           >
@@ -147,7 +147,12 @@ function NappletCard({
             )}
             {copied === naddr ? 'Copied' : 'Copy naddr'}
           </button>
-          <a href={pajaUrl(naddr)} target="_blank" rel="noreferrer" className="btn btn-sm flex-1">
+          <a
+            href={pajaUrl(naddr)}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-ghost btn-xs font-normal text-base-content/70"
+          >
             <ExternalLink size={14} aria-hidden="true" />
             Open in Paja
           </a>
@@ -169,7 +174,7 @@ export default function NappletsView() {
   const shown = filter === 'all' ? napplets : napplets.filter((n) => n.category === filter);
 
   return (
-    <div className="grid w-full gap-4 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="grid w-full gap-6 px-4 py-6 sm:px-6 lg:px-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Napplets</h1>
@@ -177,7 +182,7 @@ export default function NappletsView() {
             {napplets.length} napplets published by STLstr
           </p>
         </div>
-        <div role="tablist" className="tabs tabs-box tabs-sm">
+        <div role="tablist" className="tabs tabs-sm">
           {[{ id: 'all' as const, title: 'All' }, ...categories].map((category) => (
             <button
               key={category.id}
@@ -193,7 +198,7 @@ export default function NappletsView() {
         </div>
       </header>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-x-10 gap-y-8 md:grid-cols-2 xl:grid-cols-3">
         {shown.map((napplet) => (
           <NappletCard key={napplet.archetype} napplet={napplet} copied={copied} onCopy={copy} />
         ))}
