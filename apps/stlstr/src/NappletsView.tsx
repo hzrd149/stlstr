@@ -20,6 +20,7 @@ import {
   type NappletCategory,
 } from './services/intent-map';
 import { NAPPLET_PUBLISHER_PUBKEY, publishedNappletNaddr } from './services/napplets';
+import nappletIcon from '../../../scripts/lib/napplet-icon.png';
 
 /** Opens a napplet by naddr in the hosted Paja runtime. */
 function pajaUrl(naddr: string): string {
@@ -219,7 +220,14 @@ function Showcase({ copied, onCopy }: { copied: string | null; onCopy: (value: s
                 key={archetype}
                 className="flex flex-col gap-3 rounded-box bg-base-100 p-4 shadow-sm ring-1 ring-base-300/60"
               >
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={nappletIcon}
+                    alt=""
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 shrink-0 rounded-xl object-contain"
+                  />
                   <h3 className="font-semibold">{entry.title}</h3>
                 </div>
                 <p className="text-sm text-base-content/65">{entry.description}</p>
@@ -309,6 +317,15 @@ function ArchetypeSection({
     <article className="grid gap-4 rounded-box bg-base-100 p-5 ring-1 ring-base-300/70">
       <header className="grid gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          {published && (
+            <img
+              src={nappletIcon}
+              alt=""
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0 rounded-lg object-contain"
+            />
+          )}
           <h3 className="font-mono text-lg font-semibold">{archetype}</h3>
           {published ? (
             <span className="badge badge-success badge-sm badge-outline">published</span>
