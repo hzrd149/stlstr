@@ -6,19 +6,23 @@ This repo publishes those napplets as reusable app surfaces. Other napplet runti
 
 ## Napplet Archetypes
 
-Each napplet declares one protocol-facing archetype. The folder name is the local package/deploy `d` tag; the archetype is the interoperable role that other runtimes should target with NAP-INTENT.
+Each napplet declares the archetype (role) it fills with a manifest `z` tag, and every convention it accepts with an `i` tag such as `["i", "napplet:printable-create/create"]`. The folder name is the local package/deploy `d` tag; the archetype is the interoperable role that other runtimes target with NAP-INTENT. Handlers are matched by exact convention, so declare every action you accept.
 
-| Napplet        | Archetype          | Intent action      | Payload                   | Purpose                                                                                                                                                                  |
-| -------------- | ------------------ | ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `print-search` | `printable-search` | `open`             | Optional `query` or `tag` | Search printables and tag-filter printable feeds.                                                                                                                        |
-| `user-profile` | `profile`          | `open`             | `pubkey`                  | Show a maker profile and their published printables. This intentionally uses the generic `profile` archetype so profile links work across unrelated napplet collections. |
-| `print-detail` | `printable-detail` | `open`             | `address`                 | Show one printable, its media/files, maker attribution, comments, reactions, and edit actions.                                                                           |
-| `print-create` | `printable-create` | `open` or `create` | Optional `remixOf`        | Publish a new printable and upload its media/files.                                                                                                                      |
-| `print-edit`   | `printable-edit`   | `edit`             | `address`                 | Load an owned printable and publish a replacement event.                                                                                                                 |
-| `part-detail`  | `part-detail`      | `open`             | `fileId`                  | Show metadata for a NIP-94 part file and offer relevant actions.                                                                                                         |
-| `stl-preview`  | `stl-preview`      | `open`             | `url`, optional metadata  | Preview an STL file in 3D from NAP-RESOURCE fetch parameters, usually as an overlay.                                                                                     |
+| Napplet        | Archetype             | Actions            | Payload                   | Purpose                                                                                                                                                                  |
+| -------------- | --------------------- | ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `print-discvr` | `printable-discovery` | `open`             | none                      | Discovery home: new, featured, and friend-adjacent printables.                                                                                                           |
+| `print-search` | `printable-search`    | `open`             | Optional `query` or `tag` | Search printables and tag-filter printable feeds.                                                                                                                        |
+| `user-profile` | `profile`             | `open`             | `pubkey`                  | Show a maker profile and their published printables. This intentionally uses the generic `profile` archetype so profile links work across unrelated napplet collections. |
+| `print-detail` | `printable-detail`    | `open`             | `address`                 | Show one printable, its media/files, maker attribution, comments, reactions, and edit actions.                                                                           |
+| `print-create` | `printable-create`    | `open` or `create` | Optional `remixOf`        | Publish a new printable and upload its media/files; `remixOf` pre-fills remix attribution.                                                                               |
+| `print-edit`   | `printable-edit`      | `open` or `edit`   | `address`                 | Load an owned printable and publish a replacement event.                                                                                                                 |
+| `make-detail`  | `make-detail`         | `open`             | `eventId`                 | Show one make: photos, notes, maker, and the printable it came from.                                                                                                     |
+| `part-detail`  | `part-detail`         | `open`             | `fileId`                  | Show metadata for a NIP-94 part file and offer relevant actions.                                                                                                         |
+| `part-library` | `part-library`        | `open`             | none                      | The signed-in user's published part files and where they are used.                                                                                                       |
+| `part-upload`  | `part-upload`         | `open` or `create` | none                      | Publish reusable part file events for printables to reference.                                                                                                           |
+| `stl-preview`  | `stl-preview`         | `open`             | `url`, optional metadata  | Preview an STL file in 3D from NAP-RESOURCE fetch parameters, usually as an overlay.                                                                                     |
 
-Printable addresses use `33500:<pubkey>:<d>`, where kind `33500` is stlstr's printable event kind. Part details use a Nostr file event id as `fileId`. STL previews use resource metadata such as `{ url, name, mime, size }`; callers resolve any Nostr event before opening the viewer.
+Printable addresses use `33500:<pubkey>:<d>`, where kind `33500` is stlstr's printable event kind; the printable archetypes also accept `{ pubkey, identifier }`. Part details use a Nostr file event id as `fileId`, and makes use their event id as `eventId`. STL previews use resource metadata such as `{ url, name, mime, size }`; callers resolve any Nostr event before opening the viewer. Every payload field is a string.
 
 ## Runtime Contract
 
@@ -26,8 +30,7 @@ The napplets are sandboxed iframe apps built with `@napplet/vite-plugin` in sing
 
 Common requirements:
 
-- `intent`: open another archetype from inside a napplet.
-- `inc`: deliver inbound intent payloads on `<archetype>:<action>` topics after the napplet emits `<archetype>:ready`.
+- `intent`: open another archetype from inside a napplet, and receive this napplet's own intent through `intent.onDelivery`.
 - `outbox`: query and publish Nostr events through the runtime's relay/signing policy.
 - `identity`: expose the current user's pubkey/profile/follows when a napplet needs owner-aware UI.
 - `upload`: upload printable files and images to runtime-managed Blossom servers.
@@ -35,7 +38,9 @@ Common requirements:
 - `storage`: keep drafts and local UI state under runtime control.
 - `link`, `theme`, `common`, and `count`: optional richer shell integrations used by detail, preview, and browse surfaces.
 
-For example, a runtime that wants to use this repo's profile surface should route `intent.open('profile', { pubkey })` to the `user-profile` napplet, grant `inc`, `outbox`, `resource`, `identity`, and `intent`, then deliver the payload on `profile:open` once the frame has emitted `profile:ready`.
+Callers use the convention URI form, for example `intent.open('napplet:profile/open', { payload: { pubkey } })` or `intent.invoke('napplet:part-upload/create')`. A runtime that wants to use this repo's profile surface routes that request to the `user-profile` napplet, grants the domains its manifest requires, and posts a NAP-INTENT `intent.deliver` with `{ sender, archetype: 'profile', action: 'open', convention: 'napplet:profile/open', payload: { pubkey } }` once the frame is ready. The napplets receive it through `intent.onDelivery` (wrapped by `@stlstr/napplet-kit/intent`), so no INC topics or readiness handshake are involved.
+
+In stlstr itself an intent is a navigation: the URL carries the payload, and the verb and attested `sender` (the caller's manifest catalog id, or `shell` for a deep link) ride in router history state. Errors use NAP-INTENT's common strings: `no handler`, `unsupported convention`, `invoke rejected`.
 
 ## Compatibility Guidelines
 
@@ -43,7 +48,7 @@ To make another napplet compatible with stlstr or any runtime that understands t
 
 - Declare the shared archetype in the napplet manifest, not just a repo-specific name. Use `profile` for person/profile views instead of `user-profile`.
 - Accept the payload shapes above. If a napplet needs extra data, treat it as optional and still render from the common payload.
-- Use NAP-INTENT for cross-napplet navigation. For example, maker links should open `profile` with `{ pubkey }`, and printable links should open `printable-detail` with `{ address }`.
+- Use NAP-INTENT for cross-napplet navigation. For example, maker links should open `napplet:profile/open` with `{ pubkey }`, and printable links should open `napplet:printable-detail/open` with `{ address }`.
 - Keep Nostr reads and writes behind `outbox`; do not bundle a signer, touch `window.nostr`, or create hidden relay behavior inside the napplet.
 - Treat domains beyond the manifest payload as runtime services. If `count`, `common`, `link`, `storage`, or `theme` are absent, degrade gracefully rather than failing the whole surface.
 - Keep visual chrome out of napplets. The runtime owns windows, title bars, borders, and navigation; napplets render the embedded content surface.

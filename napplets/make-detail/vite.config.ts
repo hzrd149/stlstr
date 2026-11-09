@@ -12,11 +12,11 @@ export default defineConfig({
       nappletType: 'make-detail',
       description: 'View a completed 3D print, its photos, maker notes, and discussion.',
       icon,
-      // `inc` delivers the route payload, `outbox` resolves the kind:2351 make, its parent
+      // `intent` receives the route payload, `outbox` resolves the kind:2351 make, its parent
       // printable, and its comments; `identity` names the viewer so comments can be composed;
       // `count` shows the comment count; `resource` fetches make photos; `intent` opens the
       // parent print and the maker profile.
-      requires: ['inc', 'outbox', 'identity', 'count', 'resource', 'intent', 'theme'],
+      requires: ['outbox', 'identity', 'count', 'resource', 'intent', 'theme'],
       artifactMode: 'single-file',
       archetypes: [{ slug: 'make-detail', convention: 'napplet:make-detail/open' }],
     }),

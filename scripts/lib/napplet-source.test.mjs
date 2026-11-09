@@ -109,6 +109,18 @@ test('every napplet declares the NAP domains it uses', () => {
       }
     }
 
+    // napplet-kit modules that call a NAP domain on the napplet's behalf. Receiving intents
+    // through `@stlstr/napplet-kit/intent`, or rendering a maker link (directly or inside
+    // comments), is a use of NAP-INTENT even though the napplet never imports `intent`.
+    const kitDomains = {
+      '@stlstr/napplet-kit/intent': 'intent',
+      '@stlstr/napplet-kit/components/MakerLink.svelte': 'intent',
+      '@stlstr/napplet-kit/components/Comments.svelte': 'intent',
+    };
+    for (const [module, domain] of Object.entries(kitDomains)) {
+      if (code.includes(`'${module}'`)) imported.add(domain);
+    }
+
     for (const domain of tracked) {
       if (imported.has(domain) && !declared.has(domain)) {
         violations.push(`napplets/${napplet}: imports ${domain} but does not require it`);

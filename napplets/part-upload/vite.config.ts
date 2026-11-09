@@ -12,7 +12,7 @@ export default defineConfig({
       nappletType: 'part-upload',
       description: 'Upload 3D model files to Blossom and publish reusable parts on Nostr.',
       icon,
-      requires: ['upload', 'outbox', 'identity', 'inc', 'intent'],
+      requires: ['upload', 'outbox', 'identity', 'intent'],
       artifactMode: 'single-file',
       archetypes: [
         { slug: 'part-upload', convention: 'napplet:part-upload/open' },

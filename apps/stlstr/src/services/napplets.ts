@@ -150,17 +150,10 @@ function requiredDomains(event: NostrEvent): string[] {
   return [...manifest.requires, ...(manifest.optional ?? [])];
 }
 
+/** A manifest is compatible when it accepts at least one of the archetype's conventions. */
 function hasCompatibleArchetype(event: NostrEvent, archetype: string): boolean {
-  const conventions = conventionsFor(archetype);
-  return (
-    event.tags.some((tag) => tag[0] === 'z' && tag[1] === archetype) ||
-    event.tags.some(
-      (tag) =>
-        tag[0] === 'archetype' &&
-        tag[1] === archetype &&
-        conventions.some((id) => tag.includes(id)),
-    )
-  );
+  const known = conventionsFor(archetype);
+  return manifestConventions(event, archetype).some((id) => known.includes(id));
 }
 
 function artifactUrlFrom(event: NostrEvent): string | undefined {
@@ -222,7 +215,7 @@ function resolvedFromManifest(
     description: tagValue(manifest, 'description'),
     aggregateHash,
     artifactUrl,
-    conventions: conventionsFor(archetype),
+    conventions: manifestConventions(manifest, archetype),
     source: 'override',
     naddr,
     pubkey: manifest.pubkey,
@@ -370,12 +363,7 @@ export function resolveConfiguredNapplet(
 }
 
 export async function loadNappletArtifact(napplet: ResolvedNapplet): Promise<LoadedNapplet> {
-  const fallbackUrl = defaultArtifactUrl(napplet.dTag);
-  const url =
-    napplet.source === 'default'
-      ? await resolveRegistryNappletUrl(napplet.dTag, fallbackUrl)
-      : napplet.artifactUrl;
-  if (!url) throw new Error(`${napplet.title} does not have a loadable artifact URL.`);
+  const url = await artifactUrlFor(napplet);
 
   const cacheKey = `${napplet.dTag}:${napplet.aggregateHash}:${url}`;
   const shouldCache = napplet.source === 'default' && !STLSTR_DEV_MODE;
@@ -397,8 +385,8 @@ export async function loadNappletArtifact(napplet: ResolvedNapplet): Promise<Loa
   }
 }
 
-async function fetchNappletArtifact(napplet: ResolvedNapplet, url: string): Promise<LoadedNapplet> {
-  const artifactUrl = new URL(url, window.location.href).href;
+/** The signed manifest behind a napplet: carried, the built-in sidecar, or fetched by address. */
+async function manifestFor(napplet: ResolvedNapplet, artifactUrl: string): Promise<NostrEvent> {
   const manifest =
     napplet.manifest ??
     (napplet.source === 'default'
@@ -416,6 +404,74 @@ async function fetchNappletArtifact(napplet: ResolvedNapplet, url: string): Prom
           )
         : null);
   if (!manifest) throw new Error(`Could not resolve ${napplet.title}'s manifest.`);
+  return manifest;
+}
+
+async function artifactUrlFor(napplet: ResolvedNapplet): Promise<string> {
+  const url =
+    napplet.source === 'default'
+      ? await resolveRegistryNappletUrl(napplet.dTag, defaultArtifactUrl(napplet.dTag))
+      : napplet.artifactUrl;
+  if (!url) throw new Error(`${napplet.title} does not have a loadable artifact URL.`);
+  return new URL(url, window.location.href).href;
+}
+
+const catalogIds = new Map<string, Promise<string>>();
+
+/**
+ * The NAP-INTENT catalog id of a napplet — the opaque identity used for candidate ids,
+ * `handler` preferences, and the `sender` of deliveries it originates. Derived from the
+ * signed manifest (`getNappletCatalogId`), never from the bare `d` tag, and memoized per
+ * napplet build so `available()` does not refetch on every call.
+ */
+export function catalogIdFor(napplet: ResolvedNapplet): Promise<string> {
+  if (napplet.manifest) return Promise.resolve(getNappletCatalogId(napplet.manifest));
+
+  const key = `${napplet.source}:${napplet.dTag}:${napplet.aggregateHash}:${napplet.artifactUrl}`;
+  let id = catalogIds.get(key);
+  if (!id) {
+    id = artifactUrlFor(napplet)
+      .then((url) => manifestFor(napplet, url))
+      .then(getNappletCatalogId);
+    catalogIds.set(key, id);
+    id.catch(() => catalogIds.delete(key));
+  }
+  return id;
+}
+
+/**
+ * The conventions a manifest accepts for one archetype: its `i` tags under that archetype,
+ * honoured only when a `z` tag on the same manifest declares the archetype. A legacy combined
+ * `archetype` tag is read only when the manifest has no `z` tags at all.
+ */
+export function manifestConventions(event: NostrEvent, archetype: string): string[] {
+  const prefix = `napplet:${archetype}/`;
+  const hasRoleTags = event.tags.some((tag) => tag[0] === 'z');
+  if (hasRoleTags) {
+    if (!event.tags.some((tag) => tag[0] === 'z' && tag[1] === archetype)) return [];
+    return [
+      ...new Set(
+        event.tags
+          .filter((tag) => tag[0] === 'i' && tag[1]?.startsWith(prefix))
+          .map((tag) => tag[1]),
+      ),
+    ];
+  }
+
+  const known = conventionsFor(archetype);
+  return [
+    ...new Set(
+      event.tags
+        .filter((tag) => tag[0] === 'archetype' && tag[1] === archetype)
+        .flatMap((tag) => tag.slice(2))
+        .filter((id) => known.includes(id)),
+    ),
+  ];
+}
+
+async function fetchNappletArtifact(napplet: ResolvedNapplet, url: string): Promise<LoadedNapplet> {
+  const artifactUrl = new URL(url, window.location.href).href;
+  const manifest = await manifestFor(napplet, artifactUrl);
   const resolved = await resolveNapplet({
     event: manifest,
     cache: STLSTR_DEV_MODE ? undefined : await openNappletArtifactCache(),
@@ -447,6 +503,7 @@ async function fetchNappletArtifact(napplet: ResolvedNapplet, url: string): Prom
     ...napplet,
     manifest,
     catalogId: getNappletCatalogId(manifest),
+    conventions: manifestConventions(manifest, napplet.archetype),
     aggregateHash: resolved.aggregateHash,
     artifactUrl,
     html: resolved.indexHtml,

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { count, identity, inc, intent, link, outbox, type NostrEvent } from '@napplet/sdk';
+  import { count, identity, intent, link, outbox, type NostrEvent } from '@napplet/sdk';
   import { onMount } from 'svelte';
   import Comments from '@stlstr/napplet-kit/components/Comments.svelte';
   import GalleryImage from '@stlstr/napplet-kit/components/GalleryImage.svelte';
@@ -8,7 +8,8 @@
   import { threadFilter } from '@stlstr/napplet-kit/comments';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import type { IncEvent, Subscription } from '@stlstr/napplet-kit/inc';
+  import type { Subscription } from '@stlstr/napplet-kit/inc';
+  import { onIntent, type IntentPayload } from '@stlstr/napplet-kit/intent';
   import {
     formatBytes,
     isPreviewable,
@@ -32,12 +33,9 @@
    * The gallery, part files, owner actions, and the NIP-22 comment thread are built here.
    * Makes and remixes are still to come.
    *
-   * The address arrives over the NAP-INTENT delivery seam as a targeted `inc.event` on
-   * `printable-detail:open`. Subscribe FIRST, then emit `printable-detail:ready`.
+   * The address arrives as a NAP-INTENT delivery of `napplet:printable-detail/open`.
    */
 
-  const OPEN_TOPIC = 'printable-detail:open';
-  const READY_TOPIC = 'printable-detail:ready';
   const STL_PREVIEW_ARCHETYPE = 'stl-preview';
 
   /**
@@ -96,7 +94,6 @@
   const isOwner = $derived(Boolean(viewer && owner && viewer === owner));
 
   const hasOutbox = () => hasMethods('outbox', 'query');
-  const hasInc = () => hasMethods('inc', 'on', 'emit');
   const hasIntentOpen = () => hasMethods('intent', 'open');
   const hasIntentAvailable = () => hasMethods('intent', 'available');
   const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
@@ -263,10 +260,9 @@
     if (!result.ok) status = result.error ?? 'Could not open the editor.';
   }
 
-  function applyIntent(event: IncEvent): void {
-    const payload = event.payload;
-    const address = (payload as { address?: unknown } | undefined)?.address;
-    if (typeof address !== 'string' || address.length === 0) {
+  function applyIntent(payload: IntentPayload): void {
+    const address = payload.address;
+    if (!address) {
       status = 'The shell opened this page without a print to show.';
       return;
     }
@@ -305,17 +301,12 @@
       });
     }
 
-    if (!hasInc()) {
-      status = 'This shell cannot deliver the print to show.';
-      return () => identitySubscription?.close();
-    }
-
-    // Subscribe BEFORE signalling readiness — the shell flushes on the ready signal.
-    const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC);
+    // The runtime buffers deliveries until this handler registers.
+    const subscription = onIntent('printable-detail', { open: applyIntent });
+    if (!subscription) status = 'This shell cannot deliver the print to show.';
 
     return () => {
-      subscription.close();
+      subscription?.close();
       identitySubscription?.close();
     };
   });

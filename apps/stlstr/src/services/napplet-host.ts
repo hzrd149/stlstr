@@ -32,6 +32,25 @@ import { createStlstrLinkService } from './links';
 import { createStlstrResourceService } from './resource';
 import { sealNappletFrame } from './sandbox';
 import type { IntentDelivery } from './intent-delivery';
+import type { IntentNavigation } from './intent-map';
+
+type ShellNavigate = (href: string, navigation?: IntentNavigation) => void;
+
+/**
+ * The shell's navigate function, registered by the always-mounted shell layout. Held here
+ * rather than captured from whichever frame first created the shared host: that frame can
+ * unmount while another (the preview) keeps the host alive, and its navigate would then
+ * act on a stale location.
+ */
+let shellNavigate: ShellNavigate | null = null;
+
+/** Registers the live shell navigate function; returns an unregister callback. */
+export function setShellNavigate(navigate: ShellNavigate): () => void {
+  shellNavigate = navigate;
+  return () => {
+    if (shellNavigate === navigate) shellNavigate = null;
+  };
+}
 
 function settingsValue<T>(read: () => T) {
   return new Observable<T>((subscriber) => {
@@ -58,7 +77,7 @@ const localPool = new Proxy(relayPool, {
   },
 });
 
-function createHost(navigate: (href: string) => void) {
+function createHost() {
   const frames = new Map<
     string,
     {
@@ -109,7 +128,7 @@ function createHost(navigate: (href: string) => void) {
         },
       }),
       intent: createStlstrIntentService({
-        navigate,
+        navigate: (href, navigation) => shellNavigate?.(href, navigation),
         resolveSender: (id) => frames.get(id)?.loaded.catalogId,
       }),
       link: createStlstrLinkService(),
@@ -141,8 +160,11 @@ function createHost(navigate: (href: string) => void) {
         if (entry && message.type === 'shell.ready') {
           clearTimeout(entry.timer);
           entry.frame.dataset.nappletReady = 'true';
+          // The frame's port is bound now; NAP-INTENT delivers only to a ready target.
+          // A napplet that did not declare `intent` has no delivery binding to receive it.
+          if (entry.loaded.domains.includes('intent')) entry.delivery.markReady();
+          else console.warn(`[stlstr] ${entry.loaded.dTag} does not declare intent`);
         }
-        entry?.delivery.observeMessage(message);
       },
       onNappletRevoked: ({ windowId, detail }) => {
         const entry = frames.get(windowId);
@@ -232,8 +254,8 @@ function createHost(navigate: (href: string) => void) {
 
 let shared: ReturnType<typeof createHost> | undefined;
 let users = 0;
-export function acquireNappletHost(navigate: (href: string) => void) {
-  const host = (shared ??= createHost(navigate));
+export function acquireNappletHost() {
+  const host = (shared ??= createHost());
   users++;
   return {
     host,

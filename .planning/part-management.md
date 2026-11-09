@@ -1,6 +1,12 @@
 # Design: part management
 
-Status: design (pre-build).
+Status: design (pre-build). Built; the intent sections below are historical.
+
+> **Superseded intent details.** Archetype names here (`edit-object`, `object-detail`,
+> `create-object`, `part-preview`), the object-form `intent.open('<archetype>', payload)`
+> calls, INC delivery, and the `requires` lists predate the shipped napplets. The current
+> archetypes, payloads, and the native `intent.onDelivery` contract are in `README.md`;
+> the shell side is described in `AGENTS.md` (Host Wiring).
 
 Two new napplets — **`part-upload`** and **`part-library`** — that let a user
 manage the files they have published: upload new ones, see what they have,

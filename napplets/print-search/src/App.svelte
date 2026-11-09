@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { inc, intent, outbox } from '@napplet/sdk';
+  import { intent, outbox } from '@napplet/sdk';
   import MakerLink from '@stlstr/napplet-kit/components/MakerLink.svelte';
   import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import type { IncEvent } from '@stlstr/napplet-kit/inc';
+  import { onIntent, type IntentPayload } from '@stlstr/napplet-kit/intent';
   import { onMount } from 'svelte';
   import CoverImage from './lib/CoverImage.svelte';
   import {
@@ -22,9 +22,6 @@
    * it dispatches onward navigation the same way — by archetype, never by URL, so the shell
    * keeps ownership of routing.
    */
-
-  const OPEN_TOPIC = 'printable-search:open';
-  const READY_TOPIC = 'printable-search:ready';
 
   /** How many printables to pull for the feed. Pagination is a follow-up. */
   const FEED_LIMIT = 60;
@@ -56,7 +53,6 @@
   );
   const feed = $derived(filterPrintables(orderedObjects, { query, topics }));
 
-  const hasInc = () => hasMethods('inc', 'emit', 'on');
   const hasIntent = () => hasMethods('intent', 'open');
   const hasOutbox = () => hasMethods('outbox', 'subscribe');
 
@@ -239,17 +235,10 @@
 
   // ---------------------------------------------------------------- lifecycle
 
-  function applyIntent(event: IncEvent): void {
-    const payload = event.payload;
-    const values = (payload ?? {}) as { query?: unknown; tag?: unknown; tags?: unknown };
-    const parsed = parseSearchInput(typeof values.query === 'string' ? values.query : '');
+  function applyIntent(payload: IntentPayload): void {
+    const parsed = parseSearchInput(payload.query ?? '');
     query = parsed.query;
-    topics = normalizeTopics([
-      ...parsed.topics,
-      ...(typeof values.tag === 'string' ? [values.tag] : []),
-      ...(typeof values.tags === 'string' ? values.tags.split(',') : []),
-      ...(Array.isArray(values.tags) ? values.tags : []),
-    ]);
+    topics = normalizeTopics([...parsed.topics, ...(payload.tag ? [payload.tag] : [])]);
     sortMode = query ? 'relevance' : 'newest';
     searchInput = searchText(query, topics);
     restartFeed();
@@ -258,14 +247,10 @@
   onMount(() => {
     closeFeed = openFeed();
 
-    if (!hasInc()) return closeFeed;
-
-    // Subscribe BEFORE signalling readiness, or the shell flushes into a dead listener.
-    const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC);
+    const subscription = onIntent('printable-search', { open: applyIntent });
 
     return () => {
-      subscription.close();
+      subscription?.close();
       window.clearTimeout(makerTimer);
       closeFeed?.();
     };

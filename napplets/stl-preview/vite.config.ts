@@ -12,9 +12,9 @@ export default defineConfig({
       nappletType: 'stl-preview',
       description: 'Preview STL models in an interactive 3D viewer before printing.',
       icon,
-      // `inc` may deliver an intent payload, `resource` fetches the STL bytes, and `link`
+      // `intent` may deliver the file to preview, `resource` fetches the STL bytes, and `link`
       // lets oversized or unsupported files fall back to a shell-mediated download.
-      requires: ['inc', 'resource', 'link', 'theme'],
+      requires: ['intent', 'resource', 'link', 'theme'],
       artifactMode: 'single-file',
       archetypes: [{ slug: 'stl-preview', convention: 'napplet:stl-preview/open' }],
     }),

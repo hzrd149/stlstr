@@ -188,6 +188,8 @@ async function main() {
     await run('node', ['--test', ...testFiles], {
       env: {
         STLSTR_TEST_BASE_URL: baseUrl,
+        // Tests derive the built-in napplets' NAP-INTENT catalog ids from this key.
+        VITE_DEV_PRIVKEY_HEX: devPrivkeyHex,
         STLSTR_TEST_RELAY_URL: relayUrl,
         PUPPETEER_EXECUTABLE_PATH: chromiumPath,
       },

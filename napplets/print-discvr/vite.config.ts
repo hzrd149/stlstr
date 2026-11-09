@@ -12,7 +12,7 @@ export default defineConfig({
       nappletType: 'print-discvr',
       description: 'Discover 3D-printable projects shared by makers on Nostr.',
       icon,
-      requires: ['outbox', 'inc', 'intent', 'resource', 'identity'],
+      requires: ['outbox', 'intent', 'resource', 'identity'],
       artifactMode: 'single-file',
       archetypes: [{ slug: 'printable-discovery', convention: 'napplet:printable-discovery/open' }],
     }),

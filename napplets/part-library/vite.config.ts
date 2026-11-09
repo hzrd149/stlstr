@@ -22,7 +22,7 @@ export default defineConfig({
       //
       // `resource` fetches thumbnail bytes. Pointing an `<img>` at a published `thumb` URL
       // would work, and would leak the reader's IP to whatever host the author chose.
-      requires: ['outbox', 'inc', 'identity', 'intent', 'link', 'resource'],
+      requires: ['outbox', 'identity', 'intent', 'link', 'resource'],
       artifactMode: 'single-file',
       // The protocol names the payload SHAPE this role accepts — an unnumbered
       // convention per the naps repo, not a NAP domain.

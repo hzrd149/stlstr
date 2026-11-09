@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { identity, inc, intent, outbox, type NostrEvent } from '@napplet/sdk';
+  import { identity, intent, outbox, type NostrEvent } from '@napplet/sdk';
   import MakerLink from '@stlstr/napplet-kit/components/MakerLink.svelte';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import type { Subscription } from '@stlstr/napplet-kit/inc';
+  import { onIntent } from '@stlstr/napplet-kit/intent';
   import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { onMount } from 'svelte';
@@ -16,8 +17,6 @@
     type PrintableObject,
   } from './lib/printables';
 
-  const OPEN_TOPIC = 'printable-discovery:open';
-  const READY_TOPIC = 'printable-discovery:ready';
   const MAKE_KIND = 2351;
   const DISCOVERY_LIMIT = 80;
   const FRIEND_LIMIT = 80;
@@ -65,7 +64,6 @@
     [...makes.values()].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6),
   );
 
-  const hasInc = () => hasMethods('inc', 'emit', 'on');
   const hasOutboxSubscribe = () => hasMethods('outbox', 'subscribe');
   const hasOutboxQuery = () => hasMethods('outbox', 'query');
   const hasIntent = () => hasMethods('intent', 'open');
@@ -292,20 +290,10 @@
       });
     }
 
-    if (!hasInc()) {
-      return () => {
-        identitySubscription?.close();
-        closeDiscovery?.();
-        closeMakes?.();
-        window.clearTimeout(makerTimer);
-      };
-    }
-
-    const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC);
+    const subscription = onIntent('printable-discovery', { open: applyIntent });
 
     return () => {
-      subscription.close();
+      subscription?.close();
       identitySubscription?.close();
       closeDiscovery?.();
       closeMakes?.();

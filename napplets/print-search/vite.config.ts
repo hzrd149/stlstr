@@ -12,7 +12,7 @@ export default defineConfig({
       nappletType: 'print-search',
       description: 'Search and browse 3D-printable projects by title and tags.',
       icon,
-      requires: ['outbox', 'inc', 'identity', 'common', 'count', 'resource', 'intent'],
+      requires: ['outbox', 'identity', 'common', 'count', 'resource', 'intent'],
       artifactMode: 'single-file',
       // The protocol names the payload SHAPE this role accepts — an unnumbered
       // convention per the naps repo, not a NAP domain.

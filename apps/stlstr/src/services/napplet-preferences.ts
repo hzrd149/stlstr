@@ -84,7 +84,8 @@ export function refreshNappletPreferences() {
                     nip19.naddrEncode(ref.pointer),
                     archetype,
                   );
-                  if (!napplet.compatibleWithArchetype) continue;
+                  // Exact convention match: a napplet is only preferred for verbs it declares.
+                  if (!napplet.conventions.includes(identity)) continue;
                   resolved[identity] = napplet;
                   break;
                 } catch {

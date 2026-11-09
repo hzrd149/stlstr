@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { identity, inc, intent, link, outbox, type NostrEvent } from '@napplet/sdk';
+  import { identity, intent, link, outbox, type NostrEvent } from '@napplet/sdk';
   import {
     FILE_KIND,
     PRINTABLE_KIND,
@@ -39,8 +39,6 @@
    * shows files, and answers "what uses this" by querying the other direction.
    */
 
-  const OPEN_TOPIC = 'part-library:open';
-  const READY_TOPIC = 'part-library:ready';
   const PREVIEW_ARCHETYPE = 'stl-preview';
   const UPLOAD_ARCHETYPE = 'part-upload';
   const DETAIL_ARCHETYPE = 'printable-detail';
@@ -106,7 +104,6 @@
     return counts;
   });
 
-  const hasInc = () => hasMethods('inc', 'emit', 'on');
   const hasOutbox = () => hasMethods('outbox', 'query');
   const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
   const hasIntentOpen = () => hasMethods('intent', 'open');
@@ -368,16 +365,9 @@
       status = 'This shell cannot tell us who is signed in, so your parts cannot be listed.';
     }
 
-    if (!hasInc()) return () => identitySubscription?.close();
-
-    // Subscribe BEFORE signalling readiness, or the shell flushes into a dead listener.
-    const subscription = inc.on(OPEN_TOPIC, () => {});
-    inc.emit(READY_TOPIC);
-
-    return () => {
-      subscription.close();
-      identitySubscription?.close();
-    };
+    // The `open` intent carries no payload: the library always shows the signed-in user's
+    // files, so this page does not register an intent handler.
+    return () => identitySubscription?.close();
   });
 </script>
 

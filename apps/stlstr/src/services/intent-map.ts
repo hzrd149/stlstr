@@ -15,7 +15,45 @@ export type StlstrIntent = {
   archetype: string;
   action: string;
   payload: IntentPayload;
+  /**
+   * Shell-attested provenance handed to the target as `IntentDelivery.sender`: the invoking
+   * napplet's catalog id, or `shell` when the user reached the route directly (deep link,
+   * nav, refresh without history state). Never derived from anything a napplet sent.
+   */
+  sender?: string;
 };
+
+/** `IntentDelivery.sender` for routes the user opened rather than a napplet. */
+export const SHELL_SENDER = 'shell';
+
+/**
+ * What an in-app intent leaves in router history state, keyed by archetype.
+ *
+ * The URL carries the payload, so a deep link and an in-app open render the same page. The
+ * URL cannot carry the verb (`create` and `open` share `/create`) or who asked, so those ride
+ * in history state, which only the shell can write. Back/forward restores them with the entry.
+ */
+export type IntentNavigation = { archetype: string; action: string; sender: string };
+
+/** The router history state the shell writes. */
+export type ShellHistoryState = {
+  /** Set on the entry that opened a preview over a page, so dismissal can go Back. */
+  previewPushed?: boolean;
+  intents?: Record<string, { action: string; sender: string }>;
+};
+
+/**
+ * Applies the verb and sender an in-app intent recorded in history state to the intent a
+ * location parses to. Ignored unless the recorded action is one the archetype accepts.
+ */
+export function withNavigationState(intent: StlstrIntent, state: unknown): StlstrIntent {
+  const recorded = (state as ShellHistoryState | null)?.intents?.[intent.archetype];
+  const entry = ARCHETYPES[intent.archetype];
+  if (!recorded || !entry || !(recorded.action in entry.intents)) {
+    return { ...intent, sender: intent.sender ?? SHELL_SENDER };
+  }
+  return { ...intent, action: recorded.action, sender: recorded.sender };
+}
 
 /**
  * Presentation groups for the Napplets reference page (`/napplets`), in display order.
@@ -93,25 +131,11 @@ export type ArchetypeEntry = {
 
 /**
  * Cross-napplet payload shapes are unnumbered conventions named
- * `napplet:<archetype>/<action>` (naps repo, `01-nap-system.md`). The same vocabulary is
- * used for manifest archetype tags and for the inc topics that carry the payload.
+ * `napplet:<archetype>/<action>` (NAP-INTENT). The same identity appears in manifest `i`
+ * tags, in `intent.invoke` requests, and in the `IntentDelivery` a target receives.
  */
 export function conventionId(archetype: string, action: string): string {
   return `napplet:${archetype}/${action}`;
-}
-
-/**
- * The inc topic a napplet listens on for its intent payload, `<archetype>:<action>`.
- * This follows hyprgate-gui's `feed:open` shape verbatim; the convention id above names the
- * payload *shape* in the manifest, while this names the *channel* it arrives on.
- */
-export function intentTopic(archetype: string, action: string): string {
-  return `${archetype}:${action}`;
-}
-
-/** The inc topic a napplet emits once it is subscribed and ready to receive. */
-export function readyTopic(archetype: string): string {
-  return `${archetype}:ready`;
 }
 
 /** Address of a printable: `33500:<pubkey>:<d>`. */
@@ -121,7 +145,7 @@ const PRINTABLE_KIND = '33500';
  * The one archetype the shell renders as a centered dialog over the current page rather
  * than as a page of its own.
  *
- * NAP-INTENT cannot express this: `IntentBehavior` carries `focus` / `newWindow` / `reuse`
+ * NAP-INTENT cannot express this: `IntentBehavior` carries only `focus` / `reuse` hints
  * and nothing about presentation, so modal-versus-route is the shell's decision, taken from
  * the archetype. It is hardcoded deliberately; generalize it when a second archetype
  * needs modal presentation.
@@ -175,7 +199,7 @@ function serializeUrl(url: URL): string {
  * The overlay intent a URL carries, independent of the base route beneath it.
  *
  * This is the companion to `intentFromLocation`: together they are the `{ base, overlay }`
- * split of a location. `intentFromLocation` ignores `preview` entirely, so the two compose
+ * split of a location. `intentFromLocation` ignores the `stl` param entirely, so the two compose
  * without either needing to know about the other.
  */
 export function overlayFromLocation(location: { search: string }): StlstrIntent | null {
@@ -555,6 +579,15 @@ export const ARCHETYPES: Record<string, ArchetypeEntry> = {
     },
   },
 };
+
+/**
+ * Whether the shell advertises this archetype through `intent.available` / `intent.handlers`.
+ * An archetype without a `category` has a route but no published napplet (e.g. `make-create`),
+ * so advertising it would promise a handler that cannot load.
+ */
+export function isAdvertised(archetype: string): boolean {
+  return Boolean(ARCHETYPES[archetype]?.category);
+}
 
 /** The verbs an archetype accepts, derived from its documented intents. */
 export function actionsFor(archetype: string): string[] {

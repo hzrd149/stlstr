@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
     identity,
-    inc,
     intent,
     outbox,
     resource,
@@ -12,7 +11,8 @@
   } from '@napplet/sdk';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import type { IncEvent, Subscription } from '@stlstr/napplet-kit/inc';
+  import type { Subscription } from '@stlstr/napplet-kit/inc';
+  import { onIntent, type IntentPayload } from '@stlstr/napplet-kit/intent';
   import { onMount } from 'svelte';
 
   type UploadResult = Awaited<ReturnType<typeof upload.upload>>;
@@ -29,8 +29,8 @@
   /**
    * Edit one printable (`kind:33500`).
    *
-   * The address arrives over the NAP-INTENT delivery seam as a targeted `inc.event` on
-   * `printable-edit:edit`. Subscribe FIRST, then emit `printable-edit:ready`.
+   * The address arrives as a NAP-INTENT delivery of `napplet:printable-edit/open` or
+   * `napplet:printable-edit/edit`; both actions are handled the same way.
    *
    * Ownership is decided by NAP-IDENTITY and nothing else. The address in the payload is
    * untrusted — it crossed a sandbox boundary, and anyone can type any URL — so the owner
@@ -39,8 +39,6 @@
    * replacement is what would overwrite someone else's printable.
    */
 
-  const OPEN_TOPIC = 'printable-edit:edit';
-  const READY_TOPIC = 'printable-edit:ready';
   const DRAFT_PREFIX = 'printable-edit:draft:v1:';
   const CUSTOM_LICENSE = '__custom';
   const MUTABLE_TAGS = new Set([
@@ -93,7 +91,6 @@
   const isOwner = $derived(Boolean(viewer && owner && viewer === owner));
 
   const hasOutbox = () => hasMethods('outbox', 'query', 'publish');
-  const hasInc = () => hasMethods('inc', 'on', 'emit');
   const hasIntent = () => hasMethods('intent', 'open');
   const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
   const hasStorage = () => hasMethods('storage', 'getItem', 'setItem', 'removeItem');
@@ -362,10 +359,9 @@
     }
   }
 
-  function applyIntent(event: IncEvent): void {
-    const payload = event.payload;
-    const requested = (payload as { address?: unknown } | undefined)?.address;
-    if (typeof requested !== 'string' || requested.length === 0) {
+  function applyIntent(payload: IntentPayload): void {
+    const requested = payload.address;
+    if (!requested) {
       status = 'The shell opened this page without a print to edit.';
       return;
     }
@@ -552,17 +548,12 @@
       });
     }
 
-    if (!hasInc()) {
-      status = 'This shell cannot deliver the print to edit.';
-      return () => identitySubscription?.close();
-    }
-
-    // Subscribe BEFORE signalling readiness — the shell flushes on the ready signal.
-    const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC);
+    // The runtime buffers deliveries until this handler registers.
+    const subscription = onIntent('printable-edit', { open: applyIntent, edit: applyIntent });
+    if (!subscription) status = 'This shell cannot deliver the print to edit.';
 
     return () => {
-      subscription.close();
+      subscription?.close();
       identitySubscription?.close();
       for (const image of images) revokePreview(image.previewUrl);
     };

@@ -8,7 +8,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { acquireNappletHost } from './services/napplet-host';
+import { acquireNappletHost, setShellNavigate } from './services/napplet-host';
 import { NostrConnectAccount } from 'applesauce-accounts/accounts';
 import { getDisplayName, getProfilePicture } from 'applesauce-core/helpers';
 import { use$ } from 'applesauce-react/hooks';
@@ -25,17 +25,7 @@ import {
   Settings,
   X,
 } from 'lucide-react';
-import {
-  Link,
-  NavLink,
-  Outlet,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from 'react-router';
+import { Link, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router';
 import {
   accountManager,
   accountManagerReady,
@@ -47,10 +37,15 @@ import {
 } from './services/accounts';
 import { createIntentDelivery, type IntentDelivery } from './services/intent-delivery';
 import {
+  ARCHETYPES,
   baseHref,
   hasPreview,
+  intentFromLocation,
   intentToHref,
   overlayFromLocation,
+  withNavigationState,
+  type IntentNavigation,
+  type ShellHistoryState,
   type StlstrIntent,
 } from './services/intent-map';
 import { getUser } from './services/nostr';
@@ -575,7 +570,6 @@ function NappletFrame({
   const [status, setStatus] = useState('Loading napplet...');
   const [failure, setFailure] = useState<string | null>(null);
   const { pathname } = useLocation();
-  const navigate = useShellNavigate();
   const identity = frameKey ?? pathname;
   const nappletMountKey = `${napplet.source}:${napplet.dTag}:${napplet.aggregateHash}:${napplet.artifactUrl}`;
   const nappletRef = useRef(napplet);
@@ -584,7 +578,9 @@ function NappletFrame({
   }, [napplet]);
 
   // Serializing keeps the effect dep stable across the fresh payload each render builds.
-  const intentKey = intent ? JSON.stringify(intent) : '';
+  // The sender is provenance, not content: a history-state change that only re-attributes
+  // the same request (dismissing a deep-linked preview, say) must not redeliver it.
+  const intentKey = intent ? JSON.stringify([intent.archetype, intent.action, intent.payload]) : '';
 
   // The payload is NOT a mount dep: a new payload for the same frame is redelivered to the
   // live napplet rather than remounting it, so an open 3D preview keeps its WebGL context
@@ -593,7 +589,7 @@ function NappletFrame({
   // Synced in an effect rather than assigned during render: writing a ref while rendering
   // is what `react-hooks/refs` forbids. `useRef(intent)` already seeds the first render,
   // and effects run in declaration order, so this lands before the mount effect below
-  // reads it — the same idiom `navigateRef` uses.
+  // reads it.
   const intentRef = useRef(intent);
   useEffect(() => {
     intentRef.current = intent;
@@ -601,20 +597,12 @@ function NappletFrame({
   const deliveryRef = useRef<IntentDelivery | null>(null);
   const deliveredKeyRef = useRef('');
 
-  // NAP-INTENT navigates the shell, but a new `navigate` identity must never tear
-  // down a live bridge — so the adapter reads it through a ref instead of a dep.
-  const navigateRef = useRef(navigate);
-  useEffect(() => {
-    navigateRef.current = navigate;
-  }, [navigate]);
-
   useEffect(() => {
     const controller = new AbortController();
-    const { host, release } = acquireNappletHost((href) => navigateRef.current(href));
+    const { host, release } = acquireNappletHost();
     const mountedNapplet = nappletRef.current;
 
     const delivery = createIntentDelivery({
-      getTarget: () => iframeRef.current?.contentWindow ?? null,
       send: (message) => host.send(iframeRef.current, message),
     });
     deliveryRef.current = delivery;
@@ -629,7 +617,7 @@ function NappletFrame({
       const seeded = intentRef.current;
       if (seeded) {
         delivery.seed(seeded);
-        deliveredKeyRef.current = JSON.stringify(seeded);
+        deliveredKeyRef.current = JSON.stringify([seeded.archetype, seeded.action, seeded.payload]);
       }
 
       await host.mount(mountedNapplet, iframe, delivery, controller.signal, setFailure);
@@ -744,16 +732,22 @@ function PreviewDialog() {
   const navigate = useNavigate();
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
-  const overlay = overlayFromLocation(location);
+  const parsedOverlay = overlayFromLocation(location);
+  const overlay = parsedOverlay ? withNavigationState(parsedOverlay, location.state) : null;
   const open = Boolean(overlay);
 
   const dismiss = useCallback(() => {
     // A preview we pushed has a page beneath it in history, so Back is the dismissal that
     // keeps the stack honest. A deep-linked preview has nothing behind it — going back
     // would leave the app entirely — so it collapses to the base page instead.
-    const pushed = (location.state as { previewPushed?: boolean } | null)?.previewPushed;
-    if (pushed) void navigate(-1);
-    else void navigate(baseHref(`${location.pathname}${location.search}`), { replace: true });
+    const state = location.state as ShellHistoryState | null;
+    if (state?.previewPushed) void navigate(-1);
+    else
+      void navigate(baseHref(`${location.pathname}${location.search}`), {
+        replace: true,
+        // Keep the page's own intent provenance; only the overlay is being removed.
+        state,
+      });
   }, [navigate, location.pathname, location.search, location.state]);
 
   useEffect(() => {
@@ -831,196 +825,62 @@ function useShellNavigate() {
   const location = useLocation();
 
   return useCallback(
-    (href: string) => {
+    (href: string, intent?: IntentNavigation) => {
       closeDrawer();
 
       // A navigation that opens a preview marks its history entry, so the dialog knows it
       // has a page to go Back to. Derived from the two URLs rather than passed in, so any
       // route into a preview — an intent, a Link, a share — is marked the same way.
       const opensPreview = hasPreview(href) && !hasPreview(location.search);
-      void navigate(href, opensPreview ? { state: { previewPushed: true } } : undefined);
+
+      // The verb and sender of an in-app intent ride in history state (see
+      // `withNavigationState`). An overlay on the same page keeps the page's own entry, so
+      // the napplet beneath the dialog keeps its provenance.
+      const samePage = new URL(href, window.location.href).pathname === location.pathname;
+      const previous = (location.state as ShellHistoryState | null)?.intents;
+      const intents = {
+        ...(hasPreview(href) && samePage ? previous : undefined),
+        ...(intent ? { [intent.archetype]: { action: intent.action, sender: intent.sender } } : {}),
+      };
+
+      const state: ShellHistoryState = {
+        ...(opensPreview ? { previewPushed: true } : {}),
+        ...(Object.keys(intents).length > 0 ? { intents } : {}),
+      };
+      void navigate(href, Object.keys(state).length > 0 ? { state } : undefined);
     },
-    [navigate, location.search],
+    [navigate, location.search, location.pathname, location.state],
   );
 }
 
-function DiscoveryRoute() {
+/**
+ * A shell route that mounts the napplet handling an archetype.
+ *
+ * The intent comes from the location through `intentFromLocation` — the same parser a pasted
+ * deep link goes through — and then picks up the verb and attested sender an in-app
+ * `intent.open` left in history state. A location whose payload does not parse (a malformed
+ * id, say) is not a page.
+ */
+function IntentRoute({
+  archetype,
+  routeId,
+  title,
+}: {
+  archetype: string;
+  routeId: string;
+  title: string;
+}) {
+  const location = useLocation();
+  const parsed = intentFromLocation(location);
+  if (!parsed || parsed.archetype !== archetype) return <NotFoundRoute />;
+
+  const intent = withNavigationState(parsed, location.state);
   return (
     <NappletRouteFrame
-      archetype="printable-discovery"
-      routeId="discovery"
-      title="Discover prints"
-      intent={{ archetype: 'printable-discovery', action: 'open', payload: {} }}
-    />
-  );
-}
-
-function SearchRoute() {
-  const [searchParams] = useSearchParams();
-  const query = searchParams.get('q')?.trim() ?? '';
-
-  return (
-    <NappletRouteFrame
-      archetype="printable-search"
-      routeId="search"
-      title={query ? `Search: ${query}` : 'Search prints'}
-      intent={{ archetype: 'printable-search', action: 'open', payload: query ? { query } : {} }}
-    />
-  );
-}
-
-function TagRoute() {
-  const { tag = '' } = useParams();
-
-  return (
-    <NappletRouteFrame
-      archetype="printable-search"
-      routeId="tag"
-      title={`#${tag}`}
-      intent={{ archetype: 'printable-search', action: 'open', payload: { tag } }}
-    />
-  );
-}
-
-function CreateRoute() {
-  const [searchParams] = useSearchParams();
-  const remixOf = searchParams.get('remix')?.trim() ?? '';
-
-  return (
-    <NappletRouteFrame
-      archetype="printable-create"
-      routeId="create"
-      title="Create print"
-      intent={{
-        archetype: 'printable-create',
-        action: 'open',
-        payload: remixOf ? { remixOf } : {},
-      }}
-    />
-  );
-}
-
-/** The signed-in user's own published part files. */
-function PartLibraryRoute() {
-  return (
-    <NappletRouteFrame
-      archetype="part-library"
-      routeId="part-library"
-      title="Your parts"
-      intent={{ archetype: 'part-library', action: 'open', payload: {} }}
-    />
-  );
-}
-
-/** Standalone publisher for reusable NIP-94 file events. */
-function PartUploadRoute() {
-  return (
-    <NappletRouteFrame
-      archetype="part-upload"
-      routeId="part-upload"
-      title="Upload parts"
-      intent={{ archetype: 'part-upload', action: 'open', payload: {} }}
-    />
-  );
-}
-
-/** The maker behind a print: profile metadata, their prints, their collections. */
-function UserProfileRoute() {
-  const { pubkey = '' } = useParams();
-
-  return (
-    <NappletRouteFrame
-      archetype="profile"
-      routeId="user-profile"
-      title="Maker profile"
-      intent={{ archetype: 'profile', action: 'open', payload: { pubkey } }}
-    />
-  );
-}
-
-function PrintableDetailRoute() {
-  const { pubkey = '', identifier = '' } = useParams();
-
-  return (
-    <NappletRouteFrame
-      archetype="printable-detail"
-      routeId="printable-detail"
-      title="Print details"
-      intent={{
-        archetype: 'printable-detail',
-        action: 'open',
-        payload: { address: `33500:${pubkey}:${identifier}` },
-      }}
-    />
-  );
-}
-
-function PartDetailRoute() {
-  const { fileId = '' } = useParams();
-
-  return (
-    <NappletRouteFrame
-      archetype="part-detail"
-      routeId="part-detail"
-      title="Part details"
-      intent={{
-        archetype: 'part-detail',
-        action: 'open',
-        payload: { fileId },
-      }}
-    />
-  );
-}
-
-/** "I made one" — publish an immutable kind-2351 make for a printable. */
-function MakeCreateRoute() {
-  const { pubkey = '', identifier = '' } = useParams();
-
-  return (
-    <NappletRouteFrame
-      archetype="make-create"
-      routeId="make-create"
-      title="Post a make"
-      intent={{
-        archetype: 'make-create',
-        action: 'open',
-        payload: { address: `33500:${pubkey}:${identifier}` },
-      }}
-    />
-  );
-}
-
-/** A single make: photos, notes, maker attribution, parent printable, comments. */
-function MakeDetailRoute() {
-  const { eventId = '' } = useParams();
-
-  return (
-    <NappletRouteFrame
-      archetype="make-detail"
-      routeId="make-detail"
-      title="Make"
-      intent={{
-        archetype: 'make-detail',
-        action: 'open',
-        payload: { eventId },
-      }}
-    />
-  );
-}
-
-function PrintableEditRoute() {
-  const { pubkey = '', identifier = '' } = useParams();
-
-  return (
-    <NappletRouteFrame
-      archetype="printable-edit"
-      routeId="printable-edit"
-      title="Edit print"
-      intent={{
-        archetype: 'printable-edit',
-        action: 'edit',
-        payload: { address: `33500:${pubkey}:${identifier}` },
-      }}
+      archetype={archetype}
+      routeId={routeId}
+      title={ARCHETYPES[archetype]?.titleFor?.(intent) ?? title}
+      intent={intent}
     />
   );
 }
@@ -1111,6 +971,11 @@ function BrandLogo({ className = 'size-8' }: { className?: string }) {
 
 function ShellLayout() {
   const [accountsReady, setAccountsReady] = useState(false);
+
+  // NAP-INTENT navigates through the one always-mounted layout, so an intent never acts on a
+  // location captured by a frame that has since unmounted.
+  const navigate = useShellNavigate();
+  useEffect(() => setShellNavigate(navigate), [navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1229,20 +1094,82 @@ function App() {
   return (
     <Routes>
       <Route element={<ShellLayout />}>
-        <Route index element={<DiscoveryRoute />} />
-        <Route path="search" element={<SearchRoute />} />
-        <Route path="tags/:tag" element={<TagRoute />} />
-        <Route path="create" element={<CreateRoute />} />
-        <Route path="parts" element={<PartLibraryRoute />} />
-        <Route path="parts/upload" element={<PartUploadRoute />} />
+        <Route
+          index
+          element={
+            <IntentRoute
+              archetype="printable-discovery"
+              routeId="discovery"
+              title="Discover prints"
+            />
+          }
+        />
+        <Route
+          path="search"
+          element={
+            <IntentRoute archetype="printable-search" routeId="search" title="Search prints" />
+          }
+        />
+        <Route
+          path="tags/:tag"
+          element={<IntentRoute archetype="printable-search" routeId="tag" title="Search prints" />}
+        />
+        <Route
+          path="create"
+          element={
+            <IntentRoute archetype="printable-create" routeId="create" title="Create print" />
+          }
+        />
+        <Route
+          path="parts"
+          element={
+            <IntentRoute archetype="part-library" routeId="part-library" title="Your parts" />
+          }
+        />
+        <Route
+          path="parts/upload"
+          element={
+            <IntentRoute archetype="part-upload" routeId="part-upload" title="Upload parts" />
+          }
+        />
         <Route path="settings" element={<SettingsView />} />
         <Route path="napplets" element={<NappletsView />} />
-        <Route path="profiles/:pubkey" element={<UserProfileRoute />} />
-        <Route path="printables/:pubkey/:identifier" element={<PrintableDetailRoute />} />
-        <Route path="printables/:pubkey/:identifier/edit" element={<PrintableEditRoute />} />
-        <Route path="printables/:pubkey/:identifier/makes/new" element={<MakeCreateRoute />} />
-        <Route path="makes/:eventId" element={<MakeDetailRoute />} />
-        <Route path="part/:fileId" element={<PartDetailRoute />} />
+        <Route
+          path="profiles/:pubkey"
+          element={<IntentRoute archetype="profile" routeId="user-profile" title="Maker profile" />}
+        />
+        <Route
+          path="printables/:pubkey/:identifier"
+          element={
+            <IntentRoute
+              archetype="printable-detail"
+              routeId="printable-detail"
+              title="Print details"
+            />
+          }
+        />
+        <Route
+          path="printables/:pubkey/:identifier/edit"
+          element={
+            <IntentRoute archetype="printable-edit" routeId="printable-edit" title="Edit print" />
+          }
+        />
+        <Route
+          path="printables/:pubkey/:identifier/makes/new"
+          element={
+            <IntentRoute archetype="make-create" routeId="make-create" title="Post a make" />
+          }
+        />
+        <Route
+          path="makes/:eventId"
+          element={<IntentRoute archetype="make-detail" routeId="make-detail" title="Make" />}
+        />
+        <Route
+          path="part/:fileId"
+          element={
+            <IntentRoute archetype="part-detail" routeId="part-detail" title="Part details" />
+          }
+        />
         <Route path="*" element={<NotFoundRoute />} />
       </Route>
     </Routes>

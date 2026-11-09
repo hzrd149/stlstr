@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { inc, intent, outbox } from '@napplet/sdk';
+  import { intent, outbox } from '@napplet/sdk';
   import { onMount } from 'svelte';
   import CoverImage from './lib/CoverImage.svelte';
   import { loadImageUrl } from '@stlstr/napplet-kit/images';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import type { IncEvent } from '@stlstr/napplet-kit/inc';
+  import { onIntent, type IntentPayload } from '@stlstr/napplet-kit/intent';
   import {
     collectPrintable,
     PRINTABLE_KIND,
@@ -16,14 +16,9 @@
   /**
    * Renders one user's profile (kind 0) and the printables they have published.
    *
-   * The pubkey arrives over the NAP-INTENT delivery seam: NAP-INTENT's SDK surface is
-   * outbound only, so the shell hands the payload over as a targeted `inc.event` on
-   * `profile:open`. The cold-start guard is ordering — subscribe FIRST, then emit
-   * `profile:ready`, or the shell flushes into a napplet that is not listening yet.
+   * The pubkey arrives as a NAP-INTENT delivery of `napplet:profile/open`. The runtime
+   * buffers deliveries until the handler registers, so there is no readiness handshake.
    */
-
-  const OPEN_TOPIC = 'profile:open';
-  const READY_TOPIC = 'profile:ready';
 
   /** How many of the maker's printables to pull. Pagination is a follow-up. */
   const PRINTABLE_LIMIT = 60;
@@ -60,7 +55,6 @@
   const hasOutboxQuery = () => hasMethods('outbox', 'query');
   const hasOutboxSubscribe = () => hasMethods('outbox', 'subscribe');
   const hasIntent = () => hasMethods('intent', 'open');
-  const hasInc = () => hasMethods('inc', 'emit', 'on');
 
   function revokePicture(): void {
     if (!pictureUrl) return;
@@ -188,10 +182,9 @@
 
   // ---------------------------------------------------------------- lifecycle
 
-  function applyIntent(event: IncEvent): void {
-    const payload = event.payload;
-    const next = (payload as { pubkey?: unknown } | undefined)?.pubkey;
-    if (typeof next !== 'string' || next.length === 0) {
+  function applyIntent(payload: IntentPayload): void {
+    const next = payload.pubkey;
+    if (!next) {
       status = 'The shell opened this page without a maker to show.';
       return;
     }
@@ -202,17 +195,11 @@
   }
 
   onMount(() => {
-    if (!hasInc()) {
-      status = 'This shell cannot deliver the maker to show.';
-      return;
-    }
-
-    // Subscribe BEFORE signalling readiness — the shell flushes on the ready signal.
-    const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC);
+    const subscription = onIntent('profile', { open: applyIntent });
+    if (!subscription) status = 'This shell cannot deliver the maker to show.';
 
     return () => {
-      subscription.close();
+      subscription?.close();
       closePrintables?.();
       revokePicture();
     };

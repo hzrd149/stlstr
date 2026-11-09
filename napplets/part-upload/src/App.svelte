@@ -1,13 +1,5 @@
 <script lang="ts">
-  import {
-    identity,
-    inc,
-    intent,
-    outbox,
-    upload,
-    type NostrEvent,
-    type NostrTag,
-  } from '@napplet/sdk';
+  import { identity, intent, outbox, upload, type NostrEvent, type NostrTag } from '@napplet/sdk';
   import {
     FILE_KIND,
     type FileMeta,
@@ -19,11 +11,9 @@
   import { renderStlThumbnail } from '@stlstr/napplet-kit/stl-thumbnail';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import type { Subscription } from '@stlstr/napplet-kit/inc';
+  import { onIntent } from '@stlstr/napplet-kit/intent';
   import { onDestroy, onMount } from 'svelte';
 
-  const OPEN_TOPIC = 'part-upload:open';
-  const CREATE_TOPIC = 'part-upload:create';
-  const READY_TOPIC = 'part-upload:ready';
   const LIBRARY_ARCHETYPE = 'part-library';
   const PART_DETAIL_ARCHETYPE = 'part-detail';
 
@@ -87,7 +77,6 @@
   });
 
   const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
-  const hasInc = () => hasMethods('inc', 'on', 'emit');
   const hasOutbox = () => hasMethods('outbox', 'query', 'publish');
   const hasUpload = () => hasMethods('upload', 'upload');
   const hasIntent = () => hasMethods('intent', 'open');
@@ -537,15 +526,10 @@
       status = 'This shell cannot tell us who is signed in, so parts cannot be published.';
     }
 
-    if (!hasInc()) return () => identitySubscription?.close();
-
-    const openSubscription = inc.on(OPEN_TOPIC, applyIntent);
-    const createSubscription = inc.on(CREATE_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC);
+    const subscription = onIntent('part-upload', { open: applyIntent, create: applyIntent });
 
     return () => {
-      openSubscription.close();
-      createSubscription.close();
+      subscription?.close();
       identitySubscription?.close();
     };
   });

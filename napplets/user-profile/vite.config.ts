@@ -12,9 +12,9 @@ export default defineConfig({
       nappletType: 'user-profile',
       description: 'Explore a maker profile and the printable projects and makes they have shared.',
       icon,
-      // The shell grants exactly this list. `inc` is the NAP-INTENT payload delivery
-      // seam; the rest are guarded at runtime so a shell that omits one still works.
-      requires: ['inc', 'outbox', 'resource', 'identity', 'intent'],
+      // The shell grants exactly this list. `intent` delivers the pubkey to show; the
+      // rest are guarded at runtime so a shell that omits one still works.
+      requires: ['outbox', 'resource', 'identity', 'intent'],
       artifactMode: 'single-file',
       // The protocol names the payload SHAPE this role accepts — an unnumbered
       // convention per the naps repo, not a NAP domain.

@@ -13,9 +13,9 @@ export default defineConfig({
       description:
         'Inspect a 3D-printable part, download its file, and explore comments and related prints.',
       icon,
-      // `inc` delivers the route payload, `outbox` resolves the NIP-94 file event and its
-      // comments/usages, `identity` gates comment compose, and `intent` opens related views.
-      requires: ['inc', 'outbox', 'resource', 'intent', 'link', 'theme', 'identity', 'count'],
+      // `intent` receives the route payload and opens related views, `outbox` resolves the
+      // NIP-94 file event and its comments/usages, and `identity` gates comment compose.
+      requires: ['outbox', 'resource', 'intent', 'link', 'theme', 'identity', 'count'],
       artifactMode: 'single-file',
       archetypes: [{ slug: 'part-detail', convention: 'napplet:part-detail/open' }],
     }),

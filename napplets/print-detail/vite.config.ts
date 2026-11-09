@@ -14,10 +14,9 @@ export default defineConfig({
       icon,
       // The shell grants exactly this list; optional domains stay optional by
       // being guarded at runtime (`if (window.napplet?.count)`), not by being
-      // absent here. `inc` is the NAP-INTENT payload delivery seam.
+      // absent here. `intent` both receives the route payload and opens other views.
       requires: [
         'outbox',
-        'inc',
         'identity',
         'common',
         'count',

@@ -348,6 +348,9 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
     setStatus('Checking napplet...');
     try {
       const resolved = await resolveNappletNaddr(value, archetype);
+      if (!resolved.compatibleWithArchetype) {
+        throw new Error(`${resolved.title} does not handle ${entry.title}.`);
+      }
       const next = overrideFromResolved(resolved);
       if (!next) throw new Error('That napplet could not be stored as an override.');
       await setNappletOverride(archetype, next);
@@ -362,6 +365,12 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
   }
 
   async function applyResolvedOverride(resolved: ResolvedNapplet) {
+    // NAP-INTENT routes by exact convention; a napplet that does not declare this page's
+    // conventions would be mounted and never receive anything it understands.
+    if (!resolved.compatibleWithArchetype) {
+      setStatus(`${resolved.title} does not handle ${entry.title}.`);
+      return;
+    }
     const next = overrideFromResolved(resolved);
     if (!next) {
       setStatus('That napplet could not be stored as an override.');
@@ -507,8 +516,8 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
                             className={`badge badge-sm ${candidate.compatibleWithArchetype ? 'badge-success' : 'badge-warning'}`}
                           >
                             {candidate.compatibleWithArchetype
-                              ? 'advertises this page'
-                              : 'not advertised'}
+                              ? 'handles this page'
+                              : 'does not handle this page'}
                           </span>
                         </div>
                         {candidate.description ? (
@@ -520,6 +529,7 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
                       </div>
                       <button
                         className="btn btn-primary btn-sm"
+                        disabled={!candidate.compatibleWithArchetype}
                         onClick={() => {
                           applyResolvedOverride(candidate);
                           setPickerOpen(false);

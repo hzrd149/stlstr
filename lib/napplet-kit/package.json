@@ -10,6 +10,7 @@
     "./tags": "./src/tags.ts",
     "./capabilities": "./src/capabilities.ts",
     "./inc": "./src/inc.ts",
+    "./intent": "./src/intent.ts",
     "./images": "./src/images.ts",
     "./markdown": "./src/markdown.ts",
     "./stl": "./src/stl.ts",

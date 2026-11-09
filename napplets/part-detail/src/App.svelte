@@ -1,20 +1,12 @@
 <script lang="ts">
-  import {
-    count,
-    identity,
-    inc,
-    intent,
-    link,
-    outbox,
-    resource,
-    type NostrEvent,
-  } from '@napplet/sdk';
+  import { count, identity, intent, link, outbox, resource, type NostrEvent } from '@napplet/sdk';
   import Comments from '@stlstr/napplet-kit/components/Comments.svelte';
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { eventThreadFilter } from '@stlstr/napplet-kit/comments';
   import { tagValue } from '@stlstr/napplet-kit/tags';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import type { IncEvent, Subscription } from '@stlstr/napplet-kit/inc';
+  import type { Subscription } from '@stlstr/napplet-kit/inc';
+  import { onIntent, type IntentPayload } from '@stlstr/napplet-kit/intent';
   import {
     FILE_KIND,
     PRINTABLE_KIND,
@@ -42,8 +34,6 @@
    * receives resource params, so preview remains a NAP-INTENT handoff.
    */
 
-  const OPEN_TOPIC = 'part-detail:open';
-  const READY_TOPIC = 'part-detail:ready';
   const STL_PREVIEW_ARCHETYPE = 'stl-preview';
   const DETAIL_ARCHETYPE = 'printable-detail';
 
@@ -97,7 +87,6 @@
   const canPreviewFile = $derived(Boolean(file && canPreview && isPreviewable(file.meta)));
 
   const hasOutbox = () => hasMethods('outbox', 'query');
-  const hasInc = () => hasMethods('inc', 'on', 'emit');
   const hasIntentOpen = () => hasMethods('intent', 'open');
   const hasIntentAvailable = () => hasMethods('intent', 'available');
   const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
@@ -358,10 +347,9 @@
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 
-  function applyIntent(event: IncEvent): void {
-    const payload = event.payload;
-    const id = (payload as { fileId?: unknown } | undefined)?.fileId;
-    if (typeof id !== 'string' || id.length === 0) {
+  function applyIntent(payload: IntentPayload): void {
+    const id = payload.fileId;
+    if (!id) {
       status = 'The shell opened this page without a part to show.';
       return;
     }
@@ -396,16 +384,11 @@
       });
     }
 
-    if (!hasInc()) {
-      status = 'This shell cannot deliver the part to show.';
-      return () => identitySubscription?.close();
-    }
-
-    const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC);
+    const subscription = onIntent('part-detail', { open: applyIntent });
+    if (!subscription) status = 'This shell cannot deliver the part to show.';
 
     return () => {
-      subscription.close();
+      subscription?.close();
       identitySubscription?.close();
       stlViewer?.dispose();
       stlViewer = null;

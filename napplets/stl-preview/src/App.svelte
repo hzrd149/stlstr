@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { inc, link, resource } from '@napplet/sdk';
+  import { link, resource } from '@napplet/sdk';
   import { looksLikeStl, parseStl } from '@stlstr/napplet-kit/stl';
   import { createViewer, type Viewer } from '@stlstr/napplet-kit/stl-viewer';
   import { hasDomain } from '@stlstr/napplet-kit/capabilities';
-  import type { IncEvent } from '@stlstr/napplet-kit/inc';
+  import { onIntent, type IntentPayload } from '@stlstr/napplet-kit/intent';
   import { buildSlicerBridgeUri, isSlicerOpenableFile } from '@stlstr/napplet-kit/slicers';
   import { onMount, tick } from 'svelte';
 
@@ -13,9 +13,6 @@
    * The shell or calling napplet resolves any Nostr file event first. This viewer accepts
    * only NAP-RESOURCE fetch parameters, so it never needs relay access or part-event shape.
    */
-
-  const OPEN_TOPIC = 'stl-preview:open';
-  const READY_TOPIC = 'stl-preview:ready';
 
   /** Mirrors the shell's NAP-RESOURCE `MAX_BYTES`. */
   const MAX_PREVIEW_BYTES = 10 * 1024 * 1024;
@@ -42,7 +39,6 @@
   let loadToken = 0;
 
   const hasResource = () => hasDomain('resource');
-  const hasInc = () => hasDomain('inc');
   const hasLink = () => hasDomain('link');
 
   function formatBytes(bytes: number): string {
@@ -60,23 +56,15 @@
     }
   }
 
-  function payloadString(payload: Record<string, unknown>, key: string): string {
-    const value = payload[key];
-    return typeof value === 'string' ? value.trim() : '';
-  }
-
-  function readPayload(payload: unknown): FileMeta | null {
-    if (!payload || typeof payload !== 'object') return null;
-
-    const record = payload as Record<string, unknown>;
-    const url = payloadString(record, 'url');
+  function readPayload(payload: IntentPayload): FileMeta | null {
+    const url = payload.url?.trim() ?? '';
     if (!url) return null;
 
-    const size = Number(payloadString(record, 'size'));
+    const size = Number(payload.size?.trim() ?? '');
     return {
       url,
-      name: payloadString(record, 'name') || basename(url),
-      mime: payloadString(record, 'mime'),
+      name: payload.name?.trim() || basename(url),
+      mime: payload.mime?.trim() ?? '',
       sizeBytes: Number.isFinite(size) && size > 0 ? size : 0,
     };
   }
@@ -158,8 +146,7 @@
     }
   }
 
-  function applyIntent(event: IncEvent): void {
-    const payload = event.payload;
+  function applyIntent(payload: IntentPayload): void {
     const meta = readPayload(payload);
     if (!meta) {
       phase = 'idle';
@@ -183,21 +170,11 @@
   }
 
   onMount(() => {
-    if (!hasInc()) {
-      phase = 'idle';
-      status = 'Paste an STL file URL to preview it.';
-      return () => {
-        viewer?.dispose();
-        viewer = null;
-      };
-    }
-
-    // Subscribe BEFORE signalling readiness — the shell flushes on the ready signal.
-    const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC);
+    // Without intent delivery the viewer still works from a pasted URL.
+    const subscription = onIntent('stl-preview', { open: applyIntent });
 
     return () => {
-      subscription.close();
+      subscription?.close();
       viewer?.dispose();
       viewer = null;
     };

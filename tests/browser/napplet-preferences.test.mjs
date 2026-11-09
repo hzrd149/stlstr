@@ -38,6 +38,8 @@ test('napplet choices sync between accounts on separate devices and reset on rel
             tags: [
               ['d', pointer.identifier],
               ['z', 'printable-create'],
+              ['i', 'napplet:printable-create/open'],
+              ['i', 'napplet:printable-create/create'],
               ['title', 'Test handler'],
               ['x', 'a'.repeat(64)],
               ['url', `${baseUrl}/unused-test-artifact.html`],

@@ -25,6 +25,8 @@
   import PartThumb from '@stlstr/napplet-kit/components/PartThumb.svelte';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
   import type { Subscription } from '@stlstr/napplet-kit/inc';
+  import { onIntent, type IntentPayload } from '@stlstr/napplet-kit/intent';
+  import { tagValue } from '@stlstr/napplet-kit/tags';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
@@ -114,6 +116,9 @@
   let existingPartsStatus = $state('');
   let partSearch = $state('');
   let currentPubkey = $state('');
+  /** Address of the printable this one remixes (NIP.md, "Remixes and Derivations"). */
+  let remixOf = $state('');
+  let remixTitle = $state('');
 
   /**
    * Publishing needs a signer the shell holds. An empty pubkey means nobody is signed in,
@@ -310,6 +315,39 @@
       month: 'short',
       day: 'numeric',
     });
+  }
+
+  /** Splits a `33500:<pubkey>:<d>` address, or returns null when it is not one. */
+  function parsePrintableAddress(value: string): { pubkey: string; identifier: string } | null {
+    const match = /^33500:([0-9a-f]{64}):(.+)$/.exec(value);
+    return match ? { pubkey: match[1], identifier: match[2] } : null;
+  }
+
+  async function loadRemixTitle(address: string): Promise<void> {
+    const parsed = parsePrintableAddress(address);
+    if (!parsed || !hasMethods('outbox', 'query')) return;
+    try {
+      const { events } = await outbox.query(
+        [{ kinds: [33500], authors: [parsed.pubkey], '#d': [parsed.identifier], limit: 1 }],
+        { timeoutMs: 6000 },
+      );
+      if (remixOf !== address) return;
+      const parentTitle = events.map(({ event }) => tagValue(event.tags, 'title')).find(Boolean);
+      if (parentTitle) remixTitle = parentTitle;
+    } catch {
+      // The attribution is still published by address; only the friendly label is missing.
+    }
+  }
+
+  /**
+   * `printable-create` intents may carry `remixOf`, the address of the printable being
+   * remixed. It is untrusted input, so anything that is not a printable address is ignored.
+   */
+  function applyIntent(payload: IntentPayload): void {
+    const requested = payload.remixOf?.trim() ?? '';
+    remixOf = parsePrintableAddress(requested) ? requested : '';
+    remixTitle = '';
+    if (remixOf) void loadRemixTitle(remixOf);
   }
 
   async function loadExistingParts(pubkey: string): Promise<void> {
@@ -676,6 +714,7 @@
       appendTag(tags, summary.trim() ? ['summary', summary.trim()] : null);
       appendTag(tags, license.trim() ? ['license', license.trim()] : null);
       appendTag(tags, sourceUrl.trim() ? ['i', sourceUrl.trim()] : null);
+      appendTag(tags, remixOf ? ['a', remixOf, '', 'remix'] : null);
       for (const tag of buildTags()) tags.push(['t', tag]);
       for (const file of publishedFiles) tags.push(['e', file.id, '', file.role]);
 
@@ -767,7 +806,15 @@
 
     void loadDraft();
 
-    return () => identitySubscription?.close();
+    const intentSubscription = onIntent('printable-create', {
+      open: applyIntent,
+      create: applyIntent,
+    });
+
+    return () => {
+      intentSubscription?.close();
+      identitySubscription?.close();
+    };
   });
 
   onDestroy(() => {
@@ -796,6 +843,15 @@
       {/each}
     </ul>
   </nav>
+
+  {#if remixOf}
+    <div class="alert alert-info mb-4" data-testid="remix-of">
+      <span>Remix of {remixTitle || 'an existing print'}</span>
+      <button type="button" class="btn btn-ghost btn-xs" onclick={() => (remixOf = '')}>
+        Remove
+      </button>
+    </div>
+  {/if}
 
   <form class="grid gap-4" onsubmit={(event) => event.preventDefault()}>
     {#if currentStep === 'basics'}
@@ -1304,6 +1360,12 @@
             <dt>Source</dt>
             <dd>{sourceUrl || 'Nostr-native print'}</dd>
           </div>
+          {#if remixOf}
+            <div class="grid gap-1 md:grid-cols-[8rem_1fr]">
+              <dt>Remix of</dt>
+              <dd>{remixTitle || 'An existing print'}</dd>
+            </div>
+          {/if}
         </dl>
 
         {#if publishedAddress}

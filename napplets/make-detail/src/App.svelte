@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { count, identity, inc, intent, outbox, type NostrEvent } from '@napplet/sdk';
+  import { count, identity, intent, outbox, type NostrEvent } from '@napplet/sdk';
   import { onMount } from 'svelte';
   import Comments from '@stlstr/napplet-kit/components/Comments.svelte';
   import GalleryImage from '@stlstr/napplet-kit/components/GalleryImage.svelte';
@@ -7,7 +7,8 @@
   import Markdown from '@stlstr/napplet-kit/components/Markdown.svelte';
   import { eventThreadFilter } from '@stlstr/napplet-kit/comments';
   import { hasMethods } from '@stlstr/napplet-kit/capabilities';
-  import type { IncEvent, Subscription } from '@stlstr/napplet-kit/inc';
+  import type { Subscription } from '@stlstr/napplet-kit/inc';
+  import { onIntent, type IntentPayload } from '@stlstr/napplet-kit/intent';
   import { MAKE_KIND, PRINTABLE_KIND } from '@stlstr/napplet-kit/files';
   import { parseImages, type PrintableImage } from '@stlstr/napplet-kit/images';
   import { fetchMakers, type MakerProfile } from '@stlstr/napplet-kit/profiles';
@@ -22,8 +23,6 @@
    * profile is a NAP-INTENT handoff — this napplet never navigates the shell itself.
    */
 
-  const OPEN_TOPIC = 'make-detail:open';
-  const READY_TOPIC = 'make-detail:ready';
   const DETAIL_ARCHETYPE = 'printable-detail';
 
   const TABS = [
@@ -51,7 +50,6 @@
   const rest = $derived(images.slice(1));
 
   const hasOutbox = () => hasMethods('outbox', 'query');
-  const hasInc = () => hasMethods('inc', 'on', 'emit');
   const hasIntentOpen = () => hasMethods('intent', 'open');
   const hasIdentity = () => hasMethods('identity', 'getPublicKey', 'onChanged');
   const hasCount = () => hasMethods('count', 'query');
@@ -178,10 +176,9 @@
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 
-  function applyIntent(event: IncEvent): void {
-    const payload = event.payload;
-    const id = (payload as { eventId?: unknown } | undefined)?.eventId;
-    if (typeof id !== 'string' || id.length === 0) {
+  function applyIntent(payload: IntentPayload): void {
+    const id = payload.eventId;
+    if (!id) {
       status = 'The shell opened this page without a make to show.';
       return;
     }
@@ -205,16 +202,11 @@
       });
     }
 
-    if (!hasInc()) {
-      status = 'This shell cannot deliver the make to show.';
-      return () => identitySubscription?.close();
-    }
-
-    const subscription = inc.on(OPEN_TOPIC, applyIntent);
-    inc.emit(READY_TOPIC);
+    const subscription = onIntent('make-detail', { open: applyIntent });
+    if (!subscription) status = 'This shell cannot deliver the make to show.';
 
     return () => {
-      subscription.close();
+      subscription?.close();
       identitySubscription?.close();
     };
   });

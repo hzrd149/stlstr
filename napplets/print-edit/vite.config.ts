@@ -12,11 +12,11 @@ export default defineConfig({
       nappletType: 'print-edit',
       description: 'Update your printable project, including its parts, photos, and instructions.',
       icon,
-      // `intent` sends the user to the printable after a successful save; `storage`
-      // keeps the unsaved draft. Both stay optional at runtime (guarded via
+      // `intent` receives the printable to edit and sends the user to it after a
+      // successful save; `storage` keeps the unsaved draft. Both stay optional at runtime (guarded via
       // `napplets().intent` / `.storage`), but the shell grants exactly this list,
       // so leaving them out is what makes the feature dead rather than degraded.
-      requires: ['outbox', 'inc', 'identity', 'upload', 'resource', 'intent', 'storage'],
+      requires: ['outbox', 'identity', 'upload', 'resource', 'intent', 'storage'],
       artifactMode: 'single-file',
       archetypes: [
         {
