@@ -42,7 +42,7 @@
 
   async function openProfile(): Promise<void> {
     if (!pubkey || !canOpenProfile()) return;
-    const result = await intent.open('profile', { pubkey });
+    const result = await intent.open('napplet:profile/open', { payload: { pubkey } });
     if (!result.ok) onError?.(result.error ?? 'Could not open this maker profile.');
   }
 </script>

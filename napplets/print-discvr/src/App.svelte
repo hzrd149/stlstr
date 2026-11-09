@@ -242,24 +242,26 @@
       status = 'This shell cannot open prints.';
       return;
     }
-    const result = await intent.open('printable-detail', { address: printable.address });
+    const result = await intent.open('napplet:printable-detail/open', {
+      payload: { address: printable.address },
+    });
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 
   async function openMake(eventId: string): Promise<void> {
     if (!hasIntent()) return;
-    const result = await intent.open('make-detail', { eventId });
+    const result = await intent.open('napplet:make-detail/open', { payload: { eventId } });
     if (!result.ok) makesStatus = result.error ?? 'Could not open that make.';
   }
 
   function openSearch(query: string): void {
     if (!hasIntent()) return;
-    void intent.open('printable-search', query ? { query } : {});
+    void intent.open('napplet:printable-search/open', { payload: query ? { query } : {} });
   }
 
   function openTopic(topic: string): void {
     if (!hasIntent()) return;
-    void intent.open('printable-search', { tag: topic });
+    void intent.open('napplet:printable-search/open', { payload: { tag: topic } });
   }
 
   function applyIntent(): void {

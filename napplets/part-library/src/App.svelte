@@ -270,11 +270,13 @@
     //
     // The viewer takes resource parameters rather than an event id — it has no relay
     // access of its own — so the caller passes what it already read off the `kind:1063`.
-    void intent.open(PREVIEW_ARCHETYPE, {
-      url: file.meta.url,
-      name: file.meta.name,
-      mime: file.meta.mime,
-      size: String(file.meta.sizeBytes),
+    void intent.open(`napplet:${PREVIEW_ARCHETYPE}/open`, {
+      payload: {
+        url: file.meta.url,
+        name: file.meta.name,
+        mime: file.meta.mime,
+        size: String(file.meta.sizeBytes),
+      },
     });
   }
 
@@ -296,19 +298,23 @@
 
   async function openPrintable(entry: Usage): Promise<void> {
     if (!hasIntentOpen()) return;
-    const result = await intent.open(DETAIL_ARCHETYPE, { address: entry.address });
+    const result = await intent.open(`napplet:${DETAIL_ARCHETYPE}/open`, {
+      payload: { address: entry.address },
+    });
     if (!result.ok) status = result.error ?? 'Could not open that printable.';
   }
 
   async function openPart(file: LibraryFile): Promise<void> {
     if (!hasIntentOpen()) return;
-    const result = await intent.open(PART_DETAIL_ARCHETYPE, { fileId: file.eventId });
+    const result = await intent.open(`napplet:${PART_DETAIL_ARCHETYPE}/open`, {
+      payload: { fileId: file.eventId },
+    });
     if (!result.ok) status = result.error ?? 'Could not open that part.';
   }
 
   async function openUpload(): Promise<void> {
     if (!hasIntentOpen()) return;
-    const result = await intent.open(UPLOAD_ARCHETYPE, {});
+    const result = await intent.open(`napplet:${UPLOAD_ARCHETYPE}/open`);
     if (!result.ok) status = result.error ?? 'Could not open the uploader.';
   }
 

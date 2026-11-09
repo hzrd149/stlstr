@@ -185,7 +185,9 @@
       return;
     }
 
-    const result = await intent.open('printable-detail', { address: printable.address });
+    const result = await intent.open('napplet:printable-detail/open', {
+      payload: { address: printable.address },
+    });
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 
@@ -204,7 +206,8 @@
     const normalized = normalizeTopics(nextTopics);
     const raw = searchText(nextQuery, normalized);
     // Route through the shell so the URL matches what is shown and the search is linkable.
-    if (hasIntent()) void intent.open('printable-search', raw ? { query: raw } : {});
+    if (hasIntent())
+      void intent.open('napplet:printable-search/open', { payload: raw ? { query: raw } : {} });
     else {
       query = nextQuery.trim();
       topics = normalized;
@@ -225,7 +228,7 @@
   }
 
   function openTopic(next: string): void {
-    if (hasIntent()) void intent.open('printable-search', { tag: next });
+    if (hasIntent()) void intent.open('napplet:printable-search/open', { payload: { tag: next } });
     else {
       query = '';
       topics = normalizeTopics([next]);

@@ -731,7 +731,7 @@
 
   async function openPublishedPrintable(): Promise<void> {
     if (!publishedAddress || !hasIntent()) return;
-    await intent.open('printable-detail', { address: publishedAddress });
+    await intent.open('napplet:printable-detail/open', { payload: { address: publishedAddress } });
   }
 
   $effect(() => {

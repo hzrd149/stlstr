@@ -219,11 +219,13 @@
   function preview(part: PartFile): void {
     // Dispatched by archetype: this napplet never learns that the shell renders the
     // preview in a dialog, or which napplet handles it.
-    void intent.open(STL_PREVIEW_ARCHETYPE, {
-      url: part.meta.url,
-      name: part.meta.name,
-      mime: part.meta.mime,
-      size: part.meta.sizeBytes ? String(part.meta.sizeBytes) : '',
+    void intent.open(`napplet:${STL_PREVIEW_ARCHETYPE}/open`, {
+      payload: {
+        url: part.meta.url,
+        name: part.meta.name,
+        mime: part.meta.mime,
+        size: part.meta.sizeBytes ? String(part.meta.sizeBytes) : '',
+      },
     });
   }
 
@@ -234,7 +236,7 @@
   }
 
   function openPart(part: PartFile): void {
-    void intent.open('part-detail', { fileId: part.id });
+    void intent.open('napplet:part-detail/open', { payload: { fileId: part.id } });
   }
 
   function openInSlicer(part: PartFile): void {
@@ -257,7 +259,7 @@
   /** Owner-only: hands the printable to whichever napplet fulfills the `printable-edit` role. */
   async function edit(): Promise<void> {
     if (!address || !hasIntentOpen()) return;
-    const result = await intent.open('printable-edit', { address });
+    const result = await intent.open('napplet:printable-edit/open', { payload: { address } });
     if (!result.ok) status = result.error ?? 'Could not open the editor.';
   }
 

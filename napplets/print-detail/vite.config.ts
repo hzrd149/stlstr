@@ -2,6 +2,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { nip5aManifest } from '@napplet/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { icon } from '../../scripts/lib/napplet-metadata';
 
 export default defineConfig({
   plugins: [
@@ -9,6 +10,8 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'print-detail',
+      description: 'Explore a printable project, download its parts, and share makes and comments.',
+      icon,
       // The shell grants exactly this list; optional domains stay optional by
       // being guarded at runtime (`if (window.napplet?.count)`), not by being
       // absent here. `inc` is the NAP-INTENT payload delivery seam.

@@ -172,7 +172,9 @@
 
   async function openParent(): Promise<void> {
     if (!parentAddress || !hasIntentOpen()) return;
-    const result = await intent.open(DETAIL_ARCHETYPE, { address: parentAddress });
+    const result = await intent.open(`napplet:${DETAIL_ARCHETYPE}/open`, {
+      payload: { address: parentAddress },
+    });
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 

@@ -2,6 +2,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { nip5aManifest } from '@napplet/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { icon } from '../../scripts/lib/napplet-metadata';
 
 export default defineConfig({
   plugins: [
@@ -9,6 +10,8 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'part-library',
+      description: 'Browse and select reusable 3D-printable parts from your library.',
+      icon,
       // `identity` is not optional here the way it is elsewhere: the library is
       // definitionally the signed-in user's own files, so with no pubkey there is no
       // query to run. `link` is what makes a part obtainable rather than only viewable.

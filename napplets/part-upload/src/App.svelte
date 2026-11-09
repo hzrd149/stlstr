@@ -496,7 +496,7 @@
         status = 'New parts published. Duplicate files reused from your library.';
       else if (reused) status = 'Duplicate files reused from your library.';
       else status = 'Parts published.';
-      if (hasIntent()) await intent.open(LIBRARY_ARCHETYPE, {});
+      if (hasIntent()) await intent.open(`napplet:${LIBRARY_ARCHETYPE}/open`);
     } finally {
       busy = false;
     }
@@ -504,7 +504,9 @@
 
   async function openDuplicatePart(row: SelectedPart): Promise<void> {
     if (!row.duplicate || !hasIntent()) return;
-    const result = await intent.open(PART_DETAIL_ARCHETYPE, { fileId: row.duplicate.id });
+    const result = await intent.open(`napplet:${PART_DETAIL_ARCHETYPE}/open`, {
+      payload: { fileId: row.duplicate.id },
+    });
     if (!result.ok) status = result.error ?? 'Could not open the existing part.';
   }
 

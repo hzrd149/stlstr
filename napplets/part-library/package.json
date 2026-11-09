@@ -14,13 +14,13 @@
   },
   "dependencies": {
     "@lucide/svelte": "^1.26.0",
-    "@napplet/sdk": "^0.27.0",
+    "@napplet/sdk": "^0.33.0",
     "@stlstr/napplet-kit": "workspace:*",
     "svelte": "^5.56.4"
   },
   "devDependencies": {
-    "@napplet/conformance-cli": "^0.2.18",
-    "@napplet/vite-plugin": "^0.14.0",
+    "@napplet/conformance-cli": "^0.6.2",
+    "@napplet/vite-plugin": "^0.16.5",
     "@sveltejs/vite-plugin-svelte": "^7.2.0",
     "@tailwindcss/vite": "^4.3.3",
     "daisyui": "^5.7.0",

@@ -8,4 +8,5 @@ dist
 coverage
 .turbo
 .nip5a-manifest.json
+.napplet/config.json.bak
 apps/stlstr/public/napplets.dev.json

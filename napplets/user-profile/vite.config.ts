@@ -2,6 +2,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { nip5aManifest } from '@napplet/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { icon } from '../../scripts/lib/napplet-metadata';
 
 export default defineConfig({
   plugins: [
@@ -9,6 +10,8 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'user-profile',
+      description: 'Explore a maker profile and the printable projects and makes they have shared.',
+      icon,
       // The shell grants exactly this list. `inc` is the NAP-INTENT payload delivery
       // seam; the rest are guarded at runtime so a shell that omits one still works.
       requires: ['inc', 'outbox', 'resource', 'identity', 'intent'],

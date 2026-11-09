@@ -381,7 +381,7 @@
    */
   async function viewPrintable(): Promise<boolean> {
     if (!address || !hasIntent()) return false;
-    const result = await intent.open('printable-detail', { address });
+    const result = await intent.open('napplet:printable-detail/open', { payload: { address } });
     if (!result.ok) status = result.error ?? 'Could not open that print.';
     return result.ok;
   }

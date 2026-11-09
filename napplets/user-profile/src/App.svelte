@@ -180,7 +180,9 @@
       return;
     }
 
-    const result = await intent.open('printable-detail', { address: printable.address });
+    const result = await intent.open('napplet:printable-detail/open', {
+      payload: { address: printable.address },
+    });
     if (!result.ok) printablesStatus = result.error ?? 'Could not open that print.';
   }
 

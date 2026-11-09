@@ -2,6 +2,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { nip5aManifest } from '@napplet/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { icon } from '../../scripts/lib/napplet-metadata';
 
 export default defineConfig({
   plugins: [
@@ -9,6 +10,8 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'part-upload',
+      description: 'Upload 3D model files to Blossom and publish reusable parts on Nostr.',
+      icon,
       requires: ['upload', 'outbox', 'identity', 'inc', 'intent'],
       artifactMode: 'single-file',
       archetypes: [

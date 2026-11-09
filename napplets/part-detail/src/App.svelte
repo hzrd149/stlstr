@@ -329,11 +329,13 @@
 
   function preview(): void {
     if (!file?.meta.url || !hasIntentOpen()) return;
-    void intent.open(STL_PREVIEW_ARCHETYPE, {
-      url: file.meta.url,
-      name: file.meta.name,
-      mime: file.meta.mime,
-      size: file.meta.sizeBytes ? String(file.meta.sizeBytes) : '',
+    void intent.open(`napplet:${STL_PREVIEW_ARCHETYPE}/open`, {
+      payload: {
+        url: file.meta.url,
+        name: file.meta.name,
+        mime: file.meta.mime,
+        size: file.meta.sizeBytes ? String(file.meta.sizeBytes) : '',
+      },
     });
   }
 
@@ -350,7 +352,9 @@
 
   async function openObject(entry: Usage): Promise<void> {
     if (!hasIntentOpen()) return;
-    const result = await intent.open(DETAIL_ARCHETYPE, { address: entry.address });
+    const result = await intent.open(`napplet:${DETAIL_ARCHETYPE}/open`, {
+      payload: { address: entry.address },
+    });
     if (!result.ok) status = result.error ?? 'Could not open that print.';
   }
 

@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["scripts/lib/napplet-metadata.ts", "scripts/lib/napplet-icon.png"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

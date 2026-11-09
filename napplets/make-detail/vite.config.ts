@@ -2,6 +2,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { nip5aManifest } from '@napplet/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { icon } from '../../scripts/lib/napplet-metadata';
 
 export default defineConfig({
   plugins: [
@@ -9,6 +10,8 @@ export default defineConfig({
     tailwindcss(),
     nip5aManifest({
       nappletType: 'make-detail',
+      description: 'View a completed 3D print, its photos, maker notes, and discussion.',
+      icon,
       // `inc` delivers the route payload, `outbox` resolves the kind:2351 make, its parent
       // printable, and its comments; `identity` names the viewer so comments can be composed;
       // `count` shows the comment count; `resource` fetches make photos; `intent` opens the

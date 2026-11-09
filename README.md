@@ -123,7 +123,14 @@ servers, and signing); `nsyte` must be on `PATH`.
 
 Publishing napplets to Nostr is separate from the app deploy above, and is only
 needed for cross-runtime discovery of the napplets as standalone NIP-5A apps.
-There is one target — `.napplet/config.json`, signed with the `hzrd149` key.
+There is one target — `.napplet/config.yaml`, signed with the `hzrd149` key.
+
+The workspace launcher runs the pnpm-resolved JSR CLI version. Deployment explicitly
+uses the current NIP-5D format: the final HTML SHA-256 is the artifact identity,
+the description is event content, and the embedded PNG icon is uploaded to Blossom.
+All built-in napplets include descriptions and the stlstr icon. The build-time dummy
+key signs local sidecars for host verification; deployment signs fresh events with
+the configured publishing identity. Run `pnpm napplet:deploy:dry` before publishing.
 Store that key once in the OS keychain (it is never written to the repo), then
 deploy:
 

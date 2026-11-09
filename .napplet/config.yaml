@@ -1,0 +1,26 @@
+version: 1
+sourceDir: .
+relays:
+  - wss://relay.ditto.pub
+  - wss://relay.damus.io
+  - wss://relay.primal.net
+  - wss://nos.lol
+blossomServers:
+  - https://cdn.hzrd149.com
+  - https://blossom.ditto.pub
+defaultTarget: named
+named: []
+discover:
+  enabled: true
+  roots:
+    - napplets
+signing:
+  mode: interactive
+  keyReference: hzrd149
+  pubkey: 266815e0c9210dfa324c6cba3573b14bee49da4209a9456f9484e5106cd408a5
+  relays:
+    - wss://relay.ditto.pub
+conformance:
+  command: napplet-conformance
+paja:
+  command: kehto
