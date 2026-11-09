@@ -52,7 +52,7 @@ export function getUser(pubkey: string): User {
 }
 
 export function castStoredEvent<C extends EventCast<NostrEvent>>(
-  event: NostrEvent,
+  event: Parameters<typeof castEvent<C>>[0],
   cast: CastConstructor<C>,
 ) {
   return castEvent(event, cast, eventStore);

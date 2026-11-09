@@ -9,6 +9,17 @@ allowBuilds:
   esbuild: true
   puppeteer: false
 
+minimumReleaseAgeExclude:
+  - applesauce-accounts@7.1.0
+  - applesauce-actions@7.1.0
+  - applesauce-common@7.1.0
+  - applesauce-content@7.1.0
+  - applesauce-core@7.1.0
+  - applesauce-loaders@7.1.0
+  - applesauce-react@7.1.0
+  - applesauce-signers@7.1.0
+  - applesauce-relay@7.1.0
+
 # This is a development workspace: we deliberately do NOT pin or override any
 # versions so napplets are always tested against the real, latest resolved
 # versions of `@napplet/*` from JSR and their transitive deps. If a real

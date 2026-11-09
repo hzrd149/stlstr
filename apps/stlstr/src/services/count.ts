@@ -34,7 +34,11 @@ function countRelays(
 
     subscription = relayPool.count(relays, filters as Filter[], id).subscribe({
       next: (response) => {
-        latest = response;
+        latest = Object.fromEntries(
+          Object.entries(response).flatMap(([relay, outcome]) =>
+            outcome.ok ? [[relay, outcome.value]] : [],
+          ),
+        );
       },
       error: (cause) => {
         finish({
@@ -45,6 +49,16 @@ function countRelays(
         });
       },
       complete: () => {
+        if (!latest || Object.keys(latest).length === 0) {
+          finish({
+            ok: false,
+            error: 'count-failed',
+            reason: 'No relay returned a count.',
+            relays,
+          });
+          return;
+        }
+
         finish({
           ok: true,
           count: latest
@@ -56,7 +70,7 @@ function countRelays(
     });
 
     timeout = window.setTimeout(() => {
-      if (latest) {
+      if (latest && Object.keys(latest).length > 0) {
         finish({
           ok: true,
           count: Object.values(latest).reduce((total, relay) => total + relay.count, 0),

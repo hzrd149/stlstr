@@ -16,8 +16,8 @@
     "@lucide/svelte": "^1.26.0",
     "@napplet/sdk": "^0.27.0",
     "@stlstr/napplet-kit": "workspace:*",
-    "applesauce-common": "^6.2.0",
-    "applesauce-core": "^6.2.0",
+    "applesauce-common": "^7.1.0",
+    "applesauce-core": "^7.1.0",
     "svelte": "^5.56.4"
   },
   "devDependencies": {
