@@ -14,7 +14,7 @@ const ACTIVE_ACCOUNT_STORAGE_KEY = 'stlstr.activeAccount.v1';
 export const NOSTR_CONNECT_RELAYS = NOSTR_EXTRA_RELAYS;
 export const NOSTR_CONNECT_PERMISSIONS = [
   'get_public_key',
-  ...NostrConnectSigner.buildSigningPermissions([0, 1, 3, 10002]),
+  ...NostrConnectSigner.buildSigningPermissions([0, 1, 3, 10002, 31129]),
 ];
 
 export type AccountLoginMethod = 'extension' | 'bunker' | 'nostrconnect';

@@ -120,7 +120,7 @@ export function createStlstrIntentService({
         const { archetype } = request;
         const action = request.action ?? 'open';
         const entry = ARCHETYPES[archetype];
-        const napplet = resolveConfiguredNapplet(archetype);
+        const napplet = resolveConfiguredNapplet(archetype, action);
         const handlerDTag = napplet?.dTag ?? entry?.dTag;
 
         if (!entry) return failed(archetype, action, `no handler for ${archetype}`);

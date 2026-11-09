@@ -10,6 +10,7 @@ import { mergeRelaySets } from 'applesauce-core/helpers/relays';
 import type { NostrEvent } from 'nostr-tools';
 import { nip19 } from 'nostr-tools';
 import { accountManager } from './accounts';
+import { preferredNapplet } from './napplet-preferences';
 import { ARCHETYPES, conventionsFor } from './intent-map';
 import { getUser, STLSTR_DEV_MODE, STLSTR_LOCAL_MODE } from './nostr';
 import { firstDefinedValue } from './observable';
@@ -301,7 +302,9 @@ export async function resolveNappletNaddr(
   if (pointer.kind !== NIP5A_KIND)
     throw new Error('That naddr does not point to a NIP-5A napplet.');
 
-  const relays = mergeRelaySets([...(pointer.relays ?? []), ...(await getDiscoveryRelays())]);
+  const relays = STLSTR_LOCAL_MODE
+    ? getLookupRelays()
+    : mergeRelaySets([...(pointer.relays ?? []), ...(await getDiscoveryRelays())]);
   const manifest = await fetchManifest(pointer.pubkey, pointer.identifier, relays);
   if (!manifest) throw new Error('Could not find that napplet manifest on your relays.');
   return resolvedFromManifest(manifest, archetype, naddr.trim(), relays);
@@ -355,7 +358,12 @@ function resolvedFromOverride(archetype: string, override: NappletOverride): Res
   };
 }
 
-export function resolveConfiguredNapplet(archetype: string): ResolvedNapplet | null {
+export function resolveConfiguredNapplet(
+  archetype: string,
+  action = 'open',
+): ResolvedNapplet | null {
+  if (accountManager.active)
+    return preferredNapplet(archetype, action) ?? defaultNappletForArchetype(archetype);
   const override = getSettings().nappletOverrides[archetype];
   if (override) return resolvedFromOverride(archetype, override);
   return defaultNappletForArchetype(archetype);

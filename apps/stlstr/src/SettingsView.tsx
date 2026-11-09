@@ -3,6 +3,15 @@ import { use$ } from 'applesauce-react/hooks';
 import { ensureHttpURL } from 'applesauce-core/helpers/url';
 import { HardDrive, Radio, type LucideIcon } from 'lucide-react';
 import { accountManager } from './services/accounts';
+import {
+  getNappletPreferences,
+  subscribeToNappletPreferences,
+  preferredNapplet,
+  setNappletOverride,
+  removeNappletOverride,
+  resetNappletOverrides,
+  refreshNappletPreferences,
+} from './services/napplet-preferences';
 import { ARCHETYPES } from './services/intent-map';
 import {
   defaultNappletForArchetype,
@@ -20,11 +29,8 @@ import {
   getLookupRelays,
   getSettings,
   removeBlossomServer,
-  removeNappletOverride,
   removeRelay,
-  resetNappletOverrides,
   resetSettings,
-  setNappletOverride,
   subscribeToSettings,
   updateSettings,
   type NappletUpdateBehavior,
@@ -320,9 +326,12 @@ function archetypeLabel(archetype: string): string {
 
 function NappletOverrideRow({ archetype }: { archetype: string }) {
   const settings = useSettings();
+  const preferences = useSyncExternalStore(subscribeToNappletPreferences, getNappletPreferences);
   const entry = ARCHETYPES[archetype];
   const fallback = defaultNappletForArchetype(archetype);
-  const override = settings.nappletOverrides[archetype];
+  const override = preferences.pubkey
+    ? preferredNapplet(archetype)
+    : settings.nappletOverrides[archetype];
   const [naddr, setNaddr] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -341,7 +350,7 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
       const resolved = await resolveNappletNaddr(value, archetype);
       const next = overrideFromResolved(resolved);
       if (!next) throw new Error('That napplet could not be stored as an override.');
-      setNappletOverride(archetype, next);
+      await setNappletOverride(archetype, next);
       setNaddr('');
       setPickerOpen(false);
       setStatus(`Using ${resolved.title} for ${entry.title}.`);
@@ -352,14 +361,21 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
     }
   }
 
-  function applyResolvedOverride(resolved: ResolvedNapplet) {
+  async function applyResolvedOverride(resolved: ResolvedNapplet) {
     const next = overrideFromResolved(resolved);
     if (!next) {
       setStatus('That napplet could not be stored as an override.');
       return;
     }
-    setNappletOverride(archetype, next);
-    setStatus(`Using ${resolved.title} for ${entry.title}.`);
+    setBusy(true);
+    try {
+      await setNappletOverride(archetype, next);
+      setStatus(`Using ${resolved.title} for ${entry.title}.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not save napplet.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleDiscover() {
@@ -398,7 +414,7 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
       <div className="flex flex-wrap gap-2 xl:justify-end">
         <button
           className="btn btn-outline btn-sm w-fit"
-          disabled={discovering}
+          disabled={discovering || busy || preferences.loading || preferences.saving}
           onClick={() => {
             setPickerOpen(true);
             void handleDiscover();
@@ -408,10 +424,19 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
         </button>
         <button
           className="btn btn-ghost btn-sm"
-          disabled={!override}
-          onClick={() => {
-            removeNappletOverride(archetype);
-            setStatus('Restored the default napplet.');
+          disabled={
+            (!override && !preferences.handlers[archetype]) ||
+            busy ||
+            preferences.loading ||
+            preferences.saving
+          }
+          onClick={async () => {
+            try {
+              await removeNappletOverride(archetype);
+              setStatus('Restored the default napplet.');
+            } catch (error) {
+              setStatus(String(error));
+            }
           }}
         >
           Reset
@@ -527,10 +552,31 @@ function NappletOverrideRow({ archetype }: { archetype: string }) {
 
 function NappletOverrides() {
   const settings = useSettings();
-  const overrideCount = Object.keys(settings.nappletOverrides).length;
+  const preferences = useSyncExternalStore(subscribeToNappletPreferences, getNappletPreferences);
+  const [status, setStatus] = useState('');
+  const overrideCount = preferences.pubkey
+    ? Object.values(preferences.handlers).filter(
+        (handler) =>
+          handler.publicEntries.handlers.length ||
+          handler.publicEntries.intents.size ||
+          handler.hasHidden,
+      ).length
+    : Object.keys(settings.nappletOverrides).length;
 
   return (
     <div className="grid gap-4">
+      <p className="text-sm text-base-content/65">
+        {preferences.pubkey
+          ? 'Napplet choices sync publicly with your Nostr account.'
+          : 'Napplet choices are saved on this device. Sign in to sync them.'}
+        {preferences.loading ? ' Loading preferences…' : preferences.saving ? ' Saving…' : ''}
+      </p>
+      {preferences.error || status ? <p role="status">{preferences.error || status}</p> : null}
+      {preferences.error ? (
+        <button className="btn btn-sm w-fit" onClick={refreshNappletPreferences}>
+          Retry sync
+        </button>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-base-300 pb-4">
         <div>
           <div className="font-medium">Napplet defaults</div>
@@ -542,8 +588,15 @@ function NappletOverrides() {
         </div>
         <button
           className="btn btn-outline btn-sm"
-          disabled={!overrideCount}
-          onClick={resetNappletOverrides}
+          disabled={!overrideCount || preferences.loading || preferences.saving}
+          onClick={async () => {
+            try {
+              await resetNappletOverrides();
+              setStatus('Restored defaults.');
+            } catch (error) {
+              setStatus(String(error));
+            }
+          }}
         >
           Reset all to defaults
         </button>

@@ -56,6 +56,10 @@ import {
 import { getUser } from './services/nostr';
 import { resolveConfiguredNapplet, type ResolvedNapplet } from './services/napplets';
 import { getSettings, subscribeToSettings } from './services/settings';
+import {
+  getNappletPreferences,
+  subscribeToNappletPreferences,
+} from './services/napplet-preferences';
 import SettingsView from './SettingsView';
 import NappletsView from './NappletsView';
 
@@ -700,8 +704,9 @@ function NappletRouteFrame({
   frameKey?: string;
 }) {
   useSyncExternalStore(subscribeToSettings, getSettings, getSettings);
+  useSyncExternalStore(subscribeToNappletPreferences, getNappletPreferences, getNappletPreferences);
   const { pathname } = useLocation();
-  const napplet = resolveConfiguredNapplet(archetype);
+  const napplet = resolveConfiguredNapplet(archetype, intent.action);
 
   if (!napplet) {
     return (

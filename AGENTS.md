@@ -71,6 +71,8 @@
 
 ## Host Wiring
 
+- Signed-in napplet choices use Applesauce kind-31129 handler preferences (`services/napplet-preferences.ts`), published publicly to account outboxes plus app relays. Page choices cover each built-in convention; incoming intent-specific choices take precedence over archetype defaults. Signed-out choices stay in local settings and are not automatically imported into an account. Account changes clear the active preference view; relay subscriptions keep it current across devices. Only named manifest references supported by the existing artifact loader are resolved; unsupported or unavailable candidates fall back to the bundled napplet.
+
 - The shared host is now `services/napplet-host.ts`: one `createKehtoShellAdapter` + Kehto bridge for all route/preview frames. Applesauce Extra supplies outbox, upload, count, common, lists, and identity options; stlstr retains resource policy, routing, and link behavior. Identity options are wrapped to return empty anonymous results rather than casting an empty pubkey.
 - **Use Kehto's MessagePort transport.** The host observes `onNappletMessage` and targets replies with `originRegistry.postToNapplet`; NAP traffic must not be posted directly to iframe windows. Existing guest route conventions still use targeted INC and an application-ready handshake.
 - `applesauce-extra@7.1.0`'s `createKehtoHost` still observes window-level `shell.ready` and sends intent delivery via `window.postMessage`, incompatible with its Kehto 0.32 peer's port-only transport. Use the documented lower-level shell adapter until upstream fixes its host. Keep the lifecycle wrapper in `napplet-host.ts`, not in the React frame.
